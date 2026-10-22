@@ -13,7 +13,9 @@
 - 활성 작업: #13 `EP-01/ISS-01 Monorepo 구조·개발 환경·Compose dev 구성`
 - 브랜치: `feat/#13-monorepo-bootstrap`
 - 기준 브랜치: `develop` (2026-10-22에 `main`에서 생성해 원격 push 완료)
-- 상태: 구현·로컬 검증 완료, 아직 커밋·push·PR 없음
+- 상태: 구현·로컬 검증 완료, Draft PR #75 리뷰·추가 환경 검증 대기
+- 구현 커밋: `fe8cadd` (`[feat] 모노레포 개발 기반 구축 (#13)`)
+- PR: https://github.com/apg0001/Agent-Office/pull/75 (`develop` 대상, Draft)
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음
 
@@ -66,6 +68,7 @@
 4. 추적 라벨 10개와 전체 74개 이슈 생성, Epic 체크리스트 연결 및 개수 검증.
 5. `develop` 원격 브랜치와 `feat/#13-monorepo-bootstrap` 작업 브랜치 생성.
 6. #13용 Python/Node/Go 최소 진입점, 개발 Compose, 개발·아키텍처·운영 기준 문서 작성.
+7. 구현 커밋 `fe8cadd` push 및 `develop` 대상 Draft PR #75 생성.
 
 ## 변경 파일 요약(#13)
 
@@ -93,11 +96,12 @@
 ## 다음 에이전트가 바로 수행할 작업
 
 1. `git status --short --branch`로 이 문서의 브랜치와 변경 목록을 대조한다.
-2. 변경 목록과 잠금 파일을 검토하고 `git diff --check`를 다시 실행한다.
-3. 한국어 커밋 후 원격 브랜치에 push하고 `develop` 대상 PR을 생성한다. PR은 `Closes #13`을 포함한다.
-4. CI와 리뷰가 완료되기 전 #13을 닫거나 완료로 표시하지 않는다.
-5. Docker 엔진을 사용할 수 있는 환경에서는 image build/up/health를 추가 검증하고 PR에 결과를 남긴다.
-6. #13 병합 후 다음 순서는 #14 → #15 → #16이며, EP-02 #17~#21은 계약 #15를 기준으로 PoC한다.
+2. Draft PR #75의 diff와 리뷰 의견을 확인한다.
+3. Go가 있는 환경에서 `go test ./collector/...`를 실행하고 결과를 PR과 이 문서에 남긴다.
+4. Docker 엔진을 사용할 수 있는 환경에서 image build/up/health를 검증하고 결과를 남긴다.
+5. #16 CI가 아직 없으므로 자동 검증 부재를 해소하기 전 #13을 완료로 표시하지 않는다.
+6. 리뷰·필수 검증 후 PR #75를 `develop`에 병합하고 #13을 닫는다.
+7. 병합 후 다음 순서는 #14 → #15 → #16이며, EP-02 #17~#21은 계약 #15를 기준으로 PoC한다.
 
 ## 알려진 위험과 결정 대기
 
