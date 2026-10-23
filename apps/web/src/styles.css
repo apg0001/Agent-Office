@@ -226,3 +226,104 @@ h1 {
   cursor: pointer;
   text-align: left;
 }
+
+.session-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.session-bar a,
+.account-links a,
+.eyebrow a {
+  color: #8fc8ff;
+}
+
+.session-bar button,
+.account-card button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(167, 196, 220, 0.35);
+  border-radius: 8px;
+  background: #1d3350;
+  color: inherit;
+  cursor: pointer;
+}
+
+.account-card button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.account-shell {
+  max-width: 480px;
+}
+
+.account-card {
+  padding: 1.5rem;
+  border: 1px solid rgba(167, 196, 220, 0.18);
+  border-radius: 16px;
+  background: rgba(17, 30, 48, 0.85);
+}
+
+.account-card h2 {
+  margin-top: 0;
+}
+
+.field {
+  display: grid;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+
+.field span {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.field input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(167, 196, 220, 0.3);
+  border-radius: 8px;
+  background: #0d1624;
+  color: inherit;
+  font: inherit;
+}
+
+.choices {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  border: 0;
+  padding: 0;
+}
+
+.notice {
+  margin: 0 0 0.9rem;
+  color: #aef7de;
+}
+
+.notice.error {
+  color: #ffb4a8;
+}
+
+.hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.command {
+  overflow-x: auto;
+  padding: 0.6rem;
+  border-radius: 8px;
+  background: #0d1624;
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
