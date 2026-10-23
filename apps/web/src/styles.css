@@ -96,3 +96,35 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+.office {
+  margin: 2rem auto;
+  max-width: 1080px;
+}
+
+.office-canvas {
+  width: 100%;
+  min-height: 560px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.synthetic-badge {
+  display: inline-block;
+  margin: 0 0 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: #f0c040;
+  color: #222;
+  font-weight: 600;
+}
+
+.live-badge {
+  display: inline-block;
+  margin: 0 0 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: #3f8f5f;
+  color: #fff;
+  font-weight: 600;
+}

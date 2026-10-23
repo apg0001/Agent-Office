@@ -39,6 +39,8 @@ erDiagram
     users |o--o{ audit_logs : "행위자(SET NULL)"
 ```
 
+실시간 전달(#37)을 위해 마이그레이션 `0003`이 전역 시퀀스 `state_change_seq`와 `agent_sessions.change_seq·changed_at`, `agent_current_states.change_seq`를 추가했습니다. 화면에 보이는 값이 바뀔 때만 증가합니다. 마이그레이션 `0004`는 현재 활동의 관측·추정 구분 `agent_current_states.confidence`를 추가했습니다(#47).
+
 `instance_settings`와 `notification_channels`는 인스턴스 전역 테이블입니다. 마스터 사양의 `schema_migrations`는 Alembic의 `alembic_version` 테이블이 맡습니다.
 
 ## 무결성 규칙
