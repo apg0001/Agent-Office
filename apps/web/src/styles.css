@@ -128,3 +128,18 @@ h1 {
   color: #fff;
   font-weight: 600;
 }
+
+.office-help {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.focus-button {
+  margin: 0 0 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #888;
+  background: #fff;
+  cursor: pointer;
+}
