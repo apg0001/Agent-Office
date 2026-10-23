@@ -5,10 +5,10 @@
 | 대상 | 관측 환경 | 상태 | 근거/다음 작업 |
 |---|---|---|---|
 | Codex CLI | Windows, `codex-cli 0.162.0-alpha.17.2` | 부분 지원 실측 | 합성 exec 4회; 시작·턴 제출·도구 전·Stop·종료 관측, `PostToolUse` 미관측. #17 |
-| Codex Desktop | Windows 개발 PC | 로컬 상태 디렉터리 존재, 이벤트 미실측 | #18 보류(수동 조작 필요) |
+| Codex Desktop | Windows 11 x64, Store `OpenAI.Codex 26.1007.2314.0`(번들 `codex-cli 0.162.0-alpha.17.2`) | 부분 관측(1회) | 프로젝트 Hook 신뢰 후 `UserPromptSubmit`·`PreToolUse`·`PostToolUse`·`PermissionRequest`·`SubagentStart/Stop`·`Stop`·`SessionEnd` 관측, `SessionStart`·compact·`Interrupt` 미관측/미실행. 반복 실측 전 지원 표시 금지. #18 |
 | Codex Desktop | Raspberry Pi 5, Ubuntu 24.04 arm64 | 미설치 | 실측 불가 |
 | Codex CLI | Raspberry Pi 5, `codex-cli 0.163.0` | 설치 확인, 이벤트 미실측 | 필요 시 #17 프로브로 재실측 |
-| Codex lifecycle hooks | CLI 합성 세션 | 부분 지원 실측 | inline Hook만 확인; Desktop·승인·interrupt·subagent 미실측. #17, #18 |
+| Codex lifecycle hooks | CLI 합성 세션, Desktop 합성 세션 | 부분 지원 실측 | CLI inline 4회(#17), Desktop 프로젝트 Hook 1회(#18). 승인 거부·subagent는 Desktop만 관측; interrupt·compact 미실측 |
 | Codex app-server | CLI 명령 제공 여부 미실측 | 미검증 | #21 |
 | Claude Code CLI | Windows | 실행 파일 미설치 | #19 |
 | Claude Code CLI | Raspberry Pi 5, `2.1.308` | 설치 확인, Hook/JSONL 미실측 | #19 |

@@ -21,3 +21,24 @@ Hook 프로브는 stdin 원문을 저장하지 않습니다. 다음 정보만 st
 ```
 
 `--dangerously-bypass-hook-trust`는 이 스크립트가 방금 생성하고 내용이 고정된 임시 Hook만 대상으로 사용합니다. 일반 사용자·프로젝트 Hook에는 이 옵션을 사용하지 않습니다.
+
+## Codex Desktop 수동 합성 세션 (#18)
+
+`desktop_session.py`는 Desktop UI를 자동화하지 않습니다. 운영자가 직접 Desktop에서
+임시 작업공간을 열고 프로젝트·Hook을 신뢰한 뒤 합성 프롬프트를 보냅니다.
+
+```powershell
+# 임시 작업공간, 프로젝트 .codex/hooks.json, 전역 config.toml 백업 생성
+.\.venv\Scripts\python tests/poc/codex/desktop_session.py prepare
+# 운영자가 단계를 마칠 때마다 경계 표시
+.\.venv\Scripts\python tests/poc/codex/desktop_session.py mark <workspace> <label>
+# 이벤트 횟수·필드 이름·HMAC 별칭 상관관계만 출력
+.\.venv\Scripts\python tests/poc/codex/desktop_session.py summarize <workspace>
+# Desktop 완전 종료 후: 이 작업공간 키의 [projects.*]/[hooks.state.*]만 제거, 임시 파일 삭제
+.\.venv\Scripts\python tests/poc/codex/desktop_session.py cleanup <workspace>
+```
+
+Hook 레코드는 작업공간 밖 `<workspace>-state`에 기록됩니다. 요약은 HMAC 값 대신
+`S1`/`T1`/`A1` 별칭만 출력합니다. `cleanup`은 앱이나 사용자가 바꾼 다른 설정을
+되돌리지 않고 개수만 보고합니다. 실측 결과는
+[`docs/poc/codex-desktop.md`](../../../docs/poc/codex-desktop.md)에 있습니다.
