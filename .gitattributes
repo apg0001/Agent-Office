@@ -3,3 +3,6 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# Immutable upstream snapshot uses Markdown hard-break spaces; preserve and do not flag them.
+docs/specifications/agent-office-master-development-prompt-v0.8.md text eol=lf whitespace=-blank-at-eol

@@ -1,5 +1,7 @@
 # 문서 색인
 
+- [기준 사양 보존 정책](specifications/README.md)
+- [Agent Office 마스터 개발 프롬프트 v0.8 원문](specifications/agent-office-master-development-prompt-v0.8.md)
 - [프로젝트 상태와 인수인계](project-status.md)
 - [아키텍처 개요](architecture/overview.md)
 - [API 문서 상태](api/README.md)
