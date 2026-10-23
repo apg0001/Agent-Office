@@ -50,12 +50,17 @@ def test_hook_probe_does_not_persist_sensitive_values(tmp_path: Path) -> None:
     line = {
         "type": "assistant",
         "sessionId": SENTINEL,
+        "promptId": SENTINEL,
+        "uuid": SENTINEL,
         "cwd": SENTINEL,
+        "newKeyName": SENTINEL,
+        SENTINEL: SENTINEL,
         "message": {
+            "id": SENTINEL,
             "content": [
                 {"type": "text", "text": SENTINEL},
                 {"type": "tool_use", "id": SENTINEL, "input": {"cmd": SENTINEL}},
-            ]
+            ],
         },
     }
     transcript.write_text(
@@ -99,6 +104,16 @@ def test_hook_probe_does_not_persist_sensitive_values(tmp_path: Path) -> None:
     assert record["transcript"]["tool_use_fingerprints"] == [
         record["session_fingerprint"]
     ]
+    shape = record["transcript"]
+    assert shape["prompt_fingerprints"] == [record["prompt_fingerprint"]]
+    assert shape["unlisted_top_level_keys"] == ["newKeyName"]
+    assert shape["tool_use_line_types"] == {"assistant": 1}
+    assert (shape["uuid_lines"], shape["unique_uuid_count"]) == (1, 1)
+    assert shape["message_id_count"] == 1
+    assert shape["size_bytes"] == transcript.stat().st_size
+    assert set(shape["prefix_fingerprints"]) <= {"256", "1024", "4096"}
+    assert shape["ends_with_newline"] is True
+    assert shape["starts_with_bom"] is False
     agent_transcript = record["agent_transcript"]
     assert agent_transcript["template"] == (
         "projects/<redacted>/<redacted>/subagents/<redacted>.jsonl"

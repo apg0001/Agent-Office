@@ -13,6 +13,7 @@
 | Claude Code CLI | Windows | 실행 파일 미설치 | #19 |
 | Claude Code CLI | Raspberry Pi 5 Linux arm64, `2.1.308`, `-p` | 부분 지원 실측 | 합성 10회; 시작·턴·도구 전/후·하위 에이전트 시작/종료·권한 요청·Stop·종료 관측. 대화형 TUI·승인 대기·`Notification`·compact 미실측. #19 |
 | Claude Code CLI | Windows·macOS | 미실측 | #19 결과를 확장 적용하지 않음 |
+| Claude Code Hook·JSONL 교차 중복 | Pi Linux arm64, `2.1.308`, `-p` | 규칙 도출·참조 구현 | `tool_use_id`·`prompt_id` 키 일치, resume append-only, `Stop` 1/4 누락. compact·fork·삭제 미실측. #20 |
 | Go toolchain | Windows | 호스트 미설치 | 공식 Go 1.24 컨테이너로 fmt/vet/race test 통과 |
 | Docker CLI | 29.8.1 | 엔진 기동·검증 | server/web build와 개발 Compose smoke test 통과 |
 | Docker Compose | v5.5.1 | 구성·기동 검증 | 개발 및 production overlay config 통과 |

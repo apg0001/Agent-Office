@@ -12,6 +12,7 @@
 - [요구사항 추적](requirements/traceability.md)
 - [Codex CLI Hook·JSONL 실측](poc/codex-cli-hooks.md)
 - [Claude Code Hook·JSONL 실측](poc/claude-code-hooks.md)
+- [Hook·JSONL 중복 제거와 tail 규칙](poc/collector-dedup-tail.md)
 - [운영 Runbook](operations/runbook.md)
 - [백업·복원](operations/backup-restore.md)
 - [릴리스 절차](operations/release.md)
