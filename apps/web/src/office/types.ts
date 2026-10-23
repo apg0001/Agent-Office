@@ -33,6 +33,8 @@ export interface SessionState {
   started_at: string | null;
   ended_at: string | null;
   last_event_at: string | null;
+  /** 개인 사무실 책상 번호(서버가 배정·재사용, #48). 퇴근 후 반납되면 null. */
+  desk_slot: number | null;
   change_seq: number;
 }
 

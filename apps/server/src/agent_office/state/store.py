@@ -9,6 +9,7 @@ from sqlalchemy import Connection, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from agent_office.db import schema
+from agent_office.state.desks import ensure_desk
 from agent_office.state.engine import (
     AgentActivity,
     Lifecycle,
@@ -29,13 +30,15 @@ def apply_event(
     occurred_at: dt.datetime,
     sequence: int,
 ) -> None:
-    _apply_lifecycle(connection, session_id, event_type, occurred_at)
+    lifecycle = _apply_lifecycle(connection, session_id, event_type, occurred_at)
+    if lifecycle != "ENDED":
+        ensure_desk(connection, session_id)
     _apply_agent(connection, agent_id, event_type, activity, confidence, occurred_at, sequence)
 
 
 def _apply_lifecycle(
     connection: Connection, session_id: uuid.UUID, event_type: str, occurred_at: dt.datetime
-) -> None:
+) -> str:
     sessions = schema.agent_sessions
     row = connection.execute(
         select(sessions.c.lifecycle, sessions.c.started_at, sessions.c.ended_at)
@@ -56,6 +59,7 @@ def _apply_lifecycle(
                 changed_at=func.clock_timestamp(),
             )
         )
+    return changed.state
 
 
 def _apply_agent(

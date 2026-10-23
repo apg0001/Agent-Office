@@ -45,7 +45,8 @@ interface Actor {
 const REPLAN_INTERVAL_MS = 250;
 
 export class OfficeScene extends Phaser.Scene {
-  private readonly map: OfficeMap;
+  private map: OfficeMap;
+  private scenery: Phaser.GameObjects.GameObject[] = [];
   private readonly actors = new Map<string, Actor>();
   private state: OfficeState;
   private seats = new Map<string, Point>();
@@ -58,13 +59,35 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.drawFloor();
-    this.drawFurniture();
-    this.drawZoneLabels();
+    this.drawScenery();
     const center = gridToScreen({ x: this.map.width / 2, y: this.map.height / 2 });
     this.cameras.main.centerOn(center.sx, center.sy);
     this.cameras.main.setZoom(1);
     this.applyState(this.state);
+  }
+
+  /** 업무석이 늘어난 지도로 바닥만 다시 그린다. 캐릭터는 그대로 두고 새 목적지로 걷는다. */
+  setMap(map: OfficeMap): void {
+    this.map = map;
+    if (!this.sys.isActive()) {
+      return;
+    }
+    for (const object of this.scenery) {
+      object.destroy();
+    }
+    this.scenery = [];
+    this.drawScenery();
+    this.applyState(this.state);
+  }
+
+  get rows(): number {
+    return this.map.seats.length / 7;
+  }
+
+  private drawScenery(): void {
+    this.drawFloor();
+    this.drawFurniture();
+    this.drawZoneLabels();
   }
 
   /** 새 사실 상태를 받는다. 목적지만 바꾸고, 현재 위치에서 자연스럽게 다시 걷는다. */
@@ -147,6 +170,7 @@ export class OfficeScene extends Phaser.Scene {
   private drawFloor(): void {
     const graphics = this.add.graphics();
     graphics.setDepth(-1);
+    this.scenery.push(graphics);
     for (const tile of this.map.tiles) {
       const points = tileDiamond(tile).map((p) => new Phaser.Math.Vector2(p.sx, p.sy));
       const color = tile.zone ? ZONE_COLORS[tile.zone] : 0x6a6a6a;
@@ -166,6 +190,7 @@ export class OfficeScene extends Phaser.Scene {
       const block = this.add.rectangle(screen.sx, screen.sy - 8, 26, 16, FURNITURE_COLORS[tile.furniture]);
       block.setStrokeStyle(1, 0x000000, 0.3);
       block.setDepth(depthOf(tile, 2));
+      this.scenery.push(block);
     }
   }
 
@@ -175,7 +200,7 @@ export class OfficeScene extends Phaser.Scene {
         continue;
       }
       const screen = gridToScreen({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
-      this.add
+      const label = this.add
         .text(screen.sx, screen.sy, ZONE_LABELS[zone], {
           fontFamily: "sans-serif",
           fontSize: "11px",
@@ -184,6 +209,7 @@ export class OfficeScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setAlpha(0.6)
         .setDepth(1000);
+      this.scenery.push(label);
     }
   }
 }
