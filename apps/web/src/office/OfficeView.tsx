@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { AgentPanel } from "./AgentPanel";
 
 import { deskRowsFor } from "./behavior";
+import { detailFromState, fetchAgentDetail, type AgentDetail } from "./detail";
 import { createDefaultOffice } from "./grid";
 import { connectLive, hasSession } from "./liveSource";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
-import type { DataSource } from "./types";
+import type { DataSource, OfficeState } from "./types";
 
 /**
  * 사무실 화면. 로그인 세션이 있으면 서버 실시간 상태를, 없으면 합성 데이터를 그린다.
@@ -16,6 +19,10 @@ export function OfficeView() {
   const [online, setOnline] = useState(false);
   const [autoFocus, setAutoFocus] = useState(true);
   const resume = useRef<() => void>(() => undefined);
+  const [office, setOffice] = useState<OfficeState | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [remote, setRemote] = useState<AgentDetail | null>(null);
+  const close = useCallback(() => setSelected(null), []);
 
   useEffect(() => {
     const element = host.current;
@@ -41,6 +48,7 @@ export function OfficeView() {
       );
       scene.onCameraChange = (camera) => setAutoFocus(camera.autoFocus);
       resume.current = () => scene.resumeFocus();
+      scene.onSelect = setSelected;
       game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: element,
@@ -59,6 +67,7 @@ export function OfficeView() {
           scene.setMap(createDefaultOffice(rows));
         }
         scene.applyState(state);
+        setOffice(state);
       };
       if (live) {
         setSource("server");
@@ -82,6 +91,30 @@ export function OfficeView() {
     };
   }, []);
 
+  const local = office && selected ? detailFromState(office, selected) : null;
+  const changeSeq = local?.agent.change_seq;
+  useEffect(() => {
+    // 서버 모드는 타임라인·계획을 위해 상세를 다시 가져온다(선택 대상 상태가 바뀔 때마다).
+    if (source !== "server" || !selected) {
+      setRemote(null);
+      return undefined;
+    }
+    let current = true;
+    void fetchAgentDetail(selected).then((detail) => {
+      if (current) {
+        setRemote(detail);
+      }
+    });
+    return () => {
+      current = false;
+    };
+  }, [source, selected, changeSeq]);
+  // 실시간 상태가 최신이므로 기본 정보는 로컬, 타임라인·계획만 서버 응답을 쓴다.
+  const detail =
+    local && remote?.agent.id === local.agent.id
+      ? { ...local, timeline: remote.timeline, plan_steps: remote.plan_steps }
+      : local;
+
   return (
     <section className="office" aria-label="사무실">
       {source === "synthetic" ? (
@@ -100,6 +133,9 @@ export function OfficeView() {
         </button>
       )}
       <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
+      {detail && (
+        <AgentPanel detail={detail} source={source} now={Date.now()} onClose={close} onSelect={setSelected} />
+      )}
     </section>
   );
 }
