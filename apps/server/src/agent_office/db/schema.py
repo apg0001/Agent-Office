@@ -22,6 +22,7 @@ from sqlalchemy import (
     LargeBinary,
     MetaData,
     PrimaryKeyConstraint,
+    Sequence,
     String,
     Table,
     UniqueConstraint,
@@ -39,6 +40,9 @@ NAMING_CONVENTION = {
 }
 
 metadata = MetaData(naming_convention=NAMING_CONVENTION)
+
+# 상태 변경마다 증가하는 전역 값. 실시간 전달(#37)에서 행별 최신 판정에 쓴다.
+state_change_seq = Sequence("state_change_seq", metadata=metadata)
 
 INSTANCE_ROLES = ("SUPER_ADMIN", "ADMIN", "USER")
 USER_STATUSES = ("pending", "active", "disabled")
@@ -382,6 +386,13 @@ agent_sessions = Table(
     Column("ended_at", DateTime(timezone=True), nullable=True),
     Column("last_event_at", DateTime(timezone=True), nullable=True),
     _created_at(),
+    Column(
+        "change_seq",
+        BigInteger,
+        nullable=False,
+        server_default=text("nextval('state_change_seq')"),
+    ),
+    Column("changed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     UniqueConstraint("device_id", "provider", "collector_session_id"),
     # 이벤트가 세션과 같은 장치에서 왔는지 복합 FK로 강제하기 위한 키.
     UniqueConstraint("id", "device_id"),
@@ -390,6 +401,7 @@ agent_sessions = Table(
     CheckConstraint("ended_at IS NULL OR lifecycle = 'ENDED'", name="ended_at_requires_ended"),
 )
 Index("ix_agent_sessions_project_id", agent_sessions.c.project_id)
+Index("ix_agent_sessions_changed_at", agent_sessions.c.changed_at)
 Index(
     "ix_agent_sessions_ended_at",
     agent_sessions.c.ended_at,
@@ -493,10 +505,18 @@ agent_current_states = Table(
     Column("last_event_occurred_at", DateTime(timezone=True), nullable=True),
     Column("last_event_sequence", BigInteger, nullable=True),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column(
+        "change_seq",
+        BigInteger,
+        nullable=False,
+        server_default=text("nextval('state_change_seq')"),
+    ),
     CheckConstraint(_in("turn_state", TURN_STATES), name="turn_state"),
     CheckConstraint(_in("activity", ACTIVITIES), name="activity"),
     CheckConstraint("state_version >= 0", name="state_version_non_negative"),
 )
+
+Index("ix_agent_current_states_updated_at", agent_current_states.c.updated_at)
 
 plan_steps = Table(
     "plan_steps",

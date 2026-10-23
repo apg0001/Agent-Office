@@ -11,13 +11,13 @@
 ## 현재 위치
 
 - 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
-- 활성 작업 A(Pi, 직접): #36 `EP-05/ISS-02 세션 생명주기·턴·접속 상태 분리` (`feat/#36-state-engine`)
-- 활성 작업 B(Pi, 서브에이전트·별도 worktree): #29 `EP-04/ISS-01 Codex·Claude 어댑터 및 샘플 파서` (`feat/#29-collector-adapters`). `docs/project-status.md`는 작업 A가 통합 관리
-- 직전 완료(Pi): #25, PR https://github.com/apg0001/Agent-Office/pull/94, merge commit `21f2d61`, Issue 종료, Epic #3 체크 갱신. 그 전: #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
+- 활성 작업 A(Pi, 직접): #37 `EP-05/ISS-03 WebSocket·스냅샷·증분 복원` (`feat/#37-live-updates`)
+- 활성 작업 B(Pi, 서브에이전트·별도 worktree): #30 `EP-04/ISS-02 파일 감지·tail·오프셋·로테이션·재시작` (`feat/#30-collector-tail`). `docs/project-status.md`는 작업 A가 통합 관리
+- 직전 완료(Pi): #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
 - EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
-- 기준 브랜치: `develop` (`21f2d61`, PR #94 병합 결과)
+- 기준 브랜치: `develop` (`019faae`, PR #95 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
@@ -194,6 +194,9 @@
 108. 소유자가 자율 진행(승인 자동, 병렬 최대 2, 토큰 70%)을 지시. #29 Go Collector 어댑터를 서브에이전트(별도 worktree)에 위임하고 #36을 직접 진행.
 109. #36 상태 엔진: 순수 전이 규칙(`state/engine.py`)과 트랜잭션 내 반영(`state/store.py`, 행 잠금), 수집 경로 연결, 장치 목록에 `connection` 필드. 테스트 17개 추가.
 110. Pi SD 카드 I/O 포화(PSI io 약 90%, 부하 평균 8~11) 발견. 원인은 저장소에 생성된 `node_modules`(197MB)를 테스트 컨테이너가 매번 복사한 것과 Go race 빌드의 디스크 캐시. `node_modules` 삭제, 컨테이너 작업 디렉터리·Go 캐시를 tmpfs로 전환.
+111. PR #96 CI 통과 후 병합(`01e4aed`), #36 종료. 서브에이전트의 #29 PR #95(Go 어댑터: Claude·Codex Hook·transcript 후보, 버전 지원 수준 verified/partial/unverified, #20과 동일한 중복 제거 키·UUIDv5 parity, fuzz)를 검토 후 최신 `develop` 병합·추적표 충돌 해결·CI 통과 확인하고 병합(`019faae`), #29 종료. 서브에이전트 사용량 약 15만 토큰.
+112. #30 Go tail을 새 서브에이전트에 위임(tmpfs·Go 컨테이너 1개 제한 지침).
+113. #37: 마이그레이션 `0003`(전역 `state_change_seq`, 세션·에이전트 상태 `change_seq`, 변경 시각 인덱스), 상태 반영 시 화면에 보이는 변경에만 증가. `GET /api/v1/office` 개인 스냅샷, `WS /api/v1/live`(Origin 검사, 첫 스냅샷, 30초 재조회+연결별 change_seq 중복 제거 증분, 25초 ping, 매 주기 세션 재검증으로 즉시 철회). 테스트 8개.
 
 ## 이번 변경 요약(#22)
 

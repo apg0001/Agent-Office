@@ -52,6 +52,8 @@ def _apply_lifecycle(
                 lifecycle=changed.state,
                 started_at=changed.started_at,
                 ended_at=changed.ended_at,
+                change_seq=_next_change(),
+                changed_at=func.clock_timestamp(),
             )
         )
 
@@ -91,20 +93,25 @@ def _apply_agent(
     if lifetime:
         connection.execute(update(agents).where(agents.c.id == agent_id).values(**lifetime))
 
-    if not is_newer(occurred_at, sequence, row.last_event_occurred_at, row.last_event_sequence):
-        # 과거 이벤트는 저장만 하고 현재 상태를 되돌리지 않는다.
-        return
+    newer = is_newer(occurred_at, sequence, row.last_event_occurred_at, row.last_event_sequence)
     current = AgentActivity(row.turn_state, row.activity)
-    changed = next_activity(current, event_type, activity, confidence)
-    connection.execute(
-        update(states)
-        .where(states.c.agent_id == agent_id)
-        .values(
+    # 과거 이벤트는 저장만 하고 현재 상태를 되돌리지 않는다.
+    changed = next_activity(current, event_type, activity, confidence) if newer else current
+    values: dict[str, object] = {}
+    if newer:
+        values.update(last_event_occurred_at=occurred_at, last_event_sequence=sequence)
+    if changed != current:
+        values.update(
             turn_state=changed.turn_state,
             activity=changed.activity,
-            state_version=row.state_version + (1 if changed != current else 0),
-            last_event_occurred_at=occurred_at,
-            last_event_sequence=sequence,
-            updated_at=func.now(),
+            state_version=row.state_version + 1,
         )
-    )
+    if changed != current or lifetime:
+        # 화면에 보이는 값이 바뀌었을 때만 실시간 전달 대상이 된다.
+        values.update(change_seq=_next_change(), updated_at=func.clock_timestamp())
+    if values:
+        connection.execute(update(states).where(states.c.agent_id == agent_id).values(**values))
+
+
+def _next_change() -> object:
+    return func.nextval("state_change_seq")

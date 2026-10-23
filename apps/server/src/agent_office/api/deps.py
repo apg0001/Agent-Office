@@ -46,13 +46,10 @@ def _unauthorized() -> HTTPException:
     )
 
 
-def current_user(
-    connection: DbConnection,
-    session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
-) -> CurrentUser:
-    """브라우저 세션을 검증한다. 폐기·절대 만료·유휴 만료·비활성 사용자를 모두 거부한다."""
+def authenticate_session(connection: Connection, session_token: str | None) -> CurrentUser | None:
+    """세션 토큰을 검증한다. 폐기·절대 만료·유휴 만료·비활성 사용자는 None. WebSocket도 쓴다."""
     if not session_token or len(session_token) > 256:
-        raise _unauthorized()
+        return None
     sessions, users = schema.login_sessions, schema.users
     row = connection.execute(
         select(sessions.c.id.label("session_id"), users.c.id, users.c.instance_role)
@@ -64,7 +61,7 @@ def current_user(
         )
     ).one_or_none()
     if row is None:
-        raise _unauthorized()
+        return None
     session_service.touch(connection, row.session_id)
     return CurrentUser(
         id=row.id,
@@ -72,6 +69,16 @@ def current_user(
         session_id=row.session_id,
         csrf_token=session_service.csrf_token_for(session_token),
     )
+
+
+def current_user(
+    connection: DbConnection,
+    session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+) -> CurrentUser:
+    user = authenticate_session(connection, session_token)
+    if user is None:
+        raise _unauthorized()
+    return user
 
 
 def require_csrf(
