@@ -52,12 +52,13 @@ def _devices(connection: Connection, user_id: uuid.UUID) -> list[Any]:
 
 
 def _session_rows(connection: Connection, device_ids: list[uuid.UUID], extra: Any) -> list[Any]:
-    sessions = schema.agent_sessions
+    sessions, slots = schema.agent_sessions, schema.office_slots
     if not device_ids:
         return []
     return list(
         connection.execute(
             select(
+                slots.c.slot_index.label("desk_slot"),
                 sessions.c.id,
                 sessions.c.device_id,
                 sessions.c.provider,
@@ -66,7 +67,9 @@ def _session_rows(connection: Connection, device_ids: list[uuid.UUID], extra: An
                 sessions.c.ended_at,
                 sessions.c.last_event_at,
                 sessions.c.change_seq,
-            ).where(sessions.c.device_id.in_(device_ids), extra)
+            )
+            .select_from(sessions.outerjoin(slots, slots.c.session_id == sessions.c.id))
+            .where(sessions.c.device_id.in_(device_ids), extra)
         ).all()
     )
 
@@ -117,6 +120,8 @@ def _session_json(
         "started_at": _iso(row.started_at),
         "ended_at": _iso(row.ended_at),
         "last_event_at": _iso(row.last_event_at),
+        # 개인 사무실 책상 번호(#48). 화면이 번호로 자리 좌표를 정한다.
+        "desk_slot": row.desk_slot,
         "change_seq": row.change_seq,
     }
 

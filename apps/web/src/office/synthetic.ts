@@ -16,10 +16,12 @@ const ACTIVITY_CYCLE: ReadonlyArray<[TurnState, Activity]> = [
   ["IDLE", "idle"],
 ];
 
-function syntheticId(prefix: string, index: number): string {
-  // 예약 형식의 합성 UUID. 실제 ID와 섞이지 않게 고정 접두사를 쓴다.
-  const tail = index.toString(16).padStart(12, "0");
-  return `00000000-0000-4000-8000-${prefix}${tail}`.slice(0, 36);
+const ID_PREFIX = { device: "d", session: "5", agent: "a" } as const;
+
+function syntheticId(kind: keyof typeof ID_PREFIX, index: number): string {
+  // 예약 형식의 합성 UUID(모두 0으로 시작). 종류 접두사 1자 + 11자리로 정확히 36자다.
+  const tail = index.toString(16).padStart(11, "0");
+  return `00000000-0000-4000-8000-${ID_PREFIX[kind]}${tail}`;
 }
 
 export interface SyntheticOptions {
@@ -28,11 +30,11 @@ export interface SyntheticOptions {
 }
 
 export function createSyntheticOffice(options: SyntheticOptions): OfficeState {
-  const device = { id: syntheticId("d", 1), name: "합성 PC", connection: "ONLINE" as const };
+  const device = { id: syntheticId("device", 1), name: "합성 PC", connection: "ONLINE" as const };
   const sessions = [];
   const agents: AgentState[] = [];
   for (let s = 0; s < options.sessions; s += 1) {
-    const sessionId = syntheticId("s", s);
+    const sessionId = syntheticId("session", s);
     sessions.push({
       id: sessionId,
       device_id: device.id,
@@ -41,12 +43,13 @@ export function createSyntheticOffice(options: SyntheticOptions): OfficeState {
       started_at: null,
       ended_at: null,
       last_event_at: null,
+      desk_slot: s,
       change_seq: 1,
     });
-    const leadId = syntheticId("a", s * 100);
+    const leadId = syntheticId("agent", s * 100);
     agents.push(agentAt(leadId, sessionId, null, s, 0));
     for (let c = 1; c <= options.subagentsPerSession; c += 1) {
-      agents.push(agentAt(syntheticId("a", s * 100 + c), sessionId, leadId, s + c, 0));
+      agents.push(agentAt(syntheticId("agent", s * 100 + c), sessionId, leadId, s + c, 0));
     }
   }
   return { source: "synthetic", devices: [device], sessions, agents };

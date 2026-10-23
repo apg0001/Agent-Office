@@ -197,3 +197,13 @@
 | TAIL-004 | COL-003 탐색 | `discover_test.go`: `projects/<p>/<s>.jsonl`·`subagents/<a>.jsonl` 분류, 깊이 상한, 개수 상한, 심볼릭 링크 3종 미추적, 읽을 수 없는 디렉터리 건너뜀, 안정 `Rel`·`ID` |
 | TAIL-005 | EVT-007 읽기 전용·프라이버시 | `readonly_test.go`: 탐색·tail 전후 감시 루트 항목 수·내용·mode·mtime 불변, 루트 오류에 경로 없음, 상태 enum·sentinel 오류만 |
 | TAIL-006 | COL-005 어댑터 연동 | `fixture_test.go`: #20 합성 transcript를 Claude 배치로 놓고 탐색→tail→`ParseTranscriptLine` 후보가 직접 파싱 결과와 동일 |
+
+## 책상 배정 검증 매핑(#48)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| DESK-001 | OFF-003 세션 동안 유지 | 같은 세션의 후속 이벤트에도 책상 번호 불변, 스냅샷 `desk_slot` |
+| DESK-002 | OFF-004 빈 자리 재사용 | 종료 후 30초 안에는 비우지 않고 새 번호, 이후 가장 낮은 번호 재사용 |
+| DESK-003 | OFF-004 1~30 확장 | 30세션 번호 0~29 고유, 업무석 줄은 필요할 때만 증가·기존 자리 불변 |
+| DESK-004 | 사용자 격리 | 사용자마다 별도 개인 레이아웃 |
+| DESK-005 | 웹 배치 일치 | 서버 `slot_cell`과 웹 자리 좌표 규칙 일치, 반납 책상 미배정, 합성 ID 고유·형식 |
