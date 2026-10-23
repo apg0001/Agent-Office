@@ -1,0 +1,64 @@
+name: 기능·구현 작업
+description: Epic의 독립적으로 검증 가능한 세부 구현 작업을 등록합니다.
+title: "[EP-XX/ISS-XX] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        한국어로 작성하고 실제 번호가 없는 의존성이나 호환성을 추측하지 마세요.
+  - type: input
+    id: internal_id
+    attributes:
+      label: 내부 식별자
+      description: 마스터 백로그의 EP-XX/ISS-XX 형식입니다.
+      placeholder: EP-01/ISS-01
+    validations:
+      required: true
+  - type: input
+    id: requirements
+    attributes:
+      label: 요구사항 ID
+      description: 연결되는 AUTH/TEAM/DEV/COL/EVT/OFF/VIEW/SEC/SETUP/NOTIFY/DIST/OPS/DOC ID입니다.
+      placeholder: EVT-001, SEC-006
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표
+      description: 사용자가 확인할 수 있는 결과를 설명하세요.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 범위와 비범위
+      description: 포함할 변경과 의도적으로 제외할 변경을 구분하세요.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 수락 기준
+      description: 기능, 오류 처리, 권한·프라이버시, 문서 기준을 체크리스트로 작성하세요.
+      value: |
+        - [ ] 기능과 경계 조건
+        - [ ] 권한·프라이버시
+        - [ ] 테스트와 재현 근거
+        - [ ] 문서·인수인계
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 선행 작업과 충돌 위험
+      description: 실제 Issue 번호, 공통 파일, migration 또는 스키마 충돌 가능성을 적으세요.
+  - type: textarea
+    id: verification
+    attributes:
+      label: 검증 계획
+      description: 자동 테스트, 실장비, OS, 실패 주입과 미실행 시 기록 방법을 적으세요.
+    validations:
+      required: true

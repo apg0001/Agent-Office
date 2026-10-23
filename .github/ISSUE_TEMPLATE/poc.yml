@@ -1,0 +1,41 @@
+name: 호환성·기술 PoC
+description: 도구, OS, 프레임워크 또는 실장비 지원 범위를 실측합니다.
+title: "[POC] "
+labels:
+  - poc
+body:
+  - type: input
+    id: hypothesis
+    attributes:
+      label: 검증할 가설
+      description: 지원된다고 가정하지 말고 확인할 질문으로 작성하세요.
+    validations:
+      required: true
+  - type: textarea
+    id: matrix
+    attributes:
+      label: 버전·환경 행렬
+      description: OS, 아키텍처, 도구 버전과 실행 방식을 적으세요.
+    validations:
+      required: true
+  - type: textarea
+    id: procedure
+    attributes:
+      label: 재현 절차
+      description: 사용자 원문을 수집하지 않는 절차와 합성 fixture 생성 방법을 포함하세요.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 필요한 증거
+      description: 관측 필드, 누락, 중복, 타임아웃, 실패 동작과 정확도 측정 방법을 적으세요.
+    validations:
+      required: true
+  - type: textarea
+    id: unsupported
+    attributes:
+      label: 미지원·중단 기준
+      description: 실패를 숨기지 않고 unknown/unsupported로 판정할 기준을 적으세요.
+    validations:
+      required: true
