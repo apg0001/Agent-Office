@@ -146,6 +146,7 @@
 60. CI `Images (amd64/arm64)` 네이티브 러너 job을 `CI Gate`에 추가, 수동·승인 전용 `publish-images.yml` 작성(미실행), 회귀 테스트 3개 추가.
 61. Pi 실측: 콜드 빌드 11분 43초, 첫 기동 5분 59초(PostgreSQL pull 포함)·재기동 20.9초, 유휴 메모리 합계 약 63MiB, 운영 구성 hardening·루프백·자동 재시작(13초) 확인. 테스트 컨테이너·볼륨·baseline 이미지 정리.
 62. actionlint, Python 3.13 컨테이너 pytest 37개·Ruff, Compose 2종 config 통과.
+63. PR #83 생성, run `39905138626`에서 `Images (amd64/arm64)` 포함 전체 CI와 `CI Gate` 통과.
 
 ## 이번 변경 요약(#56)
 
@@ -189,7 +190,7 @@
 | Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: #19 포함 pytest 34개 통과(Starlette deprecation 경고 1개), Ruff lint·format, server mypy, Claude 프로브 mypy strict 통과. 호스트에는 pytest·`python3-venv` 없음 |
 | Pi 호스트 Node·Go 회귀 | 미실행 | Node·Go 호스트 미설치. CI 원격 결과로 대체 확인 |
 | Pi arm64 이미지·Compose | 통과 | #56: 빌드, 개발/운영 Compose `up --wait`, health·HTTP 200, 비루트·read-only·루프백·자동 재시작 실측 |
-| amd64 이미지 | CI 확인 대상 | #56 PR의 `Images (amd64)` 결과로 판정 |
+| amd64·arm64 이미지 CI | 통과 | PR #83 run `39905138626`: `Images (amd64)` 41초, `Images (arm64)` 39초, 나머지 job과 `CI Gate` 모두 성공 |
 | GHCR 게시 | 미실행 | 외부 공개, 관리자 승인과 `image-publish` Environment 설정 필요 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
 | diff 공백·비밀·개인 경로 검사 | 통과 | `git diff --check`, 대표 비밀/절대경로 패턴 일치 0 |
@@ -197,8 +198,8 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. #56 PR의 CI를 확인한다: `gh pr checks <PR 번호> --watch`. 특히 `Images (amd64)`·`Images (arm64)`. 실패하면 job 로그를 보고 수정한다.
-2. CI 통과 후 소유자 승인을 받아 `gh pr merge <PR 번호> --merge`, `gh issue close 56`, Epic #9 본문 체크리스트(#56)를 `gh issue edit 9 --body-file <UTF-8 파일>`로 갱신한다. 본문 편집 전 `gh api repos/apg0001/Agent-Office/issues/9 -q .body`로 한글이 정상인지 확인한다.
+1. PR #83의 최신 CI를 확인한다: `gh pr checks 83 --watch`.
+2. 소유자 승인을 받아 `gh pr merge 83 --merge`, `gh issue close 56`, Epic #9 본문 체크리스트(#56)를 `gh issue edit 9 --body-file <UTF-8 파일>`로 갱신한다. 본문 편집 전 `gh api repos/apg0001/Agent-Office/issues/9 -q .body`로 한글이 정상인지 확인한다.
 3. GHCR 게시가 필요하면 먼저 소유자가 Settings → Environments에 `image-publish`(필수 리뷰어)를 만들고 승인해야 한다. 그 전에는 `publish-images.yml`을 실행하지 않는다.
 4. 다음 Issue 후보(소유자 지시 대기): #57 Tailscale·Cloudflare 선택형 접속·HTTPS, #59 Health·모니터링·외부 Heartbeat(재부팅 자동 기동 포함), #20 Hook·JSONL 교차 중복(Claude 결과 기반), #22 PostgreSQL ERD.
 5. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때 #17 프로브(`tests/poc/codex`)로 구조 통계만 기록한다.
