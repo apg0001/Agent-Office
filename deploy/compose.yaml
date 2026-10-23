@@ -2,7 +2,8 @@ name: agent-office-dev
 
 services:
   postgres:
-    image: postgres:17-alpine
+    # 운영 Compose와 같은 PostgreSQL 이미지를 multi-arch digest로 고정한다.
+    image: postgres:17.11-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-agent_office}
       POSTGRES_USER: ${POSTGRES_USER:-agent_office}
@@ -17,6 +18,7 @@ services:
     restart: unless-stopped
 
   server:
+    image: agent-office-server:dev
     build:
       context: ../apps/server
     ports:
@@ -24,24 +26,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/system/health')",
-        ]
-      interval: 10s
-      timeout: 3s
-      retries: 5
     restart: unless-stopped
 
   web:
+    image: agent-office-web:dev
     build:
-      context: ../apps/web
+      # 루트 package-lock.json을 쓰기 위해 저장소 루트를 컨텍스트로 둔다.
+      context: ..
+      dockerfile: apps/web/Dockerfile
     ports:
-      - "${AGENT_OFFICE_WEB_PORT:-5173}:80"
+      - "${AGENT_OFFICE_WEB_PORT:-5173}:8080"
     depends_on:
       server:
         condition: service_healthy

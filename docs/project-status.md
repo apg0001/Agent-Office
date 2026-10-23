@@ -10,17 +10,16 @@
 
 ## 현재 위치
 
-- 활성 작업: #19 `EP-02/ISS-03 Claude Code Hook/JSONL 및 병렬 에이전트 실측`
-- 브랜치: `feat/#19-claude-code-hook-poc` (`develop` `9145d8c`에서 생성, #18의 Pi 기준선 커밋을 cherry-pick)
-- 상태: Pi Claude Code 2.1.308 합성 실측 10회와 보고서·회귀 테스트 완료, PR·CI 진행
-- 다음 예정: #56 ARM64 Docker 이미지·Compose 실측(소유자 지시: #19 다음)
+- 활성 작업: #56 `EP-09/ISS-01 AMD64·ARM64 Docker 이미지·GHCR·Compose`
+- 브랜치: `feat/#56-multiarch-images` (`develop` `3644486`, PR #82 병합 결과에서 생성)
+- 상태: Dockerfile·Compose·CI 멀티아키텍처 job·게시 workflow 구현, Pi arm64 실측 완료, PR·CI 진행. GHCR 게시는 미실행(관리자 승인 필요)
+- 직전 완료: #19, PR https://github.com/apg0001/Agent-Office/pull/82, merge commit `3644486`, Issue 종료
 - 보류 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
 - #18 브랜치: `feat/#18-codex-desktop-poc` (`develop` `9145d8c` 병합 완료, PR 없음)
-- 기준 브랜치: `develop` (`9145d8c`, PR #81 병합 결과)
+- 기준 브랜치: `develop` (`3644486`, PR #82 병합 결과)
 - 상태: **#18 보류(소유자 결정, 2026-10-23).** 작업 호스트가 Windows PC에서 Raspberry Pi 5(Linux arm64)로 바뀌었고, Pi에는 Codex Desktop이 없으며 Desktop UI 자동화도 금지돼 있어 실측할 수 없음. app-server 비-UI 관측은 #18이 아니라 #21 범위로 둠
 - 재개 조건: Codex Desktop이 설치된 PC에서 소유자 또는 수동 운영자가 합성 세션을 직접 조작할 수 있을 때
-- 직전 완료: #80, PR https://github.com/apg0001/Agent-Office/pull/81, merge commit `9145d8c`
-- 배포/릴리스: 수행하지 않음
+- 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19)만 실행
 - 호스트 전환: 이 Raspberry Pi가 이후 서비스 호스팅 서버가 될 예정(소유자 안내). 아래 환경 기준선 참고
 
@@ -139,8 +138,23 @@
 52. 공식 Hooks 문서와 대조해 `prompt_id`·`effort`·`background_tasks`·`duration_ms`가 문서화된 필드임을 확인하고 보고서·프로브 허용 필드 목록을 보정.
 53. 최종 프로브로 `basic` 1회 재실행해 같은 결과·미등록 필드 0 확인.
 54. 프로브 회귀 테스트 7개 추가, Python 3.13 컨테이너에서 pytest 34개·Ruff·mypy 통과.
+55. PR #82 CI 전체 통과 후 소유자 승인으로 `develop` 병합(`3644486`), #19 종료. 병합 권한은 소유자가 로컬 `.claude/settings.local.json`에 `Bash(gh pr merge:*)`로 허용(Git 제외).
+56. Epic #1·#2 본문의 한글이 `?`로 손상된 것을 발견(이전 Windows 체크리스트 갱신 시 인코딩 손상 추정). GitHub 편집 이력의 마지막 정상본(2026-10-22)에서 복원하고 실제 완료 상태(#13~#17, #19)를 체크.
+57. #56 `feat/#56-multiarch-images` 생성. 기존 Dockerfile로 Pi baseline 콜드 빌드 18분 27초, server 260MB·web 76.2MB 측정.
+58. server: wheel multi-stage, bind mount 설치(258MB), `python:3.13.17-slim` digest 고정, 비루트, `HEALTHCHECK`. web: 루트 lockfile `npm ci`, `nginx-unprivileged:1.30.6` 비루트 8080, digest 고정, `HEALTHCHECK`, 전용 dockerignore.
+59. 개발 Compose(소스 빌드)와 독립 운영 Compose(`태그@digest`, 루프백 바인딩, read-only, `cap_drop ALL`, 로그 회전, PostgreSQL 포트 비공개·SSD 경로 옵션), `deploy/.env.production.example` 추가.
+60. CI `Images (amd64/arm64)` 네이티브 러너 job을 `CI Gate`에 추가, 수동·승인 전용 `publish-images.yml` 작성(미실행), 회귀 테스트 3개 추가.
+61. Pi 실측: 콜드 빌드 11분 43초, 첫 기동 5분 59초(PostgreSQL pull 포함)·재기동 20.9초, 유휴 메모리 합계 약 63MiB, 운영 구성 hardening·루프백·자동 재시작(13초) 확인. 테스트 컨테이너·볼륨·baseline 이미지 정리.
+62. actionlint, Python 3.13 컨테이너 pytest 37개·Ruff, Compose 2종 config 통과.
+63. PR #83 생성, run `39905138626`에서 `Images (amd64/arm64)` 포함 전체 CI와 `CI Gate` 통과.
 
-## 이번 변경 요약(#19)
+## 이번 변경 요약(#56)
+
+- [Docker 이미지와 Compose](installation/docker-images.md): 이미지 구성, 설치 방식 A/B, 게시 절차, 베이스 갱신, Pi 실측.
+- 운영 Compose는 base+overlay가 아니라 독립 파일이다. CI와 문서의 검증 명령도 바뀌었다.
+- 미실행: GHCR 게시, Pi 재부팅 자동 기동, QEMU 교차 빌드, SSD 구성.
+
+## 이전 완료 변경 요약(#19)
 
 - [Claude Code Hook·JSONL 실측 보고서](poc/claude-code-hooks.md)와 [`tests/poc/claude`](../tests/poc/claude/README.md) 하네스.
 - 관측: 시작·턴·도구 전/후·하위 에이전트 시작/종료·권한 요청·Stop·종료. 미관측: `Notification`, `PostToolUseFailure`, compact, `PermissionDenied`, `StopFailure`.
@@ -174,20 +188,22 @@
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
 | 실제 Claude Code Hook 이벤트 | 부분 통과 | Pi Linux arm64, 2.1.308 `-p` 합성 10회: 9종 관측, 반복 재현, `tool_use_id`·`agent_id` 상관관계 일치; 대화형·승인 대기 미실측. 상세 #19 보고서 |
 | Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: #19 포함 pytest 34개 통과(Starlette deprecation 경고 1개), Ruff lint·format, server mypy, Claude 프로브 mypy strict 통과. 호스트에는 pytest·`python3-venv` 없음 |
-| Pi 호스트 Node·Go·Compose 회귀 | 미실행 | Node·Go 호스트 미설치, 컨테이너 재검증은 다음 Issue 착수 시 수행 |
+| Pi 호스트 Node·Go 회귀 | 미실행 | Node·Go 호스트 미설치. CI 원격 결과로 대체 확인 |
+| Pi arm64 이미지·Compose | 통과 | #56: 빌드, 개발/운영 Compose `up --wait`, health·HTTP 200, 비루트·read-only·루프백·자동 재시작 실측 |
+| amd64·arm64 이미지 CI | 통과 | PR #83 run `39905138626`: `Images (amd64)` 41초, `Images (arm64)` 39초, 나머지 job과 `CI Gate` 모두 성공 |
+| GHCR 게시 | 미실행 | 외부 공개, 관리자 승인과 `image-publish` Environment 설정 필요 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
 | diff 공백·비밀·개인 경로 검사 | 통과 | `git diff --check`, 대표 비밀/절대경로 패턴 일치 0 |
 | 마스터 사양 기준선 | 통과 | 외부 원본과 저장소 사본 44,535바이트·SHA-256 일치, 요구사항 범위·문서 링크 테스트 3개 통과 |
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. #19 PR의 `CI Gate` 결과를 확인한다: `gh pr checks <PR 번호> --watch`. 실패하면 로그를 보고 수정 커밋을 올린다.
-2. 소유자 승인 후 `gh pr merge <PR 번호> --merge`로 `develop`에 병합하고, `gh issue close 19`와 Epic #2 체크리스트(#19 체크)를 갱신한다.
-3. #56 시작: `git switch develop && git pull --ff-only && git switch -c feat/#56-multiarch-images`.
-4. #56 실측: Pi에서 `docker compose -f deploy/compose.yaml config --quiet`, `docker compose -f deploy/compose.yaml build`, 기동, `curl` health를 확인한다. 8000 포트 충돌은 이 Pi에서 다시 확인한다. 빌드 시간·메모리, SD 카드 볼륨 위치를 기록하고 테스트 컨테이너·볼륨은 정리한다.
-5. #56 범위의 GHCR 멀티아키텍처 빌드(`docker buildx`)와 Actions 연동은 push·공개 영향이 있으므로 소유자 승인 전에는 workflow 작성과 로컬 검증까지만 한다.
-6. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때 #17 프로브(`tests/poc/codex`)로 시작·턴·도구·승인·하위 에이전트·종료를 구조 통계로만 기록한다. 소유자에게 전달한 데스크톱용 지시문은 #18 Issue 댓글의 재개 조건을 따른다.
-7. #19 후속(별도 Issue 후보): 대화형 TUI 세션에서 승인 대기·`Notification`·중단·compact 관측. 자동화 금지 원칙상 소유자가 직접 조작해야 한다.
+1. PR #83의 최신 CI를 확인한다: `gh pr checks 83 --watch`.
+2. 소유자 승인을 받아 `gh pr merge 83 --merge`, `gh issue close 56`, Epic #9 본문 체크리스트(#56)를 `gh issue edit 9 --body-file <UTF-8 파일>`로 갱신한다. 본문 편집 전 `gh api repos/apg0001/Agent-Office/issues/9 -q .body`로 한글이 정상인지 확인한다.
+3. GHCR 게시가 필요하면 먼저 소유자가 Settings → Environments에 `image-publish`(필수 리뷰어)를 만들고 승인해야 한다. 그 전에는 `publish-images.yml`을 실행하지 않는다.
+4. 다음 Issue 후보(소유자 지시 대기): #57 Tailscale·Cloudflare 선택형 접속·HTTPS, #59 Health·모니터링·외부 Heartbeat(재부팅 자동 기동 포함), #20 Hook·JSONL 교차 중복(Claude 결과 기반), #22 PostgreSQL ERD.
+5. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때 #17 프로브(`tests/poc/codex`)로 구조 통계만 기록한다.
+6. #19 후속(별도 Issue 후보): 대화형 TUI에서 승인 대기·`Notification`·중단·compact 관측. 소유자가 직접 조작해야 한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -207,4 +223,7 @@
 - Computer Use 안전 지침은 ChatGPT/Codex Desktop UI 자동화를 금지한다. #18의 Desktop 상호작용은 사용자/수동 운영자가 수행해야 하며, 자동화 우회나 보안·신뢰 프롬프트 조작을 시도하지 않는다.
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
+- PR #76~#79 본문의 한글이 `?`로 손상돼 있고 GitHub 편집 이력에 원본이 없다. 커밋 메시지·문서가 원본 기록이며, 필요하면 소유자 승인 후 PR 본문을 다시 작성한다. Epic #3~#12와 세부 Issue는 손상 없음을 확인했다.
+- Windows PowerShell에서 `gh`로 한글 본문을 쓸 때 인코딩이 깨질 수 있다. 본문은 UTF-8 파일과 `--body-file`로만 전달하고 쓰기 후 다시 조회한다.
+- Pi 콜드 빌드는 10분 이상 걸리고 첫 기동은 이미지 pull로 수 분이 걸린다. 운영 배포는 사전 빌드 이미지(GHCR) pull을 전제로 한다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.

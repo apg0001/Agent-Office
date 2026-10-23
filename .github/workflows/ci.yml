@@ -95,7 +95,42 @@ jobs:
       - name: Validate development Compose
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
       - name: Validate production Compose
-        run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml -f deploy/compose.production.yaml config --quiet
+        run: docker compose --env-file deploy/.env.production.example -f deploy/compose.production.yaml config --quiet
+
+  images:
+    name: Images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      COMPOSE: docker compose --env-file deploy/.env.example -f deploy/compose.yaml -p agent-office-ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build images natively
+        run: $COMPOSE build
+      - name: Start stack and wait for health checks
+        run: $COMPOSE up -d --wait --wait-timeout 180
+      - name: Smoke test
+        run: |
+          test "$(docker image inspect agent-office-server:dev --format '{{.Architecture}}')" = "${{ matrix.arch }}"
+          test "$(docker image inspect agent-office-web:dev --format '{{.Architecture}}')" = "${{ matrix.arch }}"
+          test "$(docker image inspect agent-office-server:dev --format '{{.Config.User}}')" = "65532:65532"
+          test "$(docker image inspect agent-office-web:dev --format '{{.Config.User}}')" = "101"
+          curl --fail --silent --show-error http://127.0.0.1:8000/api/v1/system/health
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:5173/
+      - name: Show service state on failure
+        if: ${{ failure() }}
+        run: $COMPOSE ps --all
+      - name: Remove stack and test volume
+        if: ${{ always() }}
+        run: $COMPOSE down --volumes --remove-orphans
 
   secret-scan:
     name: Secret Scan
@@ -117,7 +152,7 @@ jobs:
     name: CI Gate
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    needs: [python, node, go, compose, secret-scan]
+    needs: [python, node, go, compose, images, secret-scan]
     steps:
       - name: Require every CI job
         env:
@@ -125,8 +160,9 @@ jobs:
           NODE_RESULT: ${{ needs.node.result }}
           GO_RESULT: ${{ needs.go.result }}
           COMPOSE_RESULT: ${{ needs.compose.result }}
+          IMAGES_RESULT: ${{ needs.images.result }}
           SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
         run: |
-          for result in "$PYTHON_RESULT" "$NODE_RESULT" "$GO_RESULT" "$COMPOSE_RESULT" "$SECRET_SCAN_RESULT"; do
+          for result in "$PYTHON_RESULT" "$NODE_RESULT" "$GO_RESULT" "$COMPOSE_RESULT" "$IMAGES_RESULT" "$SECRET_SCAN_RESULT"; do
             test "$result" = "success"
           done

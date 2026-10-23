@@ -2,7 +2,8 @@
 
 ## 확인된 기준선
 
-- Windows 11 계열 환경
+- Windows 11 계열 환경(#13~#17)
+- Raspberry Pi 5, Ubuntu 24.04 aarch64(#19, #56)
 - Python 3.13+
 - Node.js 24+, npm 11+
 - Go 1.24+
@@ -48,4 +49,6 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml config
 docker compose --env-file deploy/.env -f deploy/compose.yaml up --build
 ```
 
-운영에는 `.env.example` 값을 사용하지 않습니다. 현재 Compose는 개발 기준선이며 프로덕션 배포 승인을 의미하지 않습니다.
+웹은 컨테이너 안 8080 포트(비루트 nginx)에서 실행되며 호스트 `AGENT_OFFICE_WEB_PORT`(기본 5173)로 연결됩니다.
+
+운영에는 `.env.example` 값을 사용하지 않습니다. 운영 구성과 이미지 규칙은 [Docker 이미지와 Compose](docker-images.md)를 따릅니다. 문서가 있다고 프로덕션 배포가 승인된 것은 아닙니다.

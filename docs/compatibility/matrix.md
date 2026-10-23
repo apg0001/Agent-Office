@@ -18,7 +18,8 @@
 | Docker Compose | v5.5.1 | 구성·기동 검증 | 개발 및 production overlay config 통과 |
 | Python | 3.13.9 | 설치·실행 가능 | #13 서버 검사 |
 | Node/npm | 24.19.0 / 11.17.0 | 설치·실행 가능 | #13 웹 검사 |
-| Raspberry Pi 5 | 8GB, Ubuntu 24.04.5, aarch64, Docker 29.9.2/Compose v5.6.1 | 호스트 확인, 이미지 빌드·기동 미실측. 루트가 SD 카드 | #56, #63 |
+| Raspberry Pi 5 | 8GB, Ubuntu 24.04.5, aarch64, Docker 29.9.2/Compose v5.6.1 | arm64 이미지 빌드·개발/운영 Compose 기동·health·자동 재시작 실측 | 재부팅·장시간·SSD 미실측. 루트가 SD 카드. #56, #63 |
+| linux/amd64·arm64 이미지 | GitHub `ubuntu-24.04`·`ubuntu-24.04-arm` 러너 | CI 네이티브 빌드·기동·health 통과 | PR #83 run `39905138626` (amd64 41초, arm64 39초). #56 |
 | macOS/Linux Collector | 없음 | 미실측 | #42, #62 |
 
 `부분 지원`, `미실측`, `미검증`은 전체 지원 선언이 아닙니다. 실제 로그 원문은 이 문서나 저장소에 복사하지 않습니다.

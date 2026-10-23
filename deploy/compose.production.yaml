@@ -1,11 +1,62 @@
+# 운영용 독립 Compose 파일. 소스를 빌드하지 않고 사전 빌드 이미지만 실행한다.
+# 사용: docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml up -d --wait
+# 이미지 참조는 태그와 digest를 함께 지정한다(docs/installation/docker-images.md).
 name: agent-office
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs:
+    - /tmp
 
 services:
   postgres:
+    image: ${AGENT_OFFICE_POSTGRES_IMAGE:-postgres:17.11-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agent_office}
+      POSTGRES_USER: ${POSTGRES_USER:-agent_office}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    # 호스트 포트를 열지 않는다. 데이터 위치는 AGENT_OFFICE_POSTGRES_DATA로 SSD 경로를 지정할 수 있다.
+    volumes:
+      - ${AGENT_OFFICE_POSTGRES_DATA:-postgres-data}:/var/lib/postgresql/data
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
     restart: always
 
   server:
+    image: ${AGENT_OFFICE_SERVER_IMAGE:?AGENT_OFFICE_SERVER_IMAGE is required (tag@digest)}
+    <<: *hardening
+    # 기본은 루프백에만 바인딩한다. 외부 공개는 리버스 프록시·Tunnel(#57)을 통해서만 한다.
+    ports:
+      - "${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AGENT_OFFICE_HTTP_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
     restart: always
 
   web:
+    image: ${AGENT_OFFICE_WEB_IMAGE:?AGENT_OFFICE_WEB_IMAGE is required (tag@digest)}
+    <<: *hardening
+    ports:
+      - "${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AGENT_OFFICE_WEB_PORT:-8080}:8080"
+    depends_on:
+      server:
+        condition: service_healthy
+    logging: *default-logging
     restart: always
+
+volumes:
+  postgres-data:
