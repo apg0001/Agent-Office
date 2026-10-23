@@ -17,6 +17,15 @@ import {
 import { findPath } from "./pathfinding";
 import { BADGE_LABELS, idleCycle, presenceOf } from "./presence";
 import { type DisplayedZone, nextDisplayedZone } from "./smoothing";
+import {
+  type Frame,
+  labelFor,
+  pixelColor,
+  shirtIndex,
+  spriteRows,
+  textureKey,
+  walkFrame,
+} from "./sprites";
 import type { Furniture, OfficeMap, Point, ZoneKind } from "./grid";
 import { ZONE_LABELS } from "./grid";
 import { TILE_HEIGHT, depthOf, gridToScreen, tileDiamond } from "./iso";
@@ -42,9 +51,14 @@ const FURNITURE_COLORS: Record<Furniture, number> = {
   plant: 0x3f7f3f,
 };
 const WALK_TILES_PER_SECOND = 2.5;
+/** 픽셀 하나를 화면 2px로 그린다. */
+const PIXEL = 2;
 
 interface Actor {
   container: Phaser.GameObjects.Container;
+  sprite: Phaser.GameObjects.Image;
+  shirt: number;
+  label: Phaser.GameObjects.Text;
   marker: Phaser.GameObjects.Text;
   position: Point;
   target: Point;
@@ -174,6 +188,11 @@ export class OfficeScene extends Phaser.Scene {
       alive.add(agent.id);
       const actor = this.actors.get(agent.id) ?? this.spawn(agent);
       actor.agent = agent;
+      const session = state.sessions.find((s) => s.id === agent.session_id);
+      const name = labelFor(agent, state.devices.find((d) => d.id === session?.device_id));
+      if (actor.label.text !== name) {
+        actor.label.setText(name);
+      }
       this.plan(actor, Date.now());
     }
     for (const [id, actor] of this.actors) {
@@ -223,7 +242,7 @@ export class OfficeScene extends Phaser.Scene {
     actor.marker.setText(actor.agent.turn_state === "WAITING_USER" ? "!" : "?");
   }
 
-  update(_time: number, deltaMs: number): void {
+  update(time: number, deltaMs: number): void {
     this.sinceReplan += deltaMs;
     if (this.sinceReplan >= REPLAN_INTERVAL_MS) {
       // 체류 시간 때문에 미뤄 둔 목적지 변경을 다시 확인한다.
@@ -257,6 +276,10 @@ export class OfficeScene extends Phaser.Scene {
       if (actor.agent.turn_state !== "IDLE") {
         active.push(actor.position);
       }
+      const key = this.texture(actor.agent.role, actor.shirt, walkFrame(actor.path.length > 0, time));
+      if (actor.sprite.texture.key !== key) {
+        actor.sprite.setTexture(key);
+      }
       const screen = gridToScreen(actor.position);
       actor.container.setPosition(screen.sx, screen.sy - TILE_HEIGHT / 4);
       actor.container.setDepth(depthOf(actor.position, 5));
@@ -280,21 +303,42 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
+  /** 역할·옷 색·프레임별 텍스처를 처음 필요할 때 한 번만 만든다. */
+  private texture(role: AgentState["role"], shirt: number, frame: Frame): string {
+    const key = textureKey(role, shirt, frame);
+    if (!this.textures.exists(key)) {
+      const rows = spriteRows(role, frame);
+      const graphics = this.make.graphics({}, false);
+      rows.forEach((row, y) => {
+        Array.from(row).forEach((code, x) => {
+          const color = pixelColor(code, shirt);
+          if (color !== null) {
+            graphics.fillStyle(color, 1).fillRect(x * PIXEL, y * PIXEL, PIXEL, PIXEL);
+          }
+        });
+      });
+      graphics.generateTexture(key, rows[0]!.length * PIXEL, rows.length * PIXEL);
+      graphics.destroy();
+    }
+    return key;
+  }
+
   private spawn(agent: AgentState): Actor {
     // 새 캐릭터는 출입구에서 출근한다.
     const start = { ...this.map.entrance };
     const container = this.add.container(0, 0);
-    const lead = agent.role === "lead";
-    const body = this.add.rectangle(0, -10, 12, 16, lead ? 0x2f4f8f : 0x8f6f2f);
-    const head = this.add.rectangle(0, -22, 10, 10, 0xf0c8a0);
-    const badge = this.add.rectangle(0, -10, 4, 4, lead ? 0xf0d040 : 0xffffff);
+    const session = this.state.sessions.find((s) => s.id === agent.session_id);
+    const device = this.state.devices.find((d) => d.id === session?.device_id);
+    const shirt = shirtIndex(session?.device_id ?? agent.id);
+    const sprite = this.add.image(0, 0, this.texture(agent.role, shirt, 0)).setOrigin(0.5, 1);
+    const top = -sprite.height;
     // "?"는 추정 상태, "!"는 관측된 승인 대기.
     const marker = this.add
-      .text(0, -38, "?", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
+      .text(0, top - 8, "?", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
       .setOrigin(0.5)
       .setVisible(false);
     const status = this.add
-      .text(0, -50, "", {
+      .text(0, top - 20, "", {
         fontFamily: "sans-serif",
         fontSize: "10px",
         color: "#ffffff",
@@ -302,9 +346,17 @@ export class OfficeScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setVisible(false);
-    container.add([body, head, badge, marker, status]);
-    container.setSize(16, 32).setInteractive({ useHandCursor: true });
-    container.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+    const label = this.add
+      .text(0, 2, labelFor(agent, device), {
+        fontFamily: "sans-serif",
+        fontSize: "9px",
+        color: "#ffffff",
+        backgroundColor: "#00000066",
+      })
+      .setOrigin(0.5, 0);
+    container.add([sprite, label, marker, status]);
+    sprite.setInteractive({ useHandCursor: true });
+    sprite.on("pointerup", (pointer: Phaser.Input.Pointer) => {
       // 드래그(카메라 이동)로 끝난 클릭은 선택으로 보지 않는다.
       if (pointer.getDistance() < 6) {
         this.onSelect(agent.id);
@@ -312,6 +364,9 @@ export class OfficeScene extends Phaser.Scene {
     });
     const actor: Actor = {
       container,
+      sprite,
+      shirt,
+      label,
       marker,
       status,
       position: start,
