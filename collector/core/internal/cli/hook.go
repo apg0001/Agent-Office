@@ -44,7 +44,8 @@ func runHook(args []string, env Env) (code int) {
 	if err != nil {
 		return ExitOK
 	}
-	if _, err := config.Load(dirs.ConfigFile()); err != nil {
+	cfg, err := config.Load(dirs.ConfigFile())
+	if err != nil {
 		return ExitOK
 	}
 	if p, err := config.LoadPause(dirs.PauseFile()); err != nil || p.Paused {
@@ -55,6 +56,10 @@ func runHook(args []string, env Env) (code int) {
 	switch provider {
 	case "claude":
 		rt.Product = "claude-code"
+		// Hook payload에는 버전이 없다. 플래그가 없으면 hooks install이 기록한 감지 버전을 쓴다.
+		if rt.Version == "" {
+			rt.Version, rt.Mode = cfg.ClaudeVersion, cfg.ClaudeMode
+		}
 		c, err = claude.ParseHook(payload, rt)
 	case "codex":
 		rt.Product = codex.ProductCLI

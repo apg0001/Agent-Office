@@ -2,7 +2,7 @@
 
 관련 이슈: #34 (`EP-04/ISS-06`, 요구사항 COL-001~003, COL-010). 선행: #29 어댑터, #30 tail, #32 정규화, #33 큐·전송.
 
-GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니다. GUI는 나중에 이 명령들을 감쌉니다. Hook 자동 설치·제거(#31), OS 보안 저장소 토큰 보관(#41), 설치 패키지·서명(#42~#44)은 범위가 아닙니다.
+GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니다. GUI는 나중에 이 명령들을 감쌉니다. Hook 설치·제거는 #31에서 추가했습니다(아래 [Hook 설치](#hook-설치hooks-31)). OS 보안 저장소 토큰 보관(#41), 설치 패키지·서명(#42~#44)은 범위가 아닙니다.
 
 ## 검증 범위
 
@@ -13,7 +13,10 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | macOS launchd LaunchAgent | **미검증**: plist 생성 골든 테스트와 `GOOS=darwin go vet`·교차 빌드만 수행. 실제 macOS에서 실행하지 않음 | `launchd.plist.golden` |
 | Windows 작업 스케줄러(로그온 작업) | **미검증**: 작업 XML 생성 골든 테스트와 `GOOS=windows go vet`·교차 빌드만 수행. `schtasks` 등록·UTF-16 XML 수용·콘솔 창 표시 여부를 실제 Windows에서 확인하지 않음 | `task.xml.golden` |
 | 실제 Agent Office 서버(#35)와의 종단 실행 | **미실행**: `httptest` 가짜 서버로만 확인 | `e2e_test.go` |
-| 실제 Claude Code·Codex가 `hook` 명령을 호출하는 경로 | **미실행**: Hook 설정 등록은 #31 범위 | — |
+| Claude Code 사용자 설정 Hook 설치·제거(`hooks`, #31) | **Linux arm64 컨테이너에서 파일 처리만 검증**: 임시 디렉터리의 합성 `settings.json`으로 백업·원자적 쓰기·소유 항목만 제거·거부 조건 테스트 | `hooks_test.go`, `cli/hooks_test.go` |
+| Hook 명령 인용(linux·darwin·windows) | **생성만 검증**: 골든 테스트. macOS·Windows에서 실제 셸이 명령을 실행하는지 미확인 | `hooks/testdata/*.golden` |
+| 실제 Claude Code·Codex가 설치된 `hook` 명령을 호출하는 경로 | **미실행**: 컨테이너에 인증된 Claude·Codex가 없어 실행하지 않음. 사용자 실제 `~/.claude`·`~/.codex`는 건드리지 않음 | — |
+| Codex Hook 자동 설치 | **미지원(print 전용)**: 사용자 범위 Hook 설정 위치·신뢰 흐름이 실측되지 않음(#17은 `-c` inline, #18은 프로젝트 `.codex/hooks.json` + Desktop 신뢰) | — |
 
 검증되지 않은 OS에서는 지원한다고 표시하지 않습니다. 실장비 검증 전까지 macOS·Windows 서비스 정의는 미리보기·수동 등록용입니다.
 
@@ -29,6 +32,9 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | `diagnose [--json] [--offline]` | `status` + Go 런타임 버전, 기호 위치, 서버 health 도달 여부 |
 | `service install\|uninstall [--activate]` | 자동 시작 정의 설치·제거. `--activate`가 없으면 파일만 쓰고 실행할 명령을 안내합니다 |
 | `service print [--os linux\|darwin\|windows] [--exe PATH]` | 정의 미리보기(파일을 쓰지 않음) |
+| `hooks install\|uninstall [--tool claude] [--yes] [--scope user]` | Claude Code 사용자 설정에 Hook 추가·제거. `--yes`가 없으면 미리보기만 출력합니다 |
+| `hooks status [--tool claude\|codex]` | Hook 설치 상태와 도구 버전 검증 수준 |
+| `hooks print [--tool claude\|codex] [--os linux\|darwin\|windows] [--exe PATH]` | Hook 항목 미리보기(파일을 쓰지 않음). Codex는 이 명령만 지원 |
 | `version` | 버전·OS·아키텍처 |
 
 종료 코드: 0 성공, 1 실패, 2 사용법 오류. `hook`은 예외 없이 0입니다.
@@ -50,7 +56,7 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 - 서버가 401/403을 돌려주면(`ErrDeviceRevoked`) 전송과 heartbeat를 멈추고 `device_revoked` 상태와 "다시 등록" 안내를 남깁니다. 수집과 큐 기록은 계속하고 큐는 지우지 않습니다. `register --force`로 config가 바뀌면 몇 초 안에 새 장치로 다시 시작합니다. 이전 장치 `device_id`로 큐에 들어간 이벤트는 서버가 거부할 수 있고 dead-letter로 셉니다.
 - 감시 루트는 `$CLAUDE_CONFIG_DIR/projects` 또는 `~/.claude/projects`입니다(설정 파일 `claude_projects_dir`로 바꿀 수 있음). ADR-0002에 따라 Codex transcript는 tail하지 않고 Codex는 Hook만 받습니다.
 - 바뀌지 않은 transcript는 `stat`만 하고, 2분 넘게 바뀌지 않은 파일은 핸들을 닫아 열린 파일 수를 제한합니다.
-- transcript 런타임 버전은 아직 자동 감지하지 않습니다(#31). 설정 파일 `claude_version`·`claude_mode`가 비어 있으면 미검증 런타임으로 보고 confidence를 `inferred`로 낮춥니다.
+- `hooks install`(#31)이 감지한 Claude 버전을 설정 파일 `claude_version`에 기록합니다. 실행 모드 `claude_mode`는 자동으로 채우지 않으므로, 비어 있으면 미검증 런타임으로 보고 confidence를 `inferred`로 낮춥니다.
 
 ### 최초 실행 위치
 
@@ -71,6 +77,59 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 5. panic을 포함한 어떤 오류도 종료 코드 0, 출력 없음으로 끝납니다. Claude Code는 일부 Hook의 stdout을 모델 문맥에 넣으므로 stdout에 쓰지 않습니다.
 
 `run`은 spool 파일을 오래된 순서로 정규화·큐 기록 뒤 지웁니다. 형식이 틀린 파일은 지우고 `spool_invalid`로 셉니다.
+
+## Hook 설치(`hooks`, #31)
+
+### 대상과 이벤트
+
+| 도구 | 설정 파일 | 등록 이벤트 | 지원 |
+|---|---|---|---|
+| Claude Code | `$CLAUDE_CONFIG_DIR/settings.json`, 없으면 `~/.claude/settings.json`의 `hooks` | #19에서 반복 관측한 9종: `SessionStart`, `UserPromptSubmit`, `PreToolUse`·`PostToolUse`·`PermissionRequest`(matcher `*`), `SubagentStart`, `SubagentStop`, `Stop`, `SessionEnd` | `install`·`uninstall`·`status`·`print` |
+| Codex CLI·Desktop | 미확정 | #17·#18에서 관측한 9종(위와 같은 이름, matcher 없음) | `print`만. 출력은 #18이 쓴 `hooks.json` 형식입니다. Codex는 Hook 정의를 사용자가 검토·신뢰해야 하므로 직접 등록하세요 |
+
+미관측 이벤트(`PostToolUseFailure`, `Notification`, `PreCompact` 등)는 등록하지 않습니다. `--scope`는 `user`만 받습니다(프로젝트 설정은 건드리지 않음).
+
+### 핸들러
+
+```json
+{"type": "command", "command": "'/home/me/.local/bin/agent-office-collector' hook claude", "timeout": 5}
+```
+
+- 타임아웃 5초: Claude 기본값 600초는 도구 호출마다 지연을 더합니다(#19 실측 6.2초 → 21.8초). `hook` 명령은 stdin을 최대 2초만 기다리고 항상 0으로 끝납니다.
+- Linux·macOS: 실행 파일 경로를 작은따옴표로 인용합니다(공백·`'` 포함 경로 허용).
+- Windows: `"C:/Program Files/…/agent-office-collector.exe" hook claude`처럼 `/` 구분자와 큰따옴표를 씁니다. `"`·`%`·`!`·`$`·`` ` ``가 든 경로와 UNC 경로는 거부합니다. **실제 Windows Claude Code에서 실행하지 않았습니다.**
+- 버전·모드 플래그는 넣지 않습니다. 도구를 업데이트해도 Hook 명령은 그대로입니다.
+
+### 안전 규칙
+
+1. **미리보기 후 승인**: `--yes` 없이 실행하면 대상 파일(홈은 `~`로 표시), 이벤트별 `+`(추가)·`~`(교체)·`-`(제거)와 추가할 핸들러만 출력하고 파일을 바꾸지 않습니다.
+2. **보존**: 최상위 키 순서, 알 수 없는 키, 숫자·문자열 원문, 남의 Hook을 그대로 둡니다. 결과는 2칸 들여쓰기로 다시 씁니다.
+3. **거부**: JSON 객체로 읽을 수 없는 파일(주석, 중복 키, 뒤따르는 값, 문법 오류), `hooks`나 이벤트 값의 형식이 다른 파일, 읽기 전용 파일, 심볼릭 링크, 4MiB 초과 파일은 백업·쓰기 없이 실패합니다.
+4. **백업**: 파일을 바꾸기 직전에 원본 바이트를 `settings.json.agent-office-backup-<UTC 시각>`(0600, 기존 파일을 덮어쓰지 않음)으로 남깁니다. 백업은 자동으로 지우지 않습니다.
+5. **원자적 쓰기**: 같은 디렉터리 임시 파일 → fsync → rename. 원래 파일 권한을 유지하고 새 파일은 0600입니다. 백업 뒤 파일을 다시 읽어 그 사이 다른 프로그램이 바꿨으면 쓰지 않습니다.
+6. **소유 판정**: 핸들러 `command`의 첫 토큰(인용 해제) 파일 이름이 `agent-office-collector`(또는 `.exe`)이고 다음 인자가 `hook <tool>`이면 소유입니다. Claude 설정 검증이 모르는 키를 거부할 수 있어 별도 표시 키는 넣지 않습니다.
+7. **멱등**: 이미 같은 항목이 있으면 아무것도 쓰지 않습니다. 실행 파일 위치가 바뀌었거나 수동으로 고친 소유 항목은 교체합니다.
+8. **제거**: 모든 이벤트에서 소유 핸들러만 지웁니다. 소유 핸들러만 있던 그룹·이벤트 키·`hooks` 키는 비게 되면 지우고, 남의 핸들러가 함께 있던 그룹은 남깁니다. 설치 전 `"hooks": {}`처럼 원래 비어 있던 키는 제거 후 사라질 수 있습니다(의미 동일).
+
+`status` 상태: `installed`(9종 모두 최신), `partial`(일부 누락), `modified`(소유 항목의 명령·타임아웃·matcher가 다름), `not_installed`, `unreadable`. 다른 Hook 개수만 표시하고 명령 원문은 출력하지 않습니다.
+
+### 도구 버전 감지
+
+`install`·`status`는 PATH의 `claude --version`·`codex --version`을 3초 제한으로 실행해 첫 줄의 버전 문자열만 꺼냅니다(나머지 출력·stderr는 버림). 어댑터 실측 표와 제품·버전·OS가 정확히 같을 때만 `verified`/`partial`이고 실측 모드를 함께 표시합니다. 예: Linux의 Claude Code 2.1.308은 `verified (실측 모드 print 한정)`, 그 밖은 `unverified`.
+
+등록된 Collector에서 `hooks install`은 감지한 Claude 버전을 설정 파일 `claude_version`에 기록하고, `hook claude`는 `--tool-version`이 없으면 이 값을 씁니다. **실행 모드(`claude_mode`)는 기록하지 않습니다.** Hook payload로 `-p`와 대화형 TUI를 구분할 수 없고 대화형은 미실측이므로, 수동으로 `claude_mode`를 넣지 않는 한 confidence는 `inferred`로 남습니다. Claude를 업데이트하면 `hooks install --yes`를 다시 실행해 버전을 갱신하세요(Hook 항목은 변경 없음).
+
+### 예시
+
+```bash
+agent-office-collector hooks status
+agent-office-collector hooks install            # 미리보기
+agent-office-collector hooks install --yes      # 백업 후 적용
+agent-office-collector hooks uninstall --yes    # 소유 항목만 제거
+agent-office-collector hooks print --tool codex # Codex hooks.json 형식 미리보기
+```
+
+실행 중인 Claude Code 세션은 설정 파일 변경을 바로 반영하지 않거나 `/hooks` 확인을 요구할 수 있습니다(미실측). 새 세션에서 확인하세요.
 
 ## 파일 위치
 
@@ -127,6 +186,7 @@ Linux arm64 Docker `golang:1.24-bookworm`에서 `gofmt -l`, `go vet ./...`(linux
 | `paths_test.go`, `instance_test.go`, `spool_test.go` | OS별 위치 규칙, 단일 실행 잠금, spool 순서·상한·잘못된 파일·오래된 임시 파일 |
 | `service_test.go` | OS별 골든(systemd·launchd·작업 XML), systemd 인용·XML 이스케이프·UTF-16LE BOM·CRLF, 상대 경로·개행 주입 거부, 소유 파일만 교체·제거, 남의 파일·작업은 명령 실행 없이 거부, 활성화 실패 보고 |
 | `cli_test.go` | Hook fail-open 9가지 입력(인자 없음, 미지 제공자, 잘못된 플래그, 미등록, 깨진 JSON, 빈 입력, 세션 없음, 8MiB 초과, 일시중지)과 끝나지 않는 stdin·쓸 수 없는 spool, 실제 하위 프로세스 종료 코드 0·출력 없음, spool에 원문 sentinel 없음, pause/resume, 진단 출력에 토큰·경로·호스트·장치 ID sentinel 없음, service 명령, 두 번째 `run` 거부 |
+| `hooks_test.go`, `cli/hooks_test.go` (#31) | Claude·Codex × linux·darwin·windows 골든, 위험 경로 거부, 소유 판정, 남의 Hook·알 수 없는 키 보존과 백업(0600)·권한 보존, 제거 후 의미상 동일 JSON, 두 번째 설치·제거 무변경, 깨진 JSON 7종 거부(쓰기·백업 없음), 읽기 전용 파일·심볼릭 링크·쓸 수 없는 디렉터리 거부, 실행 파일 이동 교체·`partial` 판정, `--yes` 없는 미리보기, CLI 출력에 토큰·홈 경로 없음, `claude_version` 기록, 버전 문자열 추출·검증 수준 판정 |
 | `e2e_test.go` | `httptest` 서버로 register → run → 기존 transcript 건너뜀 → 새 transcript(#20 합성 fixture `tests/fixtures/collector/claude/dual-source/transcript.jsonl`)와 Hook 이벤트 전송·heartbeat → 일시중지 동안의 줄·Hook 미수집 → 재개 후 새 줄 수집 → 정상 종료(`stopped`, 큐 0) → diagnose `reachable`. 서버 본문·상태 디렉터리에 원문·토큰 sentinel 없음, 같은 event_id 중복 전달 없음 |
 
 ## 알려진 제한·후속
@@ -135,4 +195,4 @@ Linux arm64 Docker `golang:1.24-bookworm`에서 `gofmt -l`, `go vet ./...`(linux
 - 실제 systemd 사용자 세션에서 unit을 기동하지 않았습니다. 로그아웃 뒤에도 실행하려면 `loginctl enable-linger`가 필요하며 자동으로 켜지 않습니다.
 - 큐 기록이 실패하면 그 주기에 정규화한 결정적 중복 제거 키가 메모리에 남아, 같은 Hook·transcript 이벤트가 이번 실행에서 다시 나오지 않을 수 있습니다(디스크 가득 참 등 드문 경우).
 - 장치 토큰 회전(`/devices/token/rotate`), 로그아웃 시 `/devices/revoke` 호출, OS 보안 저장소는 #41입니다.
-- Hook 설정 자동 설치(백업·소유 표시·원자적 쓰기)와 도구 버전 감지는 #31입니다.
+- Hook 설치(#31): 실제 Claude Code가 설치된 Hook을 호출하는 종단 확인, macOS·Windows 명령 인용 실기 확인, Codex 사용자 범위 설정 위치 실측(자동 설치 전제)이 남았습니다. 대화형 Claude 모드가 실측되기 전까지 `claude_mode`는 자동으로 채우지 않습니다.

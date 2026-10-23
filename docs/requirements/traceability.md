@@ -396,3 +396,14 @@
 | MON-002 | OPS-010 지표 | 호스트·DB·수집 지표, 관리자만, 식별자·PC 이름·URL 미포함 |
 | MON-003 | OPS-011 외부 Heartbeat | 준비 정상일 때만 push, 성공·실패 기록, URL 미로그 |
 | MON-004 | OPS-012 전원 차단 감지 | 외부 dead-man 방식 문서화(실측 미실행) |
+
+## Go Collector Hook 설치 검증 매핑(#31)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| HOOK-001 | COL-004 비침습 설치 | `hooks_test.go`: 남의 Hook·알 수 없는 키(숫자 원문 `1.50`, `<&>` 포함)·최상위 키 순서 보존, 설치 전 원본 바이트 그대로의 0600 타임스탬프 백업, 파일 권한 보존, 임시 파일 + rename 원자적 쓰기 |
+| HOOK-002 | COL-004 소유 항목만 해제 | 명령 서명(`agent-office-collector[.exe] hook <tool>`)으로만 소유 판정. 제거 후 원본과 의미상 같은 JSON, 남의 핸들러와 같은 그룹에 있던 소유 핸들러만 제거, 두 번째 설치·제거는 변경·백업 없음 |
+| HOOK-003 | COL-004 거부 조건 | 주석·뒤따르는 값·중복 키·배열 최상위·깨진 JSON·`hooks` 형식 오류는 쓰기·백업 없이 거부, 읽기 전용 파일·심볼릭 링크·쓸 수 없는 디렉터리 거부, 읽은 뒤 파일이 바뀌면 덮어쓰지 않음 |
+| HOOK-004 | COL-004 fail-open 명령 | linux·darwin·windows 골든: 타임아웃 5초, 공백·작은따옴표 경로 인용, Windows `"C:/…" hook <tool>`, 인용할 수 없는 경로 거부. 실제 Claude·Codex가 설치된 Hook을 호출하는 경로는 미실행 |
+| HOOK-005 | COL-009 상태·복구 | `hooks status`의 `installed`/`partial`/`modified`/`not_installed`/`unreadable`, 이동한 실행 파일 항목 교체, 누락 이벤트만 추가. CLI 출력에 토큰·홈 경로 원문 없음 |
+| HOOK-006 | COL-004 버전 감지 | `--version` 첫 줄에서 버전만 추출, 어댑터 실측 표와 제품·버전·OS가 정확히 같을 때만 verified/partial. 감지한 Claude 버전을 등록 설정 `claude_version`에 기록하고 실행 모드는 기록하지 않음 |
