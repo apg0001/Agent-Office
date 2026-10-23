@@ -66,6 +66,7 @@ def test_ci_workflow_has_a_pinned_complete_gate() -> None:
         "node",
         "go",
         "compose",
+        "images",
         "secret-scan",
     }
     assert workflow["jobs"]["ci-gate"]["name"] == "CI Gate"
@@ -77,3 +78,59 @@ def test_ci_workflow_has_a_pinned_complete_gate() -> None:
     )
     assert "rhysd/actionlint@sha256:" in workflow_text
     assert 'GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"' in workflow_text
+
+
+def test_image_publish_workflow_is_manual_and_gated() -> None:
+    workflow_path = ROOT / ".github" / "workflows" / "publish-images.yml"
+    workflow_text = workflow_path.read_text(encoding="utf-8")
+    workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+
+    # GHCR 게시는 외부 공개다. PR·push로는 절대 실행되지 않아야 한다.
+    assert set(workflow["on"]) == {"workflow_dispatch"}
+    assert workflow["permissions"] == {"contents": "read"}
+    publish = workflow["jobs"]["publish"]
+    assert publish["environment"] == "image-publish"
+    assert publish["permissions"] == {"contents": "read", "packages": "write"}
+
+    action_references = re.findall(r"uses:\s+[^@\s]+@([^\s#]+)", workflow_text)
+    assert action_references
+    assert all(
+        re.fullmatch(r"[0-9a-f]{40}", reference) for reference in action_references
+    )
+    assert "platforms: linux/amd64,linux/arm64" in workflow_text
+
+
+def test_dockerfiles_pin_multi_arch_base_images() -> None:
+    for dockerfile in (
+        ROOT / "apps" / "server" / "Dockerfile",
+        ROOT / "apps" / "web" / "Dockerfile",
+    ):
+        text = dockerfile.read_text(encoding="utf-8")
+        base_images = re.findall(r"^ARG \w+_IMAGE=(\S+)$", text, flags=re.MULTILINE)
+        assert base_images, dockerfile
+        for image in base_images:
+            assert re.fullmatch(r"[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}", image), image
+        assert "HEALTHCHECK" in text
+        assert re.search(r"^USER \d+:\d+$", text, flags=re.MULTILINE) or (
+            "nginx-unprivileged" in text
+        )
+
+
+def test_production_compose_uses_pinned_images_without_builds() -> None:
+    compose = yaml.safe_load(
+        (ROOT / "deploy" / "compose.production.yaml").read_text(encoding="utf-8")
+    )
+
+    for name, service in compose["services"].items():
+        assert "build" not in service, name
+        assert service["restart"] == "always", name
+        assert "no-new-privileges:true" in service["security_opt"], name
+    assert "ports" not in compose["services"]["postgres"]
+    for name in ("server", "web"):
+        service = compose["services"][name]
+        assert service["read_only"] is True
+        assert service["cap_drop"] == ["ALL"]
+        assert all(
+            port.startswith("${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:")
+            for port in service["ports"]
+        )

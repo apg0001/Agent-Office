@@ -61,3 +61,14 @@
 | POC-CLD-005 | EVT-007 프라이버시 | 원문 미저장·stdout 없음·`~/.claude` 밖 transcript 미열람 프로브 회귀 테스트 7개, 결과 원문 패턴 0건 |
 | POC-CLD-006 | COL-004 비침습 Hook | 비정상 종료·타임아웃 장애 주입에서 Claude 정상 완료, 사용자 설정 SHA-256 무변경 |
 | POC-CLD-007 | EVT-002·008 중복·유휴 | Hook·stream·transcript `tool_use_id` 일치, transcript 블록 중복 관측; `Stop` 단독 유휴 판정 금지. 교차 중복은 #20 |
+
+## Docker 이미지 검증 매핑(#56)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| IMG-001 | DIST-004 멀티아키텍처 이미지 | CI `Images (amd64)`·`Images (arm64)` 네이티브 빌드·아키텍처 확인, Pi arm64 실측 |
+| IMG-002 | DIST-005 digest 고정 | Dockerfile 베이스와 PostgreSQL 이미지 `태그@sha256` 고정 검사 테스트 |
+| IMG-003 | DIST-006 이미지 설치·소스 빌드 경로 | 개발 Compose(소스 빌드)와 독립 운영 Compose(`태그@digest`) 렌더링·기동 |
+| IMG-004 | OPS-001 health·재시작 | 이미지 `HEALTHCHECK`, `up --wait`, 프로세스 종료 후 자동 재시작 실측 |
+| IMG-005 | SEC 최소 권한 | 비루트 사용자, 읽기 전용 루트, `cap_drop: ALL`, 루프백 바인딩 테스트·실측 |
+| IMG-006 | OPS 배포 승인 | GHCR 게시 workflow가 `workflow_dispatch`·`image-publish` Environment로만 실행되는지 테스트 |
