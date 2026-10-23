@@ -29,6 +29,7 @@ LABEL org.opencontainers.image.title="agent-office-web" \
       org.opencontainers.image.revision="${REVISION}"
 
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
 # nginx-unprivileged 이미지는 UID 101로 8080 포트에서 실행한다.
 EXPOSE 8080

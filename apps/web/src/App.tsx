@@ -1,3 +1,8 @@
+import { useEffect, useState } from "react";
+
+import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./account/AccountPages";
+import { SetupWizard } from "./account/SetupWizard";
+import { type SessionInfo, call, routeFor } from "./account/api";
 import { OfficeView } from "./office/OfficeView";
 
 const principles = [
@@ -6,9 +11,62 @@ const principles = [
   ["비침습", "Collector 장애가 에이전트 작업을 막지 않습니다."],
 ];
 
-export function App() {
+function SessionBar() {
+  const [session, setSession] = useState<SessionInfo | null | undefined>(undefined);
+
+  useEffect(() => {
+    void call<SessionInfo>("GET", "/api/v1/auth/session").then((result) => setSession(result.data));
+  }, []);
+
+  if (session === undefined) {
+    return null;
+  }
+  if (session === null) {
+    return (
+      <nav className="session-bar" aria-label="계정">
+        <a href="/login">로그인</a>
+      </nav>
+    );
+  }
+  const logout = async () => {
+    await call("POST", "/api/v1/auth/logout", undefined, session.csrf_token);
+    window.location.assign("/login");
+  };
+  return (
+    <nav className="session-bar" aria-label="계정">
+      <span>{session.user.display_name}</span>
+      <button type="button" onClick={() => void logout()}>
+        로그아웃
+      </button>
+    </nav>
+  );
+}
+
+export function App({ pathname }: { pathname?: string }) {
+  const route = routeFor(pathname ?? (typeof window === "undefined" ? "/" : window.location.pathname));
+
+  if (route !== "office") {
+    const pages = {
+      login: LoginPage,
+      signup: SignupPage,
+      verify: VerifyPage,
+      reset: ResetPage,
+      setup: SetupWizard,
+    };
+    const Page = pages[route];
+    return (
+      <main className="shell account-shell">
+        <p className="eyebrow">
+          <a href="/">AGENT OFFICE</a>
+        </p>
+        <Page />
+      </main>
+    );
+  }
+
   return (
     <main className="shell">
+      <SessionBar />
       <section className="hero">
         <p className="eyebrow">SELF-HOSTED · MULTI-USER · PRIVACY-FIRST</p>
         <h1>Agent Office</h1>
