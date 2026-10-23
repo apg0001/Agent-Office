@@ -5,14 +5,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Connection, select
 
-from agent_office import audit, instance, secret_store
+from agent_office import audit, instance, monitoring, retention, secret_store
 from agent_office.api.deps import CsrfDep, CurrentUser, DbConnection, UserDep
 from agent_office.auth import accounts, mailer
 from agent_office.db import schema
@@ -299,3 +299,23 @@ def update_oauth(
         details={"reason": provider},
     )
     return _view(connection)
+
+
+metrics_router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+
+@metrics_router.get("/metrics")
+def read_metrics(_admin: AdminDep, connection: DbConnection) -> dict[str, Any]:
+    """운영 지표(#59). 숫자·코드만 담고 사용자·장치 식별자와 주소는 없다."""
+    return {
+        "host": monitoring.host_metrics(),
+        "database": monitoring.database_metrics(connection),
+        "collection": monitoring.collection_metrics(connection),
+        "readiness": monitoring.readiness(connection),
+        "external_heartbeat": {
+            "configured": monitoring.heartbeat_url() is not None,
+            "last_at": monitoring.last_heartbeat["at"],
+            "last_ok": monitoring.last_heartbeat["ok"],
+        },
+        "retention": {"last_at": retention.last_run["at"], "last_ok": retention.last_run["ok"]},
+    }
