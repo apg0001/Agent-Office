@@ -25,6 +25,7 @@ from agent_office.security import (
     normalize_registration_code,
     token_hash,
 )
+from agent_office.state.engine import connection_state
 
 REGISTRATION_CODE_TTL = dt.timedelta(minutes=10)
 MAX_OPEN_REGISTRATION_CODES = 5
@@ -77,6 +78,8 @@ class DeviceSummary(StrictModel):
     created_at: dt.datetime
     last_seen_at: dt.datetime | None
     revoked_at: dt.datetime | None
+    # 마지막 heartbeat로 계산한 Collector 연결 상태(#36). 세션 종료와는 별개다.
+    connection: Literal["ONLINE", "DISCONNECTED"]
 
 
 def _invalid_code() -> HTTPException:
@@ -285,7 +288,18 @@ def list_devices(user: UserDep, connection: DbConnection) -> list[DeviceSummary]
         .where(devices.c.owner_user_id == user.id)
         .order_by(devices.c.created_at)
     ).all()
-    return [DeviceSummary.model_validate(row._asdict()) for row in rows]
+    now = connection.execute(select(func.now())).scalar_one()
+    return [
+        DeviceSummary.model_validate(
+            {
+                **row._asdict(),
+                "connection": "DISCONNECTED"
+                if row.revoked_at is not None
+                else connection_state(row.last_seen_at, now),
+            }
+        )
+        for row in rows
+    ]
 
 
 @router.post("/{device_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)

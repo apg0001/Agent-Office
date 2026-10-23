@@ -21,7 +21,7 @@ PostgreSQL 스키마·무결성 규칙·보존 인덱스·마이그레이션 전
 - 세션 생명주기: `DISCOVERED` / `OPEN` / `ENDED` / `UNKNOWN`
 - 활동: `WORKING` / `THINKING` / `WAITING_USER` / `IDLE` / `UNKNOWN`
 
-세션이 조용하다는 이유만으로 종료시키지 않으며, `turn/completed`는 유휴 전환의 근거일 뿐 세션 종료가 아닙니다.
+세션이 조용하다는 이유만으로 종료시키지 않으며, `turn/completed`는 유휴 전환의 근거일 뿐 세션 종료가 아닙니다. 전이 규칙은 [상태 엔진](state-engine.md)(#36)에 있습니다.
 
 ## 신뢰 경계
 
