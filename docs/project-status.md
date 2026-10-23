@@ -12,9 +12,9 @@
 
 - 활성 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
 - 브랜치: `feat/#18-codex-desktop-poc`
-- 기준 브랜치: `develop` (`f14668a`, PR #79 병합 결과)
-- 상태: Issue·브랜치·인수인계 준비 완료. `computer-use` 안전 규칙상 Codex Desktop UI 자동화가 금지되어 수동 합성 세션 또는 비-UI 관측 경로 결정 대기
-- 직전 완료: #17, PR https://github.com/apg0001/Agent-Office/pull/79, merge commit `f14668a`
+- 기준 브랜치: `develop` (`9145d8c`, PR #81 병합 결과)
+- 상태: 최신 기준선 병합 중. 공식 OpenAI app-server 프로토콜을 이용한 비-UI 관측 범위 검증 착수
+- 직전 완료: #80, PR https://github.com/apg0001/Agent-Office/pull/81, merge commit `9145d8c`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
 
@@ -24,7 +24,7 @@
 - 원격: `https://github.com/apg0001/Agent-Office.git`.
 - 로컬 `gh`로 라벨 생성과 Issue 쓰기 성공.
 - 별도 GitHub 앱 커넥터의 이슈 생성은 `403 Resource not accessible by integration`; 이후 쓰기는 검증된 로컬 `gh`만 사용.
-- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). Epic #1과 #13~#17은 완료·종료됨.
+- 등록 이슈: 75개 = Epic 12개(#1~#12) + 최초 세부 작업 62개(#13~#74) + 기준선 보존 #80. Epic #1과 #13~#17은 완료·종료됨.
 - 각 Epic 본문에 실제 하위 이슈 체크리스트와 의존성을 연결함.
 
 ### 실제 번호 매핑
@@ -100,7 +100,12 @@
 37. PR #79 생성 후 GitHub Actions run `39888754773`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
 38. PR #79 최신 run `39888846155`도 전체 통과 후 `develop` 병합, #17 종료와 Epic #2 체크리스트 동기화.
 39. #18 `feat/#18-codex-desktop-poc` 브랜치를 최신 `develop`에서 생성.
-40. `computer-use` 스킬과 필수 안전 지침을 확인. ChatGPT/Codex Desktop UI·Codex 확장 자동화 금지 규칙에 따라 앱 입력 없이 중단하고 수동 운영 절차가 필요함을 확인.
+40. `computer-use` 스킬과 안전 지침상 ChatGPT/Codex Desktop UI·확장 자동화가 금지됨을 확인하고 앱 입력 없이 중단, 수동 운영 또는 비-UI 관측 경로 결정 대기 상태를 기록.
+41. 저장소만으로 최초 사양을 복원할 수 없는 공백을 확인하고 문서 Issue #80 생성.
+42. #18 작업 브랜치를 원격 `3f39495`에 보존한 채 최신 `develop`에서 `docs/#80-master-prompt-baseline` 생성.
+43. 외부 마스터 프롬프트에 대표 비밀·개인 절대경로 패턴이 없음을 확인하고 44,535바이트 원문을 변경 없이 `docs/specifications`에 복사.
+44. 원본·저장소 사본 SHA-256 `76bf1febe43afa60072e11f232885709e24f4a4fb619067935426adfafd4c17b` 일치, 14개 요구사항 범위와 문서 링크를 검사하는 테스트 3개 추가.
+45. PR #81 최신 GitHub Actions run `39890099009`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 전체 통과 후 `develop` 병합, #80 종료.
 
 ## 직전 완료 변경 요약(#17)
 
@@ -113,7 +118,7 @@
 
 | 검사 | 상태 | 근거 |
 |---|---|---|
-| Python 설치/pytest/Ruff/mypy | 통과 | pytest 24개 통과(Starlette TestClient deprecation 경고 1개), Ruff lint·format·mypy 오류 0 |
+| Python 설치/pytest/Ruff/mypy | 통과 | #80 포함 pytest 27개 통과(Starlette TestClient deprecation 경고 1개), Ruff lint·format·mypy 오류 0 |
 | npm install/typecheck/test/build | 통과 | 이벤트 계약 3개+웹 1개 Vitest 통과, TypeScript 오류 0, 두 workspace build 성공 |
 | 이벤트 JSON Schema 계약 | 통과 | Draft 2020-12 스키마 3개, 유효 4개·무효 9개 fixture, 닫힌 허용 필드 집합 검증 |
 | FastAPI OpenAPI 계약 | 통과 | `openapi-spec-validator` 0.9.0, health path 포함 문서 검증 |
@@ -124,24 +129,26 @@
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
 | GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자·대화 해결·strict `CI Gate` 활성, 승인 0, force-push·삭제 비활성 |
-| GitHub Actions 원격 CI | 통과 | PR #79 최신 run `39888846155`: 하위 5개 job과 `CI Gate` 모두 성공 |
+| GitHub Actions 원격 CI | 통과 | PR #81 최신 run `39890099009`: Python·Node·Go·Compose·Secret Scan과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
 | diff 공백·비밀·개인 경로 검사 | 통과 | `git diff --check`, 대표 비밀/절대경로 패턴 일치 0 |
+| 마스터 사양 기준선 | 통과 | 외부 원본과 저장소 사본 44,535바이트·SHA-256 일치, 요구사항 범위·문서 링크 테스트 3개 통과 |
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. 사용자 또는 수동 운영자가 별도 합성 Desktop 세션을 직접 실행할 수 있는지 확인한다. Computer Use로 Codex UI를 자동화하지 않는다.
-2. 수동 실행이 가능하면 #17 프로브를 Desktop이 연 임시 작업공간에 연결하되 Hook 정의·신뢰 동작은 운영자가 직접 검토한다.
-3. 시작·턴·안전한 읽기 도구·승인·하위 에이전트·종료를 하나씩 수행하고 관측/미관측을 구조 통계로만 기록한다.
-4. 수동 실행이 불가능하면 #18에 미실행 사유를 남기고, #21 app-server의 허용된 비-UI 관측으로 확인 가능한 범위를 별도 검증한다.
-5. CLI #17과 Desktop 결과의 저장소 공유 여부를 값이 아닌 경로 템플릿·HMAC으로 비교하고 개인정보 회귀 테스트·호환성 보고서를 갱신한다.
+1. 공식 app-server의 stable 프로토콜과 로컬 CLI 구현에서 시작·턴·도구·승인·하위 에이전트·종료 알림의 비-UI 관측 가능 범위를 확인한다.
+2. 실제 Codex Desktop 설치·프로세스 버전과 공개된 통합 표면을 원문 로그 접근 없이 읽기 전용으로 확인한다.
+3. Desktop 전용임을 입증할 수 없는 app-server 결과는 일반 Codex harness 관측으로 분리하고 Desktop 지원을 주장하지 않는다.
+4. 사용자/수동 운영자가 별도 합성 Desktop 세션을 실행할 수 있으면 #17 프로브와 연결하고, 불가능하면 정확한 미실행 사유와 수동 절차를 남긴다.
+5. CLI #17과 Desktop 결과의 공유 여부를 값이 아닌 경로 템플릿·HMAC으로만 비교하고 개인정보 회귀 테스트·호환성 보고서를 갱신한다.
 
 ## 알려진 위험과 결정 대기
 
 - 라이선스는 소유자 결정 전까지 미정이며 `LICENSE`를 만들지 않았다.
+- 마스터 프롬프트 v0.8 저장소 사본은 불변 기준선이다. 수정이 필요하면 기존 파일을 고치지 않고 Issue·ADR과 새 버전 파일을 추가한다.
 - 호스트 Go는 없지만 공식 Go 컨테이너로 현재 모듈 검증을 완료했다.
 - 로컬 8000 포트가 이미 사용 중이어서 Compose smoke test는 18000/15173 포트로 수행했다.
 - Claude CLI가 없어 관련 검증은 수행할 수 없다.
