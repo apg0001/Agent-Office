@@ -69,6 +69,10 @@ export const EVENT_REJECTION_CODES = [
   "unauthorized_scope",
   "unsupported_schema_version",
   "retention_window_exceeded",
+  "event_id_conflict",
+  "parent_agent_unknown",
+  "parent_agent_conflict",
+  "occurred_at_out_of_range",
   "internal_error",
 ] as const;
 export type EventRejectionCode = (typeof EVENT_REJECTION_CODES)[number];

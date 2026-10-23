@@ -4,20 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-import secrets
 import uuid
 from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from helpers import CSRF, bearer, new_code, register, session_cookie, sign_in
 from sqlalchemy import Engine, select, text, update
 
-from agent_office.api.deps import CSRF_HEADER, SESSION_COOKIE
 from agent_office.db import schema
 from agent_office.db.engine import get_engine
 from agent_office.main import app
-
-CSRF = {CSRF_HEADER: "1"}
 
 
 @pytest.fixture
@@ -26,54 +23,6 @@ def client(engine: Engine) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
     get_engine.cache_clear()
-
-
-def sign_in(engine: Engine, status: str = "active") -> tuple[uuid.UUID, str]:
-    """#25 전까지 로그인 세션은 테스트가 직접 만든다(토큰 해시만 저장)."""
-    token = secrets.token_urlsafe(32)
-    with engine.begin() as connection:
-        user_id = connection.execute(
-            schema.users.insert()
-            .values(
-                email=f"{secrets.token_hex(4)}@example.invalid",
-                display_name="synthetic",
-                status=status,
-            )
-            .returning(schema.users.c.id)
-        ).scalar_one()
-        connection.execute(
-            schema.login_sessions.insert().values(
-                user_id=user_id,
-                token_hash=hashlib.sha256(token.encode()).digest(),
-                expires_at=text("now() + interval '1 hour'"),
-            )
-        )
-    return user_id, token
-
-
-def new_code(client: TestClient, session: str) -> str:
-    response = client.post(
-        "/api/v1/devices/registration-codes", headers={**CSRF, **session_cookie(session)}
-    )
-    assert response.status_code == 201, response.text
-    return str(response.json()["code"])
-
-
-def register(client: TestClient, code: str, name: str = "pc-1") -> dict[str, str]:
-    response = client.post(
-        "/api/v1/devices/register",
-        json={"registration_code": code, "name": name, "platform": "linux"},
-    )
-    assert response.status_code == 201, response.text
-    return dict(response.json())
-
-
-def session_cookie(token: str) -> dict[str, str]:
-    return {"Cookie": f"{SESSION_COOKIE}={token}"}
-
-
-def bearer(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_registration_flow_binds_device_to_code_owner(client: TestClient, engine: Engine) -> None:
