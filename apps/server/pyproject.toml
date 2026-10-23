@@ -21,6 +21,8 @@ dependencies = [
 [project.scripts]
 # 최초 관리자 bootstrap 토큰을 운영자 콘솔에만 출력한다(#66).
 agent-office-bootstrap = "agent_office.setup.bootstrap:main"
+# 보존 기간 정리를 즉시 한 번 실행한다(#39). 서버도 한 시간마다 실행한다.
+agent-office-retention = "agent_office.retention:main"
 
 [project.optional-dependencies]
 dev = [
