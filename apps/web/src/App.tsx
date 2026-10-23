@@ -1,3 +1,5 @@
+import { OfficeView } from "./office/OfficeView";
+
 const principles = [
   ["관측 우선", "실제 이벤트와 추정·연출을 분리합니다."],
   ["로컬 원문", "프롬프트와 코드, 로그 원문은 개발 PC에만 둡니다."],
@@ -16,6 +18,7 @@ export function App() {
         </p>
         <span className="status">기반 구축 중 · 실제 수집 비활성</span>
       </section>
+      <OfficeView />
       <section className="principles" aria-label="프로젝트 원칙">
         {principles.map(([title, description]) => (
           <article key={title}>
