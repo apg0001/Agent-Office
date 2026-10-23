@@ -277,3 +277,13 @@
 | QUEUE-003 | EVT-002 멱등 재전송 | `transport_test.go`: 서버 저장 후 응답 전 연결 끊김 → 재시작 → 같은 본문·ID 재전송 → `duplicate` ACK 삭제, accepted·duplicate만 삭제, 잘못된 응답 7종 ACK 없음, 계약 fixture 응답 처리 |
 | QUEUE-004 | COL-008 배치·재시도 | 500건·1MiB(설정 한도) 분할, 5xx·429 full jitter 지수 백오프와 `Retry-After` 하한, 타임아웃, 401·403 정지(큐 유지), 422 이분 탐색, retryable·알 수 없는 거부 코드, `max_attempts` dead-letter |
 | QUEUE-005 | COL-007·SEC-006 프라이버시 | Hook 원문·ID 필드, 체크포인트 경로, 거부 코드 sentinel이 DB 본 파일·WAL·오류 문자열에 없음, 전송 오류에 본문·토큰·URL 없음 |
+
+## 최초 관리자 bootstrap 검증 매핑(#66)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| BOOT-001 | SETUP-002 콘솔 일회성 토큰 | CLI 출력으로만 발급, DB에는 해시만, 재발급 시 이전 무효, 만료 거부 |
+| BOOT-002 | SETUP-001 최초 SUPER_ADMIN | 토큰으로 활성 관리자·세션 생성, 이후 재사용·재발급 거부 |
+| BOOT-003 | SEC-004 경합 | 같은 토큰 동시 4요청 중 1건만 성공, 관리자 1명 |
+| BOOT-004 | 설치 완료 잠금 | `SUPER_ADMIN`만 완료 가능, 완료 후 상태 반영 |
+| BOOT-005 | 오류 경계 | 입력 오류·중복 이메일은 토큰 미소비, 교차 사이트 403 |
