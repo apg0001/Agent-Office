@@ -13,7 +13,7 @@
 - 활성 작업: #17 `EP-02/ISS-01 Codex CLI Hook/JSONL 실측`
 - 브랜치: `feat/#17-codex-hook-poc`
 - 기준 브랜치: `develop` (`7a3cfb1`, PR #78 병합 결과)
-- 상태: 개인정보 축약 PoC 하네스·회귀 테스트와 Codex CLI 합성 실측 4회, 보고서·호환성·로컬 전체 검증 완료, 커밋·PR 대기
+- 상태: 개인정보 축약 PoC 하네스·실측·문서 완료, PR #79 첫 원격 `CI Gate` 통과, 최종 문서 commit·재검증·병합 대기
 - 직전 완료: #16, PR https://github.com/apg0001/Agent-Office/pull/78, merge commit `7a3cfb1`; Epic #1 종료
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
@@ -97,6 +97,7 @@
 34. 합성 세션 transcript가 `sessions/<number>/<number>/<number>/<redacted>.jsonl`에 append되고 종료 시 21개 유효 JSON 줄인 것을 원문 없이 확인.
 35. #17 변경 포함 Python 24개, Node, Go, Compose, actionlint 전체 회귀 검사를 로컬에서 통과.
 36. #17 작업 트리 약 60.94MB를 Gitleaks 8.30.1로 검사하고 비밀 0건 확인.
+37. PR #79 생성 후 GitHub Actions run `39888754773`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
 
 ## 직전 완료 변경 요약(#16)
 
@@ -129,10 +130,10 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. #17 PoC 보고서·호환성·요구사항 추적과 하네스 diff를 자체 리뷰한다.
-2. Python 전체 검사, Node/Go/Compose 회귀, actionlint, Gitleaks와 민감 패턴 검사를 실행한다.
-3. 한국어 커밋·push 후 `develop` 대상 PR을 만들고 필수 `CI Gate`를 통과시킨다.
-4. 실제 관측과 미관측 범위를 PR·Issue에 기록하고, 병합 후 #17과 Epic #2 체크리스트를 갱신한다.
+1. PR #79와 원격 run 근거를 반영한 문서 commit을 push한다.
+2. 최신 commit의 필수 `CI Gate` 재통과를 확인하고 PoC 프라이버시·미지원 판정을 자체 리뷰한다.
+3. 보호 규칙을 유지한 채 PR #79를 `develop`에 병합한다.
+4. #17과 Epic #2 체크리스트를 완료 처리한다.
 5. #18 Codex Desktop 세션·도구·하위 에이전트 실측을 시작한다.
 
 ## 알려진 위험과 결정 대기
