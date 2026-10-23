@@ -10,12 +10,11 @@
 
 ## 현재 위치
 
-- 활성 작업: #13 `EP-01/ISS-01 Monorepo 구조·개발 환경·Compose dev 구성`
-- 브랜치: `feat/#13-monorepo-bootstrap`
-- 기준 브랜치: `develop` (2026-10-22에 `main`에서 생성해 원격 push 완료)
-- 상태: 구현·로컬/컨테이너 검증 완료, Draft PR #75 병합 준비
-- 구현 커밋: `fe8cadd` (`[feat] 모노레포 개발 기반 구축 (#13)`)
-- PR: https://github.com/apg0001/Agent-Office/pull/75 (`develop` 대상, Draft)
+- 활성 작업: #14 `EP-01/ISS-02 Git 규칙·브랜치 보호·PR/Issue 템플릿`
+- 브랜치: `docs/#14-git-governance`
+- 기준 브랜치: `develop` (`3914632`, PR #75 병합 결과)
+- 상태: 이슈/PR 템플릿·보호 규칙·자동 구조 검사 구현 및 검증 완료, 커밋·PR 대기
+- 직전 완료: #13, PR https://github.com/apg0001/Agent-Office/pull/75, merge commit `3914632`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음
 
@@ -25,7 +24,7 @@
 - 원격: `https://github.com/apg0001/Agent-Office.git`.
 - 로컬 `gh`로 라벨 생성과 Issue 쓰기 성공.
 - 별도 GitHub 앱 커넥터의 이슈 생성은 `403 Resource not accessible by integration`; 이후 쓰기는 검증된 로컬 `gh`만 사용.
-- 열린 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74).
+- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). #13은 완료·종료됨.
 - 각 Epic 본문에 실제 하위 이슈 체크리스트와 의존성을 연결함.
 
 ### 실제 번호 매핑
@@ -71,8 +70,12 @@
 7. 구현 커밋 `fe8cadd` push 및 `develop` 대상 Draft PR #75 생성.
 8. Docker Desktop 기동 후 Go 포맷·vet·race test, Compose image build와 실제 서비스 health 검증.
 9. 8000 포트 충돌을 확인해 테스트에만 18000/15173 포트를 사용하고, 종료 후 컨테이너·네트워크·테스트 DB 볼륨 정리.
+10. PR #75를 `develop`에 병합하고 #13 종료.
+11. #14 브랜치 생성, 구조화 Issue 폼·PR 템플릿·GitHub 운영 문서·메타데이터 테스트 작성.
+12. `main`과 `develop`에 관리자 포함 PR·대화 해결 필수, force-push·삭제 금지 보호 규칙을 적용하고 GitHub API로 재검증.
+13. #14 변경에 대해 pytest 4개, Ruff, mypy, Node typecheck·Vitest·production build를 실행해 통과 확인.
 
-## 변경 파일 요약(#13)
+## 직전 완료 변경 요약(#13)
 
 - 루트: README, ignore/editor 설정, npm workspace, Python 개발 의존성.
 - 서버: 최소 FastAPI health API, 테스트, 컨테이너 정의.
@@ -91,6 +94,8 @@
 | Compose config | 통과 | `docker compose ... config --quiet` 성공 |
 | Docker image build | 통과 | FastAPI server와 React/nginx web 이미지 빌드 성공 |
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
+| 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
+| GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자 적용·대화 해결 활성, 승인 0, 필수 상태 검사 없음, force-push·삭제 비활성 |
 | 실제 Codex Hook 이벤트 | 미실행 | #17, #18 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
@@ -98,11 +103,11 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. `git status --short --branch`로 이 문서의 브랜치와 변경 목록을 대조한다.
-2. PR #75에 추가 검증 결과를 반영하고 코드 자체 검토를 완료한다.
-3. PR #75를 ready로 전환해 `develop`에 병합하고 #13을 닫는다.
-4. #14 브랜치를 `develop`에서 생성해 Git 규칙·브랜치 보호·Issue/PR 템플릿을 구현한다.
-5. 이후 #15 → #16 순서로 진행하고, EP-02 #17~#21은 계약 #15를 기준으로 PoC한다.
+1. diff·비밀·개인 경로 최종 검사를 실행하고 결과를 이 문서에 반영한다.
+2. #14 변경을 한국어 커밋으로 묶어 push하고 `develop` 대상 PR을 생성한다.
+3. PR 본문에 실제 검사 결과와 보호 규칙 설정 근거를 기록한 뒤 자체 리뷰한다.
+4. 보호 규칙을 통과해 병합하고 #14를 닫는다.
+5. `develop`을 갱신한 뒤 #15 이벤트 JSON Schema·공통 타입·API 계약을 시작한다.
 
 ## 알려진 위험과 결정 대기
 

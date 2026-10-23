@@ -1,0 +1,62 @@
+name: 버그 보고
+description: 재현 가능한 결함과 회귀를 보고합니다.
+title: "[BUG] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        실제 사용자 로그, 프롬프트, 코드, 토큰과 민감 경로를 첨부하지 마세요.
+  - type: textarea
+    id: summary
+    attributes:
+      label: 문제 요약
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 최소 재현 절차
+      description: 합성 데이터와 식별 불가능한 값만 사용하세요.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 결과
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 결과
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 버전·커밋
+      placeholder: server 0.1.0 / collector 0.1.0 / commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 영향 영역
+      options:
+        - 서버/API
+        - 웹/Phaser
+        - Collector Core
+        - Collector GUI/설치
+        - 배포/운영
+        - 문서/개발 하네스
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: 보안·개인정보 영향
+      description: 원본 데이터 노출 여부를 원문 없이 설명하세요. 민감한 취약점은 비공개 보안 제보를 사용하세요.
+    validations:
+      required: true

@@ -10,6 +10,17 @@
 
 커밋 예: `[feat] 개발용 Compose 기반 구성 (#13)`
 
+## 브랜치와 보호 규칙
+
+- 기능: `feat/#번호-영문-설명`
+- 버그: `fix/#번호-영문-설명`
+- 문서: `docs/#번호-영문-설명`
+- 테스트/하네스: `test/#번호-영문-설명` 또는 `chore/#번호-영문-설명`
+
+`main`과 `develop`에는 직접 push하지 않습니다. force-push와 브랜치 삭제도 금지됩니다. 모든 변경은 연결된 Issue와 PR을 거치며, 리뷰 대화를 해결한 뒤 병합합니다. 현재 단일 관리자 단계에서는 보호 규칙의 필수 승인 수가 0이고 상태 검사는 #16에서 추가됩니다. 그렇더라도 PR 본문의 자체 검토·검증 근거를 생략할 수 없습니다.
+
+`main` PR은 Beta·보안·백업·호환성 검증과 관리자 명시적 릴리스 승인이 있을 때만 만듭니다.
+
 ## 제출 전 확인
 
 - `python -m pytest apps/server/tests tests`
@@ -18,6 +29,7 @@
 - `npm run typecheck && npm run test && npm run build`
 - `go test ./collector/...`
 - `docker compose --env-file deploy/.env.example -f deploy/compose.yaml config`
+- `.\.venv\Scripts\python -m pytest tests/test_repository_metadata.py`
 
 환경상 실행하지 못한 검사는 PR과 `docs/project-status.md`에 이유를 적습니다.
 

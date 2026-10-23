@@ -10,4 +10,5 @@
 - [운영 Runbook](operations/runbook.md)
 - [백업·복원](operations/backup-restore.md)
 - [릴리스 절차](operations/release.md)
+- [GitHub 작업·보호 규칙](operations/github-governance.md)
 - [ADR-0001 모노레포 구조](decisions/0001-monorepo-layout.md)

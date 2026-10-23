@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 보안 취약점 비공개 제보
+    url: https://github.com/apg0001/Agent-Office/security/policy
+    about: 토큰, 개인정보 또는 악용 세부 사항을 공개 Issue에 올리지 마세요.
