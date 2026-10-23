@@ -1,0 +1,110 @@
+"""수집된 이벤트를 현재 상태 테이블에 반영한다. 이벤트 저장과 같은 트랜잭션에서 호출한다."""
+
+from __future__ import annotations
+
+import datetime as dt
+import uuid
+
+from sqlalchemy import Connection, func, select, update
+from sqlalchemy.dialects.postgresql import insert
+
+from agent_office.db import schema
+from agent_office.state.engine import (
+    AgentActivity,
+    Lifecycle,
+    is_newer,
+    next_activity,
+    next_lifecycle,
+)
+
+
+def apply_event(
+    connection: Connection,
+    *,
+    session_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    event_type: str,
+    activity: str,
+    confidence: str,
+    occurred_at: dt.datetime,
+    sequence: int,
+) -> None:
+    _apply_lifecycle(connection, session_id, event_type, occurred_at)
+    _apply_agent(connection, agent_id, event_type, activity, confidence, occurred_at, sequence)
+
+
+def _apply_lifecycle(
+    connection: Connection, session_id: uuid.UUID, event_type: str, occurred_at: dt.datetime
+) -> None:
+    sessions = schema.agent_sessions
+    row = connection.execute(
+        select(sessions.c.lifecycle, sessions.c.started_at, sessions.c.ended_at)
+        .where(sessions.c.id == session_id)
+        .with_for_update()
+    ).one()
+    current = Lifecycle(row.lifecycle, row.started_at, row.ended_at)
+    changed = next_lifecycle(current, event_type, occurred_at)
+    if changed != current:
+        connection.execute(
+            update(sessions)
+            .where(sessions.c.id == session_id)
+            .values(
+                lifecycle=changed.state,
+                started_at=changed.started_at,
+                ended_at=changed.ended_at,
+            )
+        )
+
+
+def _apply_agent(
+    connection: Connection,
+    agent_id: uuid.UUID,
+    event_type: str,
+    activity: str,
+    confidence: str,
+    occurred_at: dt.datetime,
+    sequence: int,
+) -> None:
+    states, agents = schema.agent_current_states, schema.agents
+    connection.execute(
+        insert(states).values(agent_id=agent_id).on_conflict_do_nothing(index_elements=["agent_id"])
+    )
+    row = connection.execute(
+        select(
+            states.c.turn_state,
+            states.c.activity,
+            states.c.state_version,
+            states.c.last_event_occurred_at,
+            states.c.last_event_sequence,
+        )
+        .where(states.c.agent_id == agent_id)
+        .with_for_update()
+    ).one()
+
+    lifetime: dict[str, object] = {}
+    if event_type == "agent.started":
+        lifetime["started_at"] = func.coalesce(agents.c.started_at, occurred_at)
+    elif event_type == "agent.completed":
+        lifetime["ended_at"] = func.greatest(
+            func.coalesce(agents.c.ended_at, occurred_at), occurred_at
+        )
+    if lifetime:
+        connection.execute(update(agents).where(agents.c.id == agent_id).values(**lifetime))
+
+    if not is_newer(occurred_at, sequence, row.last_event_occurred_at, row.last_event_sequence):
+        # 과거 이벤트는 저장만 하고 현재 상태를 되돌리지 않는다.
+        return
+    current = AgentActivity(row.turn_state, row.activity)
+    changed = next_activity(current, event_type, activity, confidence)
+    connection.execute(
+        update(states)
+        .where(states.c.agent_id == agent_id)
+        .values(
+            turn_state=changed.turn_state,
+            activity=changed.activity,
+            state_version=row.state_version + (1 if changed != current else 0),
+            last_event_occurred_at=occurred_at,
+            last_event_sequence=sequence,
+            updated_at=func.now(),
+        )
+    )
