@@ -28,6 +28,8 @@ docker run -d --name ao-pg-test -e POSTGRES_PASSWORD=<로컬 전용 암호> -p 1
 AGENT_OFFICE_TEST_DATABASE_URL="postgresql+psycopg://postgres:<로컬 전용 암호>@127.0.0.1:55432/postgres" python -m pytest apps/server/tests/test_db_schema.py
 ```
 
+SD 카드의 Raspberry Pi에서는 테스트마다 임시 DB를 만들 때 fsync가 몰려 매우 느려집니다(#35 실측: 이벤트 테스트 26개 194초). 테스트 전용 컨테이너는 데이터를 남길 필요가 없으므로 `--tmpfs /var/lib/postgresql/data:rw,size=1g`와 `-c fsync=off -c synchronous_commit=off -c full_page_writes=off`로 띄우면 22초로 줄어듭니다. 운영 DB에는 이 설정을 쓰지 않습니다.
+
 URL이 없으면 DB 테스트는 사유를 표시하고 건너뜁니다. 건너뛴 결과를 통과로 기록하지 않습니다.
 
 ## 웹

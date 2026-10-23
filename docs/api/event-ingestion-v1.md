@@ -4,7 +4,7 @@
 
 계약 버전: `1.0`
 
-이 문서는 구현 예정인 `POST /api/v1/collector/events`의 전송 계약을 정의합니다. #15에서는 스키마와 타입만 확정하며 인증·저장·응답 엔드포인트는 후속 이슈에서 구현합니다.
+이 문서는 `POST /api/v1/events/batch`의 전송 계약을 정의합니다. #15에서 스키마와 타입을 확정했고, #35에서 장치 인증·저장·응답을 구현했습니다. 장치 토큰은 [장치 등록·인증 API](devices-v1.md)로 받습니다.
 
 ## 단일 이벤트
 
@@ -47,7 +47,45 @@
 - `duplicate_event_ids`: 같은 `event_id`로 이미 영속화된 이벤트
 - `rejected_events`: 코드와 재시도 가능 여부가 명시된 이벤트
 
-Collector는 `accepted_event_ids`와 `duplicate_event_ids`만 로컬 큐에서 ACK 처리합니다. HTTP 오류, 연결 끊김, 형식이 맞지 않는 응답에서는 ACK하지 않습니다. 같은 `event_id`에 다른 내용이 오면 정상 중복으로 취급하지 않고 서버가 충돌로 기록·거부해야 합니다. 이 저장·멱등성 동작은 #29 이후 구현에서 검증합니다.
+Collector는 `accepted_event_ids`와 `duplicate_event_ids`만 로컬 큐에서 ACK 처리합니다. HTTP 오류, 연결 끊김, 형식이 맞지 않는 응답에서는 ACK하지 않습니다. 서버는 DB 커밋이 끝난 뒤에만 응답하므로 두 목록에 있는 이벤트는 영속화가 끝난 것입니다.
+
+### 거부 코드
+
+| 코드 | 재시도 | 의미 |
+|---|---|---|
+| `unauthorized_device` | 아니오 | 이벤트의 `device_id`가 토큰으로 판정한 장치와 다름 |
+| `unauthorized_scope` | 아니오 | 예약(현재 미사용) |
+| `unsupported_schema_version` | 아니오 | 예약(현재는 요청 검증에서 `422`) |
+| `retention_window_exceeded` | 아니오 | `occurred_at`이 서버 시각 기준 30일보다 오래됨(보존 기간 밖) |
+| `event_id_conflict` | 아니오 | 같은 `event_id`가 다른 내용으로 이미 저장됨 |
+| `parent_agent_unknown` | 예 | 부모 에이전트가 아직 없음. 부모 이벤트를 보낸 뒤 다시 보냄 |
+| `parent_agent_conflict` | 아니오 | 이미 기록된 에이전트의 부모와 다름(부모는 처음 관측값으로 고정) |
+| `occurred_at_out_of_range` | 아니오 | `occurred_at`이 서버 시각보다 1일 넘게 미래 |
+| `internal_error` | 예 | 서버 저장 오류 |
+
+`event_id_conflict`·`parent_agent_unknown`·`parent_agent_conflict`·`occurred_at_out_of_range`는 #35에서 v1 응답 enum에 추가했습니다. 당시 이 응답을 소비하는 Collector가 없었으므로 기존 소비자 호환성 영향은 없습니다. Collector(#33)는 알 수 없는 코드를 받으면 `retryable` 값만 따릅니다.
+
+### 서버 처리 규칙(#35)
+
+- 중복 판정: 허용 필드의 정규 직렬화 SHA-256(`payload_digest`)을 비교합니다. 같은 시각의 다른 표기(`Z`와 `+00:00`)는 같은 내용입니다.
+- 세션: `(장치, provider, session_id)`마다 서버 세션 하나를 만듭니다. 다른 장치의 같은 `session_id`는 별개 세션입니다.
+- 에이전트: 부모가 이미 있어야 하위 에이전트를 만듭니다. 같은 배치 안에서는 순서와 관계없이 부모를 먼저 처리합니다. 부모를 나중에 바꿀 수 없으므로 순환 계층이 생기지 않습니다.
+- 이벤트마다 savepoint로 처리해 한 이벤트의 실패가 같은 배치의 다른 이벤트 저장을 막지 않습니다.
+- 세션의 `last_event_at`과 장치의 `last_seen_at`을 갱신합니다. 세션 생명주기·현재 상태 계산은 #36 범위입니다.
+
+### 제한
+
+| 항목 | 값 | 초과 시 |
+|---|---|---|
+| 본문 크기 | 1MiB(그 밖의 API는 64KiB). `Content-Length`로 본문을 읽기 전에 검사 | `413 payload_too_large`. 길이 없는 chunked 요청은 `411 length_required` |
+| 배치 크기 | 1~500 | `422` |
+| 요청 빈도 | 장치당 60초에 120회(서버 프로세스 메모리 기준) | `429 rate_limited` + `Retry-After` |
+
+사용자별 이벤트 총량 한도와 다중 인스턴스 공유 제한은 #28·#63에서 다룹니다.
+
+### 검증 오류 응답
+
+`422` 응답은 `{"detail": [{"loc": [...], "type": "..."}]}` 형식이며 입력 값과 메시지를 담지 않습니다. 위치(`loc`)에는 API가 정의한 필드 이름과 배열 인덱스만 남고, 정의되지 않은 키 이름은 `<field>`로 가립니다. FastAPI 기본 응답은 실패한 입력 값을 그대로 되돌려 보내므로, 스키마 밖 필드에 실린 원문이 응답·로그에 노출되지 않게 바꿨습니다. 이 정책은 모든 API에 적용됩니다.
 
 자유 형식 오류 메시지는 이벤트 응답에 넣지 않습니다. 진단 정보가 원본 데이터나 내부 경로를 노출하지 않도록 서버 로그도 별도 검열합니다.
 
