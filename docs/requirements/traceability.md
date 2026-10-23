@@ -147,3 +147,14 @@
 | STATE-003 | EVT-006 순서 | 늦게 도착한 과거 이벤트는 저장만 하고 현재 상태·버전을 되돌리지 않음(시각 후 sequence 비교) |
 | STATE-004 | EVT-004 하위 에이전트 | 하위 에이전트 독립 상태·시작/종료 시각, 대장 턴 완료 중에도 하위 WORKING 유지 |
 | STATE-005 | 연결 상태 분리 | heartbeat 120초 기준 ONLINE/DISCONNECTED, 연결 끊김·30분 무활동 OPEN 세션만 읽을 때 UNKNOWN, ENDED로 바꾸지 않음 |
+
+## Go Collector 어댑터 검증 매핑(#29)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| ADP-001 | COL-003~005 Hook 입력 매핑 | Claude·Codex Hook 이벤트 표 테스트, 미지 이벤트 `unknown`, Codex CLI `PostToolUse`로 `tool.completed` 미생성 |
+| ADP-002 | EVT-002 이중 수집 멱등 | `claude/parity_test.go`: dual-source fixture로 `expected.json` 통과 키·억제 8건·완료 유형 재현, Hook·transcript `event_id` 동일, Python UUIDv5 값 일치, 재시작 재처리 0 |
+| ADP-003 | COL-006 버전 감지·미검증 처리 | `VerifiedTargets` 정확 일치만 `verified`/`observed`, 다른 버전·OS·모드·미관측 이벤트 `unverified`/`inferred`, Codex Desktop `partial` |
+| ADP-004 | EVT-007 프라이버시 | 민감 필드·도구 이름·하위 에이전트 유형·식별자 위치의 sentinel이 후보·오류 문자열에 0건, 정확한 키 일치, Codex 합성 fixture 원문 패턴 0건 |
+| ADP-005 | EVT-001 enum 정합 | 후보 enum이 이벤트 v1 `provider`·`source`·`event_type`·`activity`·`confidence` 값의 부분집합 |
+| ADP-006 | COL-004 fail-open | 크기 상한·깨진 JSON·깊은 중첩 typed 오류, `recover`, 퍼즈 시드 테스트(로컬 30초 퍼즈 약 96만 회 실패 0) |
