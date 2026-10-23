@@ -224,3 +224,14 @@
 | LIFE-002 | 연결 상태 분리 | `DISCONNECTED`는 퇴근 없이 흐림·연결 끊김 표시 |
 | LIFE-003 | 열림 미확인 | `UNKNOWN`은 옅게·마지막 활동 이후 대기 표시 |
 | LIFE-004 | IDLE 생활 연출 | 주기적 자리 변경, 연속 ID도 시작 시점 분산 |
+
+## Go Collector 정규화 검증 매핑(#32)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| NORM-001 | EVT-001 v1 계약 일치 | `schema_test.go`: `Event` 직렬화 키 = 스키마 `required` = `properties`, 패키지 enum = 스키마 enum, 의존성 없는 스키마 검사기로 모든 출력 검증 |
+| NORM-002 | EVT-004·SEC-006 식별자 매핑 | `normalize_test.go`: 원본 세션·에이전트 참조 → 장치·제공자·세션 범위 UUIDv5(별도 namespace), 재시작 결정성, 하위 에이전트 `parent_agent_id` = 대장 |
+| NORM-003 | COL-006 시간·순서 | 검증된 transcript `timestamp`만 사용(시간대 없음·미래·형식 오류는 관측 시각), UTC RFC 3339, 세션별 sequence 0부터 단조 증가·영속 저장소 재개·중복 미소비·상한 |
+| NORM-004 | EVT-002 이중 수집 멱등 | `pipeline_test.go`: #20 dual-source fixture를 Hook + tail → 어댑터 → 정규화로 양쪽 순서 처리, 키 이벤트 10개·억제 8건, 영속 키 재시작 재방출 0 |
+| NORM-005 | EVT-005 진실성 | 미검증·부분 지원은 `inferred`, enum 밖 값은 `unknown`+`inferred`, 세션 없는 `unknown`은 개수만 세고 버림, Codex CLI `tool.completed` 미생성 |
+| NORM-006 | EVT-007·COL-007 프라이버시 | `privacy_test.go`: 모든 어댑터 입력 필드·런타임·후보 문자열 필드의 sentinel이 출력 JSON·카운터·오류에 없음, 어댑터 오류 fail-open 개수 |
