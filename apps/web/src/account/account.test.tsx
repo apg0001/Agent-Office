@@ -10,6 +10,7 @@ describe("routing", () => {
     expect(routeFor("/login")).toBe("login");
     expect(routeFor("/login/")).toBe("login");
     expect(routeFor("/setup")).toBe("setup");
+    expect(routeFor("/invite")).toBe("invite");
     expect(routeFor("/verify-email")).toBe("verify");
     expect(routeFor("/reset-password")).toBe("reset");
     expect(routeFor("/")).toBe("office");

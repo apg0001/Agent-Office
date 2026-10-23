@@ -17,6 +17,7 @@ from sqlalchemy import Connection, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from agent_office import audit
+from agent_office.api import teams
 from agent_office.api.auth import CurrentSessionResponse, SessionUser
 from agent_office.api.deps import DbConnection
 from agent_office.auth import accounts, mailer, passwords
@@ -56,6 +57,8 @@ class SignupRequest(StrictModel):
     email: str = Field(max_length=accounts.MAX_EMAIL_LENGTH)
     password: str = Field(max_length=1024)
     display_name: str = Field(min_length=1, max_length=80)
+    # 초대 전용 정책에서 팀 초대 링크로 가입할 때(#27).
+    invite_token: str | None = Field(default=None, max_length=256)
 
 
 class TokenRequest(StrictModel):
@@ -133,10 +136,12 @@ def signup(
     policy = accounts.signup_policy(connection)
     if policy == "CLOSED":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="signup_closed")
-    if policy == "INVITE_ONLY":
-        # 초대 수락 가입은 팀 초대(#27)에서 연다.
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invite_required")
     email = accounts.normalize_email(body.email)
+    if policy == "INVITE_ONLY" and (
+        email is None or teams.open_invitation(connection, body.invite_token or "", email) is None
+    ):
+        # 초대받은 주소와 초대 토큰이 함께 맞아야 한다. 팀 합류는 로그인 후 수락에서 한다.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invite_required")
     if email is None:
         raise _bad_request("invalid_email")
     problem = passwords.password_problem(body.password)

@@ -33,7 +33,7 @@
 |---|---|
 | `PUBLIC_VERIFIED_EMAIL` | 가입 → 이메일 확인 → 활성 |
 | `ADMIN_APPROVAL` | 가입 → 이메일 확인 → 관리자 승인 전까지 `pending`(승인 화면은 EP-11) |
-| `INVITE_ONLY` | 공개 가입 거부. 초대 수락 가입은 #27 |
+| `INVITE_ONLY` | 팀 초대 토큰(`invite_token`)과 초대받은 이메일이 맞을 때만 가입(#27, `docs/api/teams-v1.md`) |
 | `CLOSED` | 가입 거부 |
 
 ## 비밀번호와 토큰

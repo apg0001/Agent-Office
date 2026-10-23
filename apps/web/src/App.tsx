@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./account/AccountPages";
+import { InvitePage } from "./account/InvitePage";
 import { SetupWizard } from "./account/SetupWizard";
 import { type SessionInfo, call, routeFor } from "./account/api";
 import { OfficeView } from "./office/OfficeView";
@@ -52,6 +53,7 @@ export function App({ pathname }: { pathname?: string }) {
       verify: VerifyPage,
       reset: ResetPage,
       setup: SetupWizard,
+      invite: InvitePage,
     };
     const Page = pages[route];
     return (
