@@ -6,6 +6,7 @@
 - [아키텍처 개요](architecture/overview.md)
 - [데이터 모델과 마이그레이션](architecture/data-model.md)
 - [API 문서 상태](api/README.md)
+- [장치 등록·인증 API v1](api/devices-v1.md)
 - [호환성 행렬](compatibility/matrix.md)
 - [개발 환경 설치](installation/development.md)
 - [Docker 이미지와 Compose](installation/docker-images.md)

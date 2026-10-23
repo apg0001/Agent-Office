@@ -10,12 +10,12 @@
 
 ## 현재 위치
 
-- 활성 작업: #88 `[테스트] #19·#21 PoC 테스트의 Windows 비호환 실패 정리`
-- 브랜치: `fix/#88-windows-test-compat` PR #90 병합(`e2deaa7`). Windows PC 실검증 실패 0으로 #88 종료(2026-10-23), 상태 기록 `docs/#88-windows-verification`
-- 직전 완료(Pi): #22, PR https://github.com/apg0001/Agent-Office/pull/89, merge commit `9914373`, Issue 종료, Epic #3 체크 갱신
+- 활성 작업: #35 `EP-05/ISS-01 인증 이벤트 API·멱등성·전송 제한` (Pi, `feat/#35-event-ingestion` 진행 중)
+- 직전 완료(Pi): #26, PR https://github.com/apg0001/Agent-Office/pull/91, merge commit `7e2df6b`, Issue 종료, Epic #3 체크 갱신. 그 전: #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
+- 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
 - EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
-- 기준 브랜치: `develop` (`9914373`, PR #89 병합 결과)
+- 기준 브랜치: `develop` (`e2deaa7`, PR #90 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
@@ -173,6 +173,10 @@
 89. PR #89 최신 커밋 CI 전체 통과 후 병합(`9914373`), #22 종료, Epic #3 체크 갱신.
 90. 소유자 안내 반영: #18(PR #86, `16b55d5`)과 Epic #2 종료 확인. #88 착수: Claude 프로브 테스트가 `HOME` 대신 `CLAUDE_CONFIG_DIR`로 Claude 홈을 지정하도록 수정(HOME 미설정·존재하지 않는 HOME에서 Linux 통과), WebSocket 테스트는 `socket.AF_UNIX`가 없으면 사유와 함께 skip(AF_UNIX 제거 시뮬레이션으로 skip 사유 출력 확인). Windows 실검증은 미실행.
 91. #88 Windows 실검증(Windows PC): `develop` `e2deaa7`, `pip install -e "./apps/server[dev]"` 후 `pytest -rs apps/server/tests tests` 65 통과·10 skip·실패 0. Ruff·server mypy 통과. #88에 결과 댓글 후 종료.
+92. 소유자 승인으로 PR #90 병합(`e2deaa7`). Windows PC용 #88 검증 지시문을 소유자에게 전달(Issue에는 게시하지 않음).
+93. #26 `feat/#26-device-auth` 생성. 마이그레이션 `0002`(`device_registration_codes`), DB 엔진 의존성(`scope="function"`으로 커밋 후 응답), 토큰·코드 해시, 감사 로그, 세션 검증·CSRF 헤더·장치 Bearer 인증 의존성, 장치 API 7개 구현.
+94. DB fixture를 `apps/server/tests/conftest.py`로 이동, 장치 API 통합 테스트 10개 추가. pytest 85개(DB 포함, 비root), Ruff, mypy strict 통과.
+95. 소유자 승인으로 PR #91 병합(`7e2df6b`), #26 종료. Windows PC 쪽 상태 PR #92를 소유자 위임으로 최신 `develop` 병합·충돌 해결 후 병합.
 
 ## 이번 변경 요약(#22)
 
@@ -258,7 +262,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 다음 Issue 후보(Pi): #26 기기 인증·장치 등록·토큰(수집 API #35의 선행), #23 이메일 가입·로그인, #29 Collector 어댑터(#20 fixture 재사용). 서버 수집 경로를 먼저 세우려면 #26 → #35 순서를 권장한다.
+4. #26 PR의 CI 확인 후 소유자 승인을 받아 병합하고 `gh issue close 26`, Epic #3 체크리스트(#26) 갱신. 다음 후보는 #35 인증 이벤트 수집 API(#26 장치 인증 사용) 또는 #25 브라우저 세션 발급·CSRF 토큰(#26의 임시 CSRF 헤더 대체).
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
@@ -290,6 +294,7 @@
 - PR #76~#79 본문의 한글이 `?`로 손상돼 있고 GitHub 편집 이력에 원본이 없다. 커밋 메시지·문서가 원본 기록이며, 필요하면 소유자 승인 후 PR 본문을 다시 작성한다. Epic #3~#12와 세부 Issue는 손상 없음을 확인했다.
 - 운영 DB에서 `alembic downgrade`(특히 `0001`)는 모든 테이블을 삭제한다. 운영 롤백은 백업 복원(#58)으로만 한다.
 - 부모 에이전트 순환은 DB FK로 막을 수 없다. 수집 API(#35)가 부모 존재·불변을 검증해야 한다.
+- #26의 쿠키 인증 쓰기 요청은 임시로 `X-Agent-Office-Request: 1` 헤더를 CSRF 방어로 요구한다. #25에서 CSRF 토큰·SameSite 쿠키로 대체해야 한다. 등록 코드 IP 속도 제한은 #28.
 - Pi(SD 카드)에서 PostgreSQL 첫 기동이 2분 이상 걸릴 수 있다. healthcheck `start_period`를 줄이지 않는다.
 - Codex app-server 제어 소켓은 `command/exec`·`fs/writeFile`·샌드박스 밖 `thread/shellCommand`를 허용한다. Collector가 연결하면 실행 권한을 갖게 되므로 ADR-0002 개정 없이 연결하지 않는다.
 - `/tmp/codex-daemon-<uid>/`에 #21 실험용 해시 항목이 남았을 수 있다. 사용자 실제 daemon 항목과 구분할 수 없어 삭제하지 않았다.
