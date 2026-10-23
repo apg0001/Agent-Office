@@ -1,6 +1,6 @@
 # 프로젝트 상태와 세션 인수인계
 
-최종 갱신: 2026-10-22 (KST)
+최종 갱신: 2026-10-23 (KST)
 
 기준 문서: Agent Office 마스터 개발 프롬프트 v0.8
 
@@ -13,7 +13,7 @@
 - 활성 작업: #13 `EP-01/ISS-01 Monorepo 구조·개발 환경·Compose dev 구성`
 - 브랜치: `feat/#13-monorepo-bootstrap`
 - 기준 브랜치: `develop` (2026-10-22에 `main`에서 생성해 원격 push 완료)
-- 상태: 구현·로컬 검증 완료, Draft PR #75 리뷰·추가 환경 검증 대기
+- 상태: 구현·로컬/컨테이너 검증 완료, Draft PR #75 병합 준비
 - 구현 커밋: `fe8cadd` (`[feat] 모노레포 개발 기반 구축 (#13)`)
 - PR: https://github.com/apg0001/Agent-Office/pull/75 (`develop` 대상, Draft)
 - 배포/릴리스: 수행하지 않음
@@ -55,8 +55,8 @@
 | Python | 3.13.9 |
 | Node/npm | 24.19.0 / 11.17.0 |
 | Docker/Compose CLI | 29.8.1 / v5.5.1 |
-| Docker 엔진 | 미실행: Linux engine named pipe 없음 |
-| Go | 미설치 |
+| Docker 엔진 | 29.8.1, Linux x86_64; 2026-10-23 기동·검증 완료 |
+| Go | 호스트 미설치; `golang:1.24-bookworm` 컨테이너로 검증 |
 | Codex CLI | 0.162.0-alpha.17.2 |
 | Claude CLI | 미설치(로컬 `.claude` 상태 디렉터리는 존재) |
 
@@ -69,6 +69,8 @@
 5. `develop` 원격 브랜치와 `feat/#13-monorepo-bootstrap` 작업 브랜치 생성.
 6. #13용 Python/Node/Go 최소 진입점, 개발 Compose, 개발·아키텍처·운영 기준 문서 작성.
 7. 구현 커밋 `fe8cadd` push 및 `develop` 대상 Draft PR #75 생성.
+8. Docker Desktop 기동 후 Go 포맷·vet·race test, Compose image build와 실제 서비스 health 검증.
+9. 8000 포트 충돌을 확인해 테스트에만 18000/15173 포트를 사용하고, 종료 후 컨테이너·네트워크·테스트 DB 볼륨 정리.
 
 ## 변경 파일 요약(#13)
 
@@ -85,9 +87,10 @@
 |---|---|---|
 | Python 설치/pytest/Ruff/mypy | 통과 | pytest 1개 통과(Starlette TestClient deprecation 경고 1개), Ruff·mypy 오류 0 |
 | npm install/typecheck/test/build | 통과 | Vitest 1개 통과, TypeScript 오류 0, Vite production build 성공 |
-| Go test | 미실행 | Go 미설치 |
+| Go fmt/vet/race test | 통과 | `golang:1.24-bookworm`; 패키지는 현재 테스트 파일 없음 |
 | Compose config | 통과 | `docker compose ... config --quiet` 성공 |
-| Docker image build/up | 미실행 | Docker 엔진 미실행 |
+| Docker image build | 통과 | FastAPI server와 React/nginx web 이미지 빌드 성공 |
+| Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 실제 Codex Hook 이벤트 | 미실행 | #17, #18 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
@@ -96,17 +99,16 @@
 ## 다음 에이전트가 바로 수행할 작업
 
 1. `git status --short --branch`로 이 문서의 브랜치와 변경 목록을 대조한다.
-2. Draft PR #75의 diff와 리뷰 의견을 확인한다.
-3. Go가 있는 환경에서 `go test ./collector/...`를 실행하고 결과를 PR과 이 문서에 남긴다.
-4. Docker 엔진을 사용할 수 있는 환경에서 image build/up/health를 검증하고 결과를 남긴다.
-5. #16 CI가 아직 없으므로 자동 검증 부재를 해소하기 전 #13을 완료로 표시하지 않는다.
-6. 리뷰·필수 검증 후 PR #75를 `develop`에 병합하고 #13을 닫는다.
-7. 병합 후 다음 순서는 #14 → #15 → #16이며, EP-02 #17~#21은 계약 #15를 기준으로 PoC한다.
+2. PR #75에 추가 검증 결과를 반영하고 코드 자체 검토를 완료한다.
+3. PR #75를 ready로 전환해 `develop`에 병합하고 #13을 닫는다.
+4. #14 브랜치를 `develop`에서 생성해 Git 규칙·브랜치 보호·Issue/PR 템플릿을 구현한다.
+5. 이후 #15 → #16 순서로 진행하고, EP-02 #17~#21은 계약 #15를 기준으로 PoC한다.
 
 ## 알려진 위험과 결정 대기
 
 - 라이선스는 소유자 결정 전까지 미정이며 `LICENSE`를 만들지 않았다.
-- Go와 Claude CLI가 없어 관련 검증은 수행할 수 없다.
-- Docker 엔진이 꺼져 있어 실제 컨테이너 build/up은 확인하지 못했다.
+- 호스트 Go는 없지만 공식 Go 컨테이너로 현재 모듈 검증을 완료했다.
+- 로컬 8000 포트가 이미 사용 중이어서 Compose smoke test는 18000/15173 포트로 수행했다.
+- Claude CLI가 없어 관련 검증은 수행할 수 없다.
 - Codex 로컬 DB/JSONL 원문은 민감정보 보호를 위해 아직 읽지 않았다. #17/#18에서 스키마 키와 안전한 합성 fixture만 추출한다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.
