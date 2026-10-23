@@ -19,8 +19,9 @@ import run_probe
 def probe_environment(home: Path) -> dict[str, str]:
     environment = os.environ.copy()
     environment["AGENT_OFFICE_POC_RUN_SALT"] = "synthetic-test-salt"
-    environment["HOME"] = str(home)
-    environment.pop("CLAUDE_CONFIG_DIR", None)
+    # Windows의 Path.home()은 HOME이 아니라 USERPROFILE을 따른다(#88). 플랫폼과 무관하게
+    # 프로브가 쓰는 Claude 홈을 CLAUDE_CONFIG_DIR로 직접 지정한다.
+    environment["CLAUDE_CONFIG_DIR"] = str(home / ".claude")
     return environment
 
 

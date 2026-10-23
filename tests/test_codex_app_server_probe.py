@@ -8,6 +8,8 @@ import tempfile
 import threading
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests" / "poc" / "codex"))
 
@@ -98,6 +100,10 @@ def _fake_websocket_server(
     server.close()
 
 
+@pytest.mark.skipif(
+    not hasattr(socket, "AF_UNIX"),
+    reason="이 Python에는 socket.AF_UNIX가 없다(Windows). 제어 소켓 실측은 Linux 기준(#21, #88)",
+)
 def test_unix_websocket_client_frames_round_trip() -> None:
     outgoing = {
         "jsonrpc": "2.0",

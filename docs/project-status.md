@@ -10,12 +10,12 @@
 
 ## 현재 위치
 
-- 활성 작업: #22 `EP-03/ISS-01 PostgreSQL ERD·인덱스·마이그레이션`
-- 브랜치: `feat/#22-postgres-schema` (`develop` `8dec412`에서 생성, PR 전 `16b55d5` 병합)
-- 상태: SQLAlchemy Core 스키마 25테이블, Alembic `0001`(트리거 포함), DB 테스트 10개, CI PostgreSQL 서비스·이미지 내 마이그레이션 smoke, Pi E2E 완료. PR https://github.com/apg0001/Agent-Office/pull/89 CI 진행
-- 직전 완료(Pi): #21, PR https://github.com/apg0001/Agent-Office/pull/85, merge commit `8dec412`
+- 활성 작업: #88 `[테스트] #19·#21 PoC 테스트의 Windows 비호환 실패 정리`
+- 브랜치: `fix/#88-windows-test-compat` (`develop` `9914373`에서 생성). PR 생성 후 소유자 승인 대기, 병합하지 않음
+- 직전 완료(Pi): #22, PR https://github.com/apg0001/Agent-Office/pull/89, merge commit `9914373`, Issue 종료, Epic #3 체크 갱신
+- EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요)·#88
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
-- 기준 브랜치: `develop` (`16b55d5`, PR #86 병합 결과)
+- 기준 브랜치: `develop` (`9914373`, PR #89 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
@@ -170,6 +170,8 @@
 86. Pi E2E 첫 시도에서 SD 카드 initdb가 healthcheck 재시도(약 50초)를 넘겨 PostgreSQL unhealthy로 실패. 두 Compose에 `start_period: 120s`를 추가해 재실행: `up --wait` 143초, upgrade 후 26테이블, downgrade 후 1, 재-upgrade·health 성공.
 87. pytest 70개(비root, DB 포함, 건너뜀 0), Ruff, mypy, Compose 2종, actionlint 통과.
 88. PR #89 생성 후 Windows PC 쪽 #18 병합(`16b55d5`)으로 `develop`이 앞서 나가 최신 `develop`을 병합. `docs/project-status.md` 충돌 3곳을 양쪽 기록 보존으로 해결하고 전체 테스트 재실행.
+89. PR #89 최신 커밋 CI 전체 통과 후 병합(`9914373`), #22 종료, Epic #3 체크 갱신.
+90. 소유자 안내 반영: #18(PR #86, `16b55d5`)과 Epic #2 종료 확인. #88 착수: Claude 프로브 테스트가 `HOME` 대신 `CLAUDE_CONFIG_DIR`로 Claude 홈을 지정하도록 수정(HOME 미설정·존재하지 않는 HOME에서 Linux 통과), WebSocket 테스트는 `socket.AF_UNIX`가 없으면 사유와 함께 skip(AF_UNIX 제거 시뮬레이션으로 skip 사유 출력 확인). Windows 실검증은 미실행.
 
 ## 이번 변경 요약(#22)
 
@@ -251,15 +253,15 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. PR #89의 CI를 확인한다: `gh pr checks 89 --watch`. Python job의 PostgreSQL 서비스와 Images job의 `alembic upgrade head`가 처음 실행되므로 실패 시 job 로그를 확인한다.
-2. CI 통과 후 `gh pr merge 89 --merge`(소유자 자율 진행 승인), `gh issue close 22`, Epic #3 체크리스트(#22)를 UTF-8 파일로 갱신하고 재조회한다.
+1. 완료: PR #89 CI 통과·병합(`9914373`).
+2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
 4. 다음 Issue 후보(Pi): #26 기기 인증·장치 등록·토큰(수집 API #35의 선행), #23 이메일 가입·로그인, #29 Collector 어댑터(#20 fixture 재사용). 서버 수집 경로를 먼저 세우려면 #26 → #35 순서를 권장한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
-7. EP-02 세부 Issue(#17~#21)가 모두 닫혔다. Epic #2 종료 여부를 소유자에게 확인한다(#87은 후속 PoC).
-8. #87(Windows PC): `python tests/poc/codex/desktop_session.py prepare`부터 소유자 조작으로 반복 실측·`SessionStart`·승인 허용·Interrupt 확인. 로그인한 CLI·Desktop의 app-server daemon 공유 확인도 함께 한다(#21 후속).
-9. #88(Windows PC): `pytest tests/test_claude_hook_probe.py tests/test_codex_app_server_probe.py`로 재현 후 수정 또는 사유 있는 skip. Pi 쪽 분석: Claude 테스트는 Windows `Path.home()`이 `HOME`이 아니라 `USERPROFILE`을 써서 생기는 문제로 보이며 `CLAUDE_CONFIG_DIR`을 테스트 환경에 지정하면 플랫폼 무관하게 고칠 수 있다(미검증). WebSocket 테스트는 Windows에 `socket.AF_UNIX`가 없으므로 사유 있는 skip이 맞다.
+7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
+8. #87(Windows PC 전용, Pi에서 실행 불가·진행 금지): `python tests/poc/codex/desktop_session.py prepare`부터 소유자 조작으로 반복 실측·`SessionStart`·승인 허용·Interrupt 확인. 로그인한 CLI·Desktop의 app-server daemon 공유 확인도 함께 한다(#21 후속).
+9. #88: Pi에서 수정 PR 진행 중(`fix/#88-windows-test-compat`). 소유자 승인 후 병합. Windows 실검증은 미실행이므로 Windows PC에서 `pytest apps/server/tests tests`로 실패 0(skip은 사유 표시)을 확인해 PR 또는 Issue에 결과를 남긴다. Windows 지원으로 표시하지 않는다.
 10. #19·#20 후속 후보: 대화형 TUI의 승인 대기·`Notification`·중단·compact·fork 관측(소유자 조작 필요).
 
 ## 알려진 위험과 결정 대기
