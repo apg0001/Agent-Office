@@ -10,10 +10,10 @@
 
 ## 현재 위치
 
-- 활성 작업: #26 `EP-03/ISS-05 기기 인증·장치 등록·토큰 갱신·폐기`
-- 브랜치: `feat/#26-device-auth` (`develop` `e2deaa7`에서 생성). PR 생성 후 소유자 승인 대기, 승인 전 병합하지 않음
-- 직전 완료(Pi): #88 수정 PR #90 소유자 승인 후 병합(`e2deaa7`). #88은 Windows 실검증 전이라 열어 둠. 그 전: #22(PR #89, `9914373`)
-- EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요)·#88
+- 활성 작업: #35 `EP-05/ISS-01 인증 이벤트 API·멱등성·전송 제한` (Pi, `feat/#35-event-ingestion` 진행 중)
+- 직전 완료(Pi): #26, PR https://github.com/apg0001/Agent-Office/pull/91, merge commit `7e2df6b`, Issue 종료, Epic #3 체크 갱신. 그 전: #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
+- 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
+- EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
 - 기준 브랜치: `develop` (`e2deaa7`, PR #90 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
@@ -172,9 +172,11 @@
 88. PR #89 생성 후 Windows PC 쪽 #18 병합(`16b55d5`)으로 `develop`이 앞서 나가 최신 `develop`을 병합. `docs/project-status.md` 충돌 3곳을 양쪽 기록 보존으로 해결하고 전체 테스트 재실행.
 89. PR #89 최신 커밋 CI 전체 통과 후 병합(`9914373`), #22 종료, Epic #3 체크 갱신.
 90. 소유자 안내 반영: #18(PR #86, `16b55d5`)과 Epic #2 종료 확인. #88 착수: Claude 프로브 테스트가 `HOME` 대신 `CLAUDE_CONFIG_DIR`로 Claude 홈을 지정하도록 수정(HOME 미설정·존재하지 않는 HOME에서 Linux 통과), WebSocket 테스트는 `socket.AF_UNIX`가 없으면 사유와 함께 skip(AF_UNIX 제거 시뮬레이션으로 skip 사유 출력 확인). Windows 실검증은 미실행.
-91. 소유자 승인으로 PR #90 병합(`e2deaa7`). Windows PC용 #88 검증 지시문을 소유자에게 전달(Issue에는 게시하지 않음).
-92. #26 `feat/#26-device-auth` 생성. 마이그레이션 `0002`(`device_registration_codes`), DB 엔진 의존성(`scope="function"`으로 커밋 후 응답), 토큰·코드 해시, 감사 로그, 세션 검증·CSRF 헤더·장치 Bearer 인증 의존성, 장치 API 7개 구현.
-93. DB fixture를 `apps/server/tests/conftest.py`로 이동, 장치 API 통합 테스트 10개 추가. pytest 85개(DB 포함, 비root), Ruff, mypy strict 통과.
+91. #88 Windows 실검증(Windows PC): `develop` `e2deaa7`, `pip install -e "./apps/server[dev]"` 후 `pytest -rs apps/server/tests tests` 65 통과·10 skip·실패 0. Ruff·server mypy 통과. #88에 결과 댓글 후 종료.
+92. 소유자 승인으로 PR #90 병합(`e2deaa7`). Windows PC용 #88 검증 지시문을 소유자에게 전달(Issue에는 게시하지 않음).
+93. #26 `feat/#26-device-auth` 생성. 마이그레이션 `0002`(`device_registration_codes`), DB 엔진 의존성(`scope="function"`으로 커밋 후 응답), 토큰·코드 해시, 감사 로그, 세션 검증·CSRF 헤더·장치 Bearer 인증 의존성, 장치 API 7개 구현.
+94. DB fixture를 `apps/server/tests/conftest.py`로 이동, 장치 API 통합 테스트 10개 추가. pytest 85개(DB 포함, 비root), Ruff, mypy strict 통과.
+95. 소유자 승인으로 PR #91 병합(`7e2df6b`), #26 종료. Windows PC 쪽 상태 PR #92를 소유자 위임으로 최신 `develop` 병합·충돌 해결 후 병합.
 
 ## 이번 변경 요약(#22)
 
@@ -240,6 +242,7 @@
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
 | 실제 Codex Desktop Hook 이벤트 | 부분 통과 | #18: Windows Desktop 합성 1회, 8종 관측·`SessionStart` 미관측, Pre/Post `tool_use_id` 4/4·Subagent `agent_id` 1/1 일치 |
 | Windows 호스트 Python 회귀(#18) | 부분 통과 | `develop` `8dec412` 병합 후 pytest 62 통과·2 실패·1 skip. 실패는 #19 transcript 템플릿·#21 `socket.AF_UNIX`의 Windows 비호환(#18 변경 무관, Linux CI 대상). Ruff·server mypy·Codex 프로브 mypy strict 통과, Gitleaks 작업 트리 61.12MB leak 0. 후속 #88 |
+| Windows 호스트 Python 회귀(#88) | 통과 | Windows 11 10.0.26200, Python 3.13.9, `develop` `e2deaa7`: pytest 65 통과·10 skip·실패 0. skip 사유: PostgreSQL URL 미설정 8, `socket.AF_UNIX` 없음 1, POSIX 권한 거부 재현 불가 1. Ruff·server mypy 오류 0. Windows Collector 지원 의미 아님 |
 | GitHub Actions 원격 CI(#18) | 통과 | PR #86 run `39920836824`: Python·Node·Go·Compose·Images(amd64·arm64)·Secret Scan과 `CI Gate` 모두 성공 |
 | 실제 Claude Code Hook 이벤트 | 부분 통과 | Pi Linux arm64, 2.1.308 `-p` 합성 10회: 9종 관측, 반복 재현, `tool_use_id`·`agent_id` 상관관계 일치; 대화형·승인 대기 미실측. 상세 #19 보고서 |
 | Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: #19 포함 pytest 34개 통과(Starlette deprecation 경고 1개), Ruff lint·format, server mypy, Claude 프로브 mypy strict 통과. 호스트에는 pytest·`python3-venv` 없음 |
@@ -264,7 +267,7 @@
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
 8. #87(Windows PC 전용, Pi에서 실행 불가·진행 금지): `python tests/poc/codex/desktop_session.py prepare`부터 소유자 조작으로 반복 실측·`SessionStart`·승인 허용·Interrupt 확인. 로그인한 CLI·Desktop의 app-server daemon 공유 확인도 함께 한다(#21 후속).
-9. #88: 수정 PR #90 병합 완료(`e2deaa7`). Windows 실검증 미실행. Windows PC에서 `python -m pytest -rs apps/server/tests tests`로 실패 0(skip은 사유 표시)을 확인해 #88에 결과를 남기고 닫는다. Windows 지원으로 표시하지 않는다.
+9. #88: 완료. PR #90 병합(`e2deaa7`), Windows 실검증 실패 0, Issue 종료. Windows에서 PostgreSQL 연동 테스트는 `AGENT_OFFICE_TEST_DATABASE_URL` 설정 시에만 실행된다.
 10. #19·#20 후속 후보: 대화형 TUI의 승인 대기·`Notification`·중단·compact·fork 관측(소유자 조작 필요).
 
 ## 알려진 위험과 결정 대기
@@ -284,7 +287,7 @@
 - 임시 프로젝트 `hooks.json`은 `--ignore-user-config` 비대화형 조합에서 발견되지 않았고 inline `-c` Hook은 동작했다. 대화형 신뢰 UI와 일반 프로젝트 탐색 지원은 아직 주장하지 않는다.
 - #18 Desktop 실측은 1회이고 `SessionStart`가 미관측이다. Hook 신뢰 전에 세션이 시작됐을 가능성이 있어 미지원으로 단정하지 않으며, 반복 실측(#87) 전 Desktop 지원을 표시하지 않는다.
 - #18 실행으로 Codex가 관리하는 합성 Desktop 세션 transcript가 사용자 Codex 상태에 남았다. 원본 기록 삭제 금지 원칙에 따라 그대로 두었다.
-- #19·#21 테스트 2개가 Windows에서 실패한다(Linux 전용 가정). #88에서 Windows 건너뛰기 또는 수정 여부를 결정한다.
+- #19·#21 테스트의 Windows 실패는 #88에서 해소됐다. Windows에서 AF_UNIX 제어 소켓·POSIX 권한 거부·PostgreSQL 연동 테스트는 skip(미실행)이다.
 - Computer Use 안전 지침은 ChatGPT/Codex Desktop UI 자동화를 금지한다. #18의 Desktop 상호작용은 사용자/수동 운영자가 수행해야 하며, 자동화 우회나 보안·신뢰 프롬프트 조작을 시도하지 않는다.
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
