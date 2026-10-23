@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -107,6 +108,20 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "tools": "Agent,Read",
         "allowed": ["Agent", "Read"],
         "agents": True,
+    },
+    # 같은 세션을 --session-id로 시작하고 --resume으로 이어 재시작 경계를 관측한다(#20).
+    "resume": {
+        "prompt": (
+            "This is a synthetic lifecycle probe. Use the Read tool exactly once on "
+            "notes.txt, then reply exactly POC_OK."
+        ),
+        "resume_prompt": (
+            "This is the resumed synthetic probe turn. Use the Read tool exactly once "
+            "on notes.txt, then reply exactly POC_RESUMED."
+        ),
+        "tools": "Read",
+        "allowed": ["Read"],
+        "agents": False,
     },
     "denied": {
         "prompt": (
@@ -356,7 +371,7 @@ def run_probe(
         settings_path.write_text(
             json.dumps(hook_settings(probe, run_salt, events, fault)), encoding="utf-8"
         )
-        command = [
+        base_command = [
             claude_executable,
             "-p",
             "--output-format",
@@ -381,23 +396,33 @@ def run_probe(
             scenario["tools"],
         ]
         if scenario["allowed"]:
-            command.extend(["--allowedTools", *scenario["allowed"]])
+            base_command.extend(["--allowedTools", *scenario["allowed"]])
         if scenario["agents"]:
-            command.extend(["--agents", json.dumps(SUBAGENT_DEFINITION)])
-        command.extend(["--", scenario["prompt"]])
+            base_command.extend(["--agents", json.dumps(SUBAGENT_DEFINITION)])
+        invocations = [(base_command, scenario["prompt"])]
+        if "resume_prompt" in scenario:
+            session_id = str(uuid.uuid4())
+            invocations = [
+                ([*base_command, "--session-id", session_id], scenario["prompt"]),
+                ([*base_command, "--resume", session_id], scenario["resume_prompt"]),
+            ]
         started = time.monotonic()
-        result = subprocess.run(
-            command,
-            cwd=workspace,
-            env=child_environment(),
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=300,
-            check=False,
-        )
+        results = [
+            subprocess.run(
+                [*command, "--", prompt],
+                cwd=workspace,
+                env=child_environment(),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,
+                check=False,
+            )
+            for command, prompt in invocations
+        ]
+        result = results[-1]
         summary = {
             "poc_schema_version": "1.0",
             "scenario": scenario_name,
@@ -406,15 +431,23 @@ def run_probe(
             "hook_fault": fault,
             "elapsed_seconds": round(time.monotonic() - started, 1),
             "claude_exit_code": result.returncode,
-            "stderr_line_count": len((result.stderr or "").splitlines()),
-            "stderr_categories": stderr_categories(result.stderr),
+            "invocation_exit_codes": [item.returncode for item in results],
+            "stderr_line_count": sum(
+                len((r.stderr or "").splitlines()) for r in results
+            ),
+            "stderr_categories": stderr_categories(
+                "\n".join(r.stderr or "" for r in results)
+            ),
             "user_settings_unchanged": file_digest(user_settings) == settings_before,
             "workspace_file_created": (workspace / "denied.txt").exists(),
             "stream_jsonl": sanitize_stream_jsonl(result.stdout, run_salt),
+            "invocation_streams": [
+                sanitize_stream_jsonl(item.stdout, run_salt) for item in results
+            ],
             "hooks": summarize_hooks(load_hook_records(workspace), events),
         }
         print(json.dumps(summary, indent=2, sort_keys=True))
-        return result.returncode
+        return max(item.returncode for item in results)
 
 
 def main() -> int:

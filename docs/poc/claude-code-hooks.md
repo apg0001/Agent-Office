@@ -110,4 +110,4 @@ projects/<redacted>/<redacted>/subagents/<redacted>.jsonl
 - 비정상 종료(SIGKILL)·네트워크 단절 시 `SessionEnd` 누락 여부는 미실행
 - Windows·macOS와 다른 Claude Code 버전은 미실행
 - 웹 검색·편집 도구, 계획 모드(`ExitPlanMode`)는 미실행
-- Hook·JSONL 교차 중복, 로테이션, 재시작은 #20에서 검증
+- Hook·JSONL 교차 중복, 로테이션, 재시작은 #20에서 검증했다: [중복 제거와 tail 규칙](collector-dedup-tail.md). resume 시 같은 세션·파일에 append되며, resumed 턴의 `Stop`이 4회 중 1회 누락됐다

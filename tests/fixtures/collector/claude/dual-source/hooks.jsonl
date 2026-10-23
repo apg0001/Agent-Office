@@ -1,0 +1,13 @@
+{"hook_event_name": "SessionStart", "session_id": "00000000-0000-4000-8000-000000000001", "source": "startup"}
+{"hook_event_name": "UserPromptSubmit", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "prompt": "<synthetic>"}
+{"hook_event_name": "PreToolUse", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "tool_name": "Read", "tool_use_id": "toolu_synthetic_0001", "tool_input": {"file_path": "<synthetic>"}}
+{"hook_event_name": "PostToolUse", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "tool_name": "Read", "tool_use_id": "toolu_synthetic_0001", "tool_response": "<synthetic>"}
+{"hook_event_name": "PreToolUse", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "tool_name": "Agent", "tool_use_id": "toolu_synthetic_agent", "tool_input": {"prompt": "<synthetic>"}}
+{"hook_event_name": "SubagentStart", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "agent_id": "a0000000000000001", "agent_type": "poc-reader"}
+{"hook_event_name": "PostToolUse", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "tool_name": "Agent", "tool_use_id": "toolu_synthetic_agent", "tool_response": "<synthetic>"}
+{"hook_event_name": "PreToolUse", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "agent_id": "a0000000000000001", "agent_type": "poc-reader", "tool_name": "Bash", "tool_use_id": "toolu_synthetic_0002", "tool_input": {"command": "<synthetic>"}}
+{"hook_event_name": "PostToolUseFailure", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "agent_id": "a0000000000000001", "agent_type": "poc-reader", "tool_name": "Bash", "tool_use_id": "toolu_synthetic_0002", "error": "<synthetic>"}
+{"hook_event_name": "SubagentStop", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "agent_id": "a0000000000000001", "agent_type": "poc-reader"}
+{"hook_event_name": "Stop", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000101", "stop_hook_active": false}
+{"hook_event_name": "UserPromptSubmit", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000102", "prompt": "<synthetic>"}
+{"hook_event_name": "SessionEnd", "session_id": "00000000-0000-4000-8000-000000000001", "prompt_id": "00000000-0000-4000-8000-000000000102", "reason": "other"}

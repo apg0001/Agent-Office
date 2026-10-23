@@ -10,17 +10,17 @@
 
 ## 현재 위치
 
-- 활성 작업: #56 `EP-09/ISS-01 AMD64·ARM64 Docker 이미지·GHCR·Compose`
-- 브랜치: `feat/#56-multiarch-images` (`develop` `3644486`, PR #82 병합 결과에서 생성)
-- 상태: Dockerfile·Compose·CI 멀티아키텍처 job·게시 workflow 구현, Pi arm64 실측 완료, PR·CI 진행. GHCR 게시는 미실행(관리자 승인 필요)
-- 직전 완료: #19, PR https://github.com/apg0001/Agent-Office/pull/82, merge commit `3644486`, Issue 종료
+- 활성 작업: #20 `EP-02/ISS-04 이중 수집 중복 제거 및 로그 변경·재시작 검증`
+- 브랜치: `feat/#20-dedup-tail-poc` (`develop` `f6fedff`, PR #83 병합 결과에서 생성)
+- 상태: Claude 합성 실측 7회, 중복 제거·tail 규칙 보고서, 참조 구현·fixture·테스트 완료. PR·CI 진행
+- 직전 완료: #56, PR https://github.com/apg0001/Agent-Office/pull/83, merge commit `f6fedff`, Issue 종료, Epic #9 체크 갱신
 - 보류 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
 - #18 브랜치: `feat/#18-codex-desktop-poc` (`develop` `9145d8c` 병합 완료, PR 없음)
-- 기준 브랜치: `develop` (`3644486`, PR #82 병합 결과)
+- 기준 브랜치: `develop` (`f6fedff`, PR #83 병합 결과)
 - 상태: **#18 보류(소유자 결정, 2026-10-23).** 작업 호스트가 Windows PC에서 Raspberry Pi 5(Linux arm64)로 바뀌었고, Pi에는 Codex Desktop이 없으며 Desktop UI 자동화도 금지돼 있어 실측할 수 없음. app-server 비-UI 관측은 #18이 아니라 #21 범위로 둠
 - 재개 조건: Codex Desktop이 설치된 PC에서 소유자 또는 수동 운영자가 합성 세션을 직접 조작할 수 있을 때
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
-- 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19)만 실행
+- 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
 - 호스트 전환: 이 Raspberry Pi가 이후 서비스 호스팅 서버가 될 예정(소유자 안내). 아래 환경 기준선 참고
 
 ## GitHub 연결과 백로그
@@ -147,8 +147,20 @@
 61. Pi 실측: 콜드 빌드 11분 43초, 첫 기동 5분 59초(PostgreSQL pull 포함)·재기동 20.9초, 유휴 메모리 합계 약 63MiB, 운영 구성 hardening·루프백·자동 재시작(13초) 확인. 테스트 컨테이너·볼륨·baseline 이미지 정리.
 62. actionlint, Python 3.13 컨테이너 pytest 37개·Ruff, Compose 2종 config 통과.
 63. PR #83 생성, run `39905138626`에서 `Images (amd64/arm64)` 포함 전체 CI와 `CI Gate` 통과.
+64. 소유자 승인으로 PR #83 병합(`f6fedff`), #56 종료, Epic #9 체크리스트를 UTF-8 파일로 갱신·재조회 확인.
+65. 다음 작업을 #20으로 선택(EP-02 최우선 기술 위험, EP-04 선행). `feat/#20-dedup-tail-poc` 생성.
+66. #19 프로브에 파일 동일성·앞부분 지문(256B/1KiB/4KiB)·BOM·개행·`uuid`·`message.id`·`promptId` 지문·`tool_use` 줄 유형·미등록 키 이름 통계와 `resume` 시나리오(`--session-id`→`--resume`) 추가.
+67. 합성 실측 7회(basic 3, resume 4, 약 $0.14): resume 시 같은 세션·같은 파일 append-only, `promptId`=`prompt_id`, `tool_use` 중복은 `api-request-blob` 내부 줄 때문, resumed 턴 `Stop` 1/4 누락. 결과 원문 패턴 0건, 사용자 설정 무변경.
+68. `tests/poc/collector` tail·중복 제거 참조 구현, 합성 dual-source fixture, 테스트 18개(비root 권한 거부 포함) 추가. 의존성 설치 시간을 줄이려고 로컬 테스트 이미지 `agent-office-test:py313`을 만들어 사용(저장소 미포함).
+69. Python 3.13 컨테이너 pytest 56개, Ruff lint·format, server mypy, PoC mypy strict 통과.
 
-## 이번 변경 요약(#56)
+## 이번 변경 요약(#20)
+
+- [Hook·JSONL 중복 제거와 tail 규칙](poc/collector-dedup-tail.md): 결정적 키 `device|provider|session|kind|ref`와 UUIDv5 `event_id`, transcript는 `assistant`·`user` 줄만, tail 체크포인트 `{device, inode, offset, prefix_digest}`.
+- 언어 중립 fixture `tests/fixtures/collector/claude/dual-source/`를 Go Collector(#30·#32·#33)가 재사용한다.
+- 미실행: Codex 교차 키, compact·fork·삭제, SIGKILL, Windows·macOS 파일 ID, 대화형 TUI.
+
+## 이전 완료 변경 요약(#56)
 
 - [Docker 이미지와 Compose](installation/docker-images.md): 이미지 구성, 설치 방식 A/B, 게시 절차, 베이스 갱신, Pi 실측.
 - 운영 Compose는 base+overlay가 아니라 독립 파일이다. CI와 문서의 검증 명령도 바뀌었다.
@@ -190,6 +202,7 @@
 | Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: #19 포함 pytest 34개 통과(Starlette deprecation 경고 1개), Ruff lint·format, server mypy, Claude 프로브 mypy strict 통과. 호스트에는 pytest·`python3-venv` 없음 |
 | Pi 호스트 Node·Go 회귀 | 미실행 | Node·Go 호스트 미설치. CI 원격 결과로 대체 확인 |
 | Pi arm64 이미지·Compose | 통과 | #56: 빌드, 개발/운영 Compose `up --wait`, health·HTTP 200, 비루트·read-only·루프백·자동 재시작 실측 |
+| Hook·JSONL 중복 제거·tail 규칙 | 통과(참조 구현) | #20: 합성 fixture 순서 무관·재시작 재처리 0, tail 경계 10종, Claude 실측 7회 |
 | amd64·arm64 이미지 CI | 통과 | PR #83 run `39905138626`: `Images (amd64)` 41초, `Images (arm64)` 39초, 나머지 job과 `CI Gate` 모두 성공 |
 | GHCR 게시 | 미실행 | 외부 공개, 관리자 승인과 `image-publish` Environment 설정 필요 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
@@ -198,12 +211,12 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. PR #83의 최신 CI를 확인한다: `gh pr checks 83 --watch`.
-2. 소유자 승인을 받아 `gh pr merge 83 --merge`, `gh issue close 56`, Epic #9 본문 체크리스트(#56)를 `gh issue edit 9 --body-file <UTF-8 파일>`로 갱신한다. 본문 편집 전 `gh api repos/apg0001/Agent-Office/issues/9 -q .body`로 한글이 정상인지 확인한다.
-3. GHCR 게시가 필요하면 먼저 소유자가 Settings → Environments에 `image-publish`(필수 리뷰어)를 만들고 승인해야 한다. 그 전에는 `publish-images.yml`을 실행하지 않는다.
-4. 다음 Issue 후보(소유자 지시 대기): #57 Tailscale·Cloudflare 선택형 접속·HTTPS, #59 Health·모니터링·외부 Heartbeat(재부팅 자동 기동 포함), #20 Hook·JSONL 교차 중복(Claude 결과 기반), #22 PostgreSQL ERD.
-5. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때 #17 프로브(`tests/poc/codex`)로 구조 통계만 기록한다.
-6. #19 후속(별도 Issue 후보): 대화형 TUI에서 승인 대기·`Notification`·중단·compact 관측. 소유자가 직접 조작해야 한다.
+1. #20 PR의 CI를 확인한다: `gh pr checks <PR 번호> --watch`.
+2. CI 통과 후 `gh pr merge <PR 번호> --merge`(소유자가 다음 작업까지 자율 진행을 승인함), `gh issue close 20`, Epic #2 체크리스트(#20)를 UTF-8 파일로 `gh issue edit 2 --body-file`하고 재조회해 한글을 확인한다.
+3. 다음 Issue 후보: #21 Codex app-server 범위 조사(Pi Codex CLI 0.163.0, 사용량·인증 확인 필요), #22 PostgreSQL ERD·마이그레이션(EP-03 시작, 서버 기반), #29~#33 Go Collector 코어(#20 fixture 재사용). 의존성상 #22 또는 #29가 EP-02 이후의 자연스러운 다음 단계다.
+4. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
+5. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때만.
+6. #19·#20 후속(별도 Issue 후보): 대화형 TUI의 승인 대기·`Notification`·중단·compact·fork 관측. 소유자가 직접 조작해야 한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -224,6 +237,8 @@
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
 - PR #76~#79 본문의 한글이 `?`로 손상돼 있고 GitHub 편집 이력에 원본이 없다. 커밋 메시지·문서가 원본 기록이며, 필요하면 소유자 승인 후 PR 본문을 다시 작성한다. Epic #3~#12와 세부 Issue는 손상 없음을 확인했다.
+- Claude Code `Stop`은 누락될 수 있다(#20, resume 1/4). 상태 엔진(#36)은 `Stop` 하나에 의존해 IDLE을 만들지 않는다.
+- 로컬 테스트 이미지 `agent-office-test:py313`은 Pi에만 있는 캐시다. 의존성이 바뀌면 다시 만든다(`docs/project-status.md` 68번 참고).
 - Windows PowerShell에서 `gh`로 한글 본문을 쓸 때 인코딩이 깨질 수 있다. 본문은 UTF-8 파일과 `--body-file`로만 전달하고 쓰기 후 다시 조회한다.
 - Pi 콜드 빌드는 10분 이상 걸리고 첫 기동은 이미지 pull로 수 분이 걸린다. 운영 배포는 사전 빌드 이미지(GHCR) pull을 전제로 한다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.

@@ -1,0 +1,27 @@
+{
+  "description": "합성 Hook·transcript 이중 수집 결과. 어느 순서로 처리해도 통과 키 집합과 event_id가 같아야 한다.",
+  "device_ref": "device-synthetic-1",
+  "accepted_dedup_keys": [
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|agent.completed|a0000000000000001",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|agent.started|a0000000000000001",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|tool.finished|toolu_synthetic_0001",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|tool.finished|toolu_synthetic_0002",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|tool.finished|toolu_synthetic_agent",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|tool.started|toolu_synthetic_0001",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|tool.started|toolu_synthetic_0002",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|tool.started|toolu_synthetic_agent",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|turn.started|00000000-0000-4000-8000-000000000101",
+    "device-synthetic-1|claude|00000000-0000-4000-8000-000000000001|turn.started|00000000-0000-4000-8000-000000000102"
+  ],
+  "keyless_event_types_from_hooks": [
+    "session.started",
+    "turn.completed",
+    "session.ended"
+  ],
+  "suppressed_when_hooks_first": 8,
+  "tool_finished_event_type": {
+    "toolu_synthetic_0001": "tool.completed",
+    "toolu_synthetic_agent": "tool.completed",
+    "toolu_synthetic_0002": "tool.failed"
+  }
+}
