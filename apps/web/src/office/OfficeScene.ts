@@ -15,6 +15,7 @@ import {
   zoomBy,
 } from "./camera";
 import { findPath } from "./pathfinding";
+import { BADGE_LABELS, idleCycle, presenceOf } from "./presence";
 import { type DisplayedZone, nextDisplayedZone } from "./smoothing";
 import type { Furniture, OfficeMap, Point, ZoneKind } from "./grid";
 import { ZONE_LABELS } from "./grid";
@@ -51,6 +52,8 @@ interface Actor {
   path: Point[];
   agent: AgentState;
   displayed?: DisplayedZone;
+  leaving: boolean;
+  status: Phaser.GameObjects.Text;
 }
 
 const REPLAN_INTERVAL_MS = 250;
@@ -172,17 +175,41 @@ export class OfficeScene extends Phaser.Scene {
       this.plan(actor, Date.now());
     }
     for (const [id, actor] of this.actors) {
-      if (!alive.has(id)) {
-        actor.container.destroy();
-        this.actors.delete(id);
+      if (!alive.has(id) && !actor.leaving) {
+        // 상태에서 빠진 캐릭터도 순간 사라지지 않고 퇴근한다.
+        this.startLeaving(actor);
       }
     }
   }
 
   /** 폭주 병합을 거친 표시 구역으로 목적지를 정하고, 추정 상태를 구분해 표시한다. */
+  private startLeaving(actor: Actor): void {
+    actor.leaving = true;
+    const here = { x: Math.round(actor.position.x), y: Math.round(actor.position.y) };
+    actor.target = this.map.entrance;
+    actor.path = findPath(this.map, here, this.map.entrance);
+    actor.status.setVisible(false);
+    actor.marker.setVisible(false);
+  }
+
   private plan(actor: Actor, now: number): void {
+    if (actor.leaving) {
+      return;
+    }
+    const view = presenceOf(actor.agent, this.state);
+    if (view.presence === "leaving") {
+      this.startLeaving(actor);
+      return;
+    }
+    actor.container.setAlpha(view.alpha);
+    actor.status.setVisible(view.badge !== null);
+    if (view.badge) {
+      actor.status.setText(BADGE_LABELS[view.badge]);
+    }
     actor.displayed = nextDisplayedZone(actor.displayed, actor.agent, now);
-    const target = targetTile(this.map, actor.agent, this.seats, actor.displayed.zone);
+    // 유휴면 휴게실 안에서 가끔 자리를 옮긴다(생활 연출).
+    const variant = actor.displayed.zone === "lounge" ? idleCycle(now, actor.agent.id) : 0;
+    const target = targetTile(this.map, actor.agent, this.seats, actor.displayed.zone, variant);
     if (target.x !== actor.target.x || target.y !== actor.target.y || actor.path.length === 0) {
       // 이동 중에 목적지가 바뀌어도 지금 서 있는 칸에서 다시 경로를 찾는다.
       const here = { x: Math.round(actor.position.x), y: Math.round(actor.position.y) };
@@ -190,7 +217,6 @@ export class OfficeScene extends Phaser.Scene {
       actor.target = target;
     }
     const inferred = actor.agent.confidence === "inferred";
-    actor.container.setAlpha(inferred ? 0.55 : 1);
     actor.marker.setVisible(inferred || actor.agent.turn_state === "WAITING_USER");
     actor.marker.setText(actor.agent.turn_state === "WAITING_USER" ? "!" : "?");
   }
@@ -232,6 +258,11 @@ export class OfficeScene extends Phaser.Scene {
       const screen = gridToScreen(actor.position);
       actor.container.setPosition(screen.sx, screen.sy - TILE_HEIGHT / 4);
       actor.container.setDepth(depthOf(actor.position, 5));
+      if (actor.leaving && actor.path.length === 0) {
+        // 출입구에 도착하면 퇴근 완료. 책상은 서버가 퇴근 연출 시간 후 반납한다.
+        actor.container.destroy();
+        this.actors.delete(actor.agent.id);
+      }
     }
     if (this.camera.autoFocus) {
       // 활동 중인 캐릭터들의 중심을 부드럽게 따라간다.
@@ -260,8 +291,26 @@ export class OfficeScene extends Phaser.Scene {
       .text(0, -38, "?", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
       .setOrigin(0.5)
       .setVisible(false);
-    container.add([body, head, badge, marker]);
-    const actor: Actor = { container, marker, position: start, target: start, path: [], agent };
+    const status = this.add
+      .text(0, -50, "", {
+        fontFamily: "sans-serif",
+        fontSize: "10px",
+        color: "#ffffff",
+        backgroundColor: "#00000088",
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
+    container.add([body, head, badge, marker, status]);
+    const actor: Actor = {
+      container,
+      marker,
+      status,
+      position: start,
+      target: start,
+      path: [],
+      agent,
+      leaving: false,
+    };
     this.actors.set(agent.id, actor);
     return actor;
   }

@@ -5,6 +5,7 @@
 
 import type { OfficeMap, Point, ZoneKind } from "./grid";
 import { walkableTiles } from "./grid";
+import { mixHash } from "./presence";
 import type { Activity, AgentState, OfficeState, TurnState } from "./types";
 
 export function zoneForActivity(activity: Activity, turnState: TurnState): ZoneKind {
@@ -55,6 +56,7 @@ export function targetTile(
   agent: AgentState,
   seats: Map<string, Point>,
   zone: ZoneKind = zoneForActivity(agent.activity, agent.turn_state),
+  variant = 0,
 ): Point {
   const seat = seats.get(agent.session_id);
   if (zone === "desk" && seat) {
@@ -68,13 +70,5 @@ export function targetTile(
   if (tiles.length === 0) {
     return map.entrance;
   }
-  return tiles[hash(agent.id) % tiles.length] ?? map.entrance;
-}
-
-function hash(value: string): number {
-  let result = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    result = (result * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return result;
+  return tiles[(mixHash(agent.id) + variant) % tiles.length] ?? map.entrance;
 }
