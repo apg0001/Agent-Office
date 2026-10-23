@@ -11,13 +11,13 @@
 ## 현재 위치
 
 - 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
-- 활성 작업 A(Pi, 직접): #57 `EP-09/ISS-02 원격 접속·HTTPS` (`feat/#57-reverse-proxy`)
-- 활성 작업 B(Pi, 서브에이전트·별도 worktree): #34 `EP-04/ISS-06 OS별 독립 백그라운드 수집·진단` (`feat/#34-collector-runtime`). `docs/project-status.md`는 작업 A가 통합 관리
-- 직전 완료(Pi): #27(PR #112, `b111d67`), #67(PR #110 서버 `b101c9a`, PR #111 웹 `217531e`), #66(PR #109, `c7722b1`), #33(PR #108, `113905c`, 서브에이전트), #23(PR #107, `e008e28`), #46(PR #106, `119ae9d`, Epic #7 종료), #51(PR #105, `fe6592d`), #32(PR #103, `4ed866c`, 서브에이전트), #50(PR #104, `bd5b25a`), #49(PR #102, `74d70c3`), #48(PR #101, `8a1d885`), #30(PR #98, `a589e62`, 서브에이전트), #47(PR #100, `09ea7b7`), #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
+- 활성 작업 A(Pi, 직접): 없음(체크포인트, 다음 작업 대기)
+- 활성 작업 B(Pi, 서브에이전트): 없음
+- 직전 완료(Pi): #34(PR #113, `5b85ade`, 서브에이전트), #57(PR #114, `985c59f`), #27(PR #112, `b111d67`), #67(PR #110 서버 `b101c9a`, PR #111 웹 `217531e`), #66(PR #109, `c7722b1`), #33(PR #108, `113905c`, 서브에이전트), #23(PR #107, `e008e28`), #46(PR #106, `119ae9d`, Epic #7 종료), #51(PR #105, `fe6592d`), #32(PR #103, `4ed866c`, 서브에이전트), #50(PR #104, `bd5b25a`), #49(PR #102, `74d70c3`), #48(PR #101, `8a1d885`), #30(PR #98, `a589e62`, 서브에이전트), #47(PR #100, `09ea7b7`), #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
 - EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
-- 기준 브랜치: `develop` (`b111d67`, PR #112 병합 결과)
+- 기준 브랜치: `develop` (`5b85ade`, PR #113 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
@@ -225,6 +225,9 @@
 139. #27: `/api/v1/teams`(생성·조회·수정·삭제, 역할 변경, 내보내기·탈퇴, 소유권 이전), 초대(7일·일회용·재초대 시 이전 무효·초대받은 이메일 계정만 수락·메일 없으면 링크를 초대자에게 반환), 프로젝트 생성·소유자 동의 공유·해제·팀별 공유 목록, `INVITE_ONLY` 가입 시 초대 토큰·이메일 일치 검사. 팀 권한은 팀 역할로만(SUPER_ADMIN도 없음), 남의 팀은 404. 웹 `/invite` 수락 화면. 서버 212개·웹 52개 테스트 통과.
 140. PR #112 병합(`b111d67`), #27 종료. 진행률: 세부 Issue 62개 중 31개.
 141. #57: 운영 Compose에 Caddy `proxy`(2.10.2, digest 고정)를 유일한 호스트 포트로 추가하고 서버·웹 포트 제거, 서버 `FORWARDED_ALLOW_IPS`로 실제 클라이언트 IP 사용, 보안 헤더, `docs/installation/remote-access.md`(Tailscale 권장·Cloudflare Tunnel·도메인 HTTPS·Nginx·위협 모델). Pi에서 로컬 빌드 이미지로 운영 Compose 실기동 검증. Caddy 실행 파일의 파일 권한 때문에 `NET_BIND_SERVICE`가 필요함을 실측으로 발견.
+142. PR #114 병합(`985c59f`), #57 종료. 기존 저장소 메타데이터 테스트가 서버·웹 호스트 포트를 가정해 CI 실패 → proxy 단일 진입점 검사로 갱신.
+143. #34 서브에이전트 PR #113(`agent-office-collector` CLI: register(0600 원자적 설정, 토큰 미출력, https 강제·루프백 예외), run(탐색·tail·정규화·큐·전송·60초 heartbeat·일일 정리, 단일 인스턴스, 401/403 시 큐 보존·재등록 안내), hook(항상 종료 코드 0·무출력, 필터된 결과만 로컬 spool), pause/resume, status/diagnose(코드·개수만), service install/uninstall(systemd user·launchd·Windows 로그온 작업, 소유 표시 없는 파일 미변경); 최초 설치 시 기존 transcript는 끝에서 시작)을 최신 `develop` 병합·추적표 충돌 해결·CI 통과 후 병합(`5b85ade`), #34 종료. 서브에이전트 사용량 약 26만 토큰. 미검증: macOS·Windows·실제 systemd·실제 서버·실제 Hook 호출.
+144. 체크포인트: 세부 Issue 62개 중 33개 완료. Epic #7 종료, Epic #4는 #31만 남음.
 
 ## 이번 변경 요약(#22)
 
@@ -310,7 +313,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율): #57 PR 병합 → #54·#55 팀 사무실·실시간 범위 / 병렬 #34 실행·진단(서브에이전트, PR 생성 후 `git merge origin/develop`·추적표 충돌 해결·CI 확인 후 병합). 이후 #27 팀, EP-08/09/11/12. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다. #33 PR은 서브에이전트가 만든 뒤 `git merge origin/develop`·추적표 충돌 해결·CI 확인 후 병합한다.
+4. 진행 순서(자율, 소유자 재개 지시 후): #54·#55 팀 사무실·실시간 범위(`api/office.py`에 팀 범위·공유 프로젝트 필터, 매 주기 권한 재검사) → #31 Hook 설치·도구 버전 감지(Go, `collector/core/internal/service` 소유 표시 방식 재사용) → #41 OS 키체인·토큰 교체 → #68 운영 설정·진단 UI. 이후 EP-08/09/11/12 나머지. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
