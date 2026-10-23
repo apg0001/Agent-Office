@@ -9,6 +9,7 @@
 - [API 문서 상태](api/README.md)
 - [장치 등록·인증 API v1](api/devices-v1.md)
 - [브라우저 세션·CSRF·로그아웃 API v1](api/auth-sessions-v1.md)
+- [사무실 스냅샷·실시간 API v1](api/office-live-v1.md)
 - [호환성 행렬](compatibility/matrix.md)
 - [개발 환경 설치](installation/development.md)
 - [Docker 이미지와 Compose](installation/docker-images.md)

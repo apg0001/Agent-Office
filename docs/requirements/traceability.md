@@ -158,3 +158,13 @@
 | ADP-004 | EVT-007 프라이버시 | 민감 필드·도구 이름·하위 에이전트 유형·식별자 위치의 sentinel이 후보·오류 문자열에 0건, 정확한 키 일치, Codex 합성 fixture 원문 패턴 0건 |
 | ADP-005 | EVT-001 enum 정합 | 후보 enum이 이벤트 v1 `provider`·`source`·`event_type`·`activity`·`confidence` 값의 부분집합 |
 | ADP-006 | COL-004 fail-open | 크기 상한·깨진 JSON·깊은 중첩 typed 오류, `recover`, 퍼즈 시드 테스트(로컬 30초 퍼즈 약 96만 회 실패 0) |
+
+## 사무실 실시간 검증 매핑(#37)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| LIVE-001 | OFF-010 스냅샷·복원 | 스냅샷이 자기 장치·세션·에이전트 상태만 담음, 재접속 시 끊긴 동안의 변경 복원 |
+| LIVE-002 | 실시간 증분 | 이벤트 수집 후 delta 수신, `change_seq` 증가, 세션 종료 delta |
+| LIVE-003 | SEC-001 인증·철회 | 쿠키 없음·위조 4401, 로그아웃 시 연결 즉시 종료 |
+| LIVE-004 | SEC 교차 사이트 | 다른 Origin 4403, 같은 호스트 Origin 허용 |
+| LIVE-005 | SEC-002 격리·프라이버시 | 다른 사용자의 변경 미전달, Collector 원본 ID·토큰 미노출 |
