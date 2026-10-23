@@ -70,6 +70,8 @@ function agentAt(
     role: parent ? "subagent" : "lead",
     turn_state: turnState,
     activity,
+    // 합성 데이터에서도 추정 표시를 확인할 수 있게 일부를 추정으로 둔다.
+    confidence: offset % 4 === 3 ? "inferred" : "observed",
     state_version: tick,
     started_at: null,
     ended_at: null,

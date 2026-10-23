@@ -11,13 +11,13 @@
 ## 현재 위치
 
 - 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
-- 활성 작업 A(Pi, 직접): #45 `EP-07/ISS-01 Phaser 아이소메트릭 타일맵·기초 애니메이션 엔진` (`feat/#45-office-tilemap`)
+- 활성 작업 A(Pi, 직접): #47 `EP-07/ISS-03 실제 이벤트→행동 상태·자연스러운 연출` (`feat/#47-live-behavior`)
 - 활성 작업 B(Pi, 서브에이전트·별도 worktree): #30 `EP-04/ISS-02 파일 감지·tail·오프셋·로테이션·재시작` (`feat/#30-collector-tail`). `docs/project-status.md`는 작업 A가 통합 관리
-- 직전 완료(Pi): #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
+- 직전 완료(Pi): #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
 - EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
-- 기준 브랜치: `develop` (`95bac53`, PR #97 병합 결과)
+- 기준 브랜치: `develop` (`f1b7d7b`, PR #99 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
@@ -199,6 +199,8 @@
 113. #37: 마이그레이션 `0003`(전역 `state_change_seq`, 세션·에이전트 상태 `change_seq`, 변경 시각 인덱스), 상태 반영 시 화면에 보이는 변경에만 증가. `GET /api/v1/office` 개인 스냅샷, `WS /api/v1/live`(Origin 검사, 첫 스냅샷, 30초 재조회+연결별 change_seq 중복 제거 증분, 25초 ping, 매 주기 세션 재검증으로 즉시 철회). 테스트 8개.
 114. PR #97 CI 통과 후 병합(`95bac53`), #37 종료. 서버 데이터 흐름(수집→상태→실시간) 완성.
 115. #45: `node_modules`를 SD 카드 작업 트리 대신 Docker 볼륨 `ao-node-modules`에 두는 node 실행 방식 도입. `apps/web/src/office`(사실 상태 타입, 논리 그리드·구역·가구·자리, 2:1 투영·깊이, 활동→구역, 결정적 합성 어댑터, Phaser 장면, 지연 로드 React 뷰, 합성 데이터 배지). Vitest 13개·typecheck·build 통과. 실제 브라우저 렌더링은 헤드리스 브라우저가 없어 미검증.
+116. PR #99 CI 통과 후 병합(`f1b7d7b`), #45 종료. #30 서브에이전트가 PR #98을 생성(보고 대기).
+117. #47: 마이그레이션 `0004`(`agent_current_states.confidence`), 상태 반영·스냅샷·증분에 신뢰도 포함. 웹: 스냅샷·증분 병합(`change_seq`), 폭주 병합(1.5초 체류, 긴급 전환 즉시), 로그인 시 실시간 연결·재접속, 미로그인 시 합성, 추정 상태 반투명·`?`, 승인 대기 `!`, Vite `/api` 프록시. 서버 테스트 84개·웹 테스트 19개 통과.
 
 ## 이번 변경 요약(#22)
 

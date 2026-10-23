@@ -268,3 +268,22 @@ def test_resumed_session_reopens_with_later_activity(
     with engine.connect() as connection:
         ended_at = connection.execute(select(schema.agent_sessions.c.ended_at)).scalar_one()
     assert ended_at is None
+
+
+def test_current_state_records_inferred_confidence(
+    client: TestClient, engine: Engine, device: dict[str, str]
+) -> None:
+    stream, lead = Stream(device), uuid.uuid4()
+    stream.send(
+        client,
+        stream.event("session.started", 0, lead),
+        stream.event("tool.started", 1, lead, activity="reading", confidence="inferred"),
+    )
+    states, agents = schema.agent_current_states, schema.agents
+    with engine.connect() as connection:
+        confidence = connection.execute(
+            select(states.c.confidence)
+            .select_from(states.join(agents, agents.c.id == states.c.agent_id))
+            .where(agents.c.collector_agent_id == lead)
+        ).scalar_one()
+    assert confidence == "inferred"

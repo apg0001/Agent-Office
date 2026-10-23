@@ -86,6 +86,7 @@ def _agent_rows(connection: Connection, session_ids: list[uuid.UUID], extra: Any
                 agents.c.ended_at,
                 states.c.turn_state,
                 states.c.activity,
+                states.c.confidence,
                 states.c.state_version,
                 states.c.change_seq,
             )
@@ -128,6 +129,7 @@ def _agent_json(row: Row[Any]) -> dict[str, Any]:
         "role": row.role,
         "turn_state": row.turn_state,
         "activity": row.activity,
+        "confidence": row.confidence,
         "state_version": row.state_version,
         "started_at": _iso(row.started_at),
         "ended_at": _iso(row.ended_at),

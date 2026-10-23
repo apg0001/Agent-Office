@@ -6,6 +6,7 @@
 import Phaser from "phaser";
 
 import { assignSeats, targetTile } from "./behavior";
+import { type DisplayedZone, nextDisplayedZone } from "./smoothing";
 import type { Furniture, OfficeMap, Point, ZoneKind } from "./grid";
 import { ZONE_LABELS } from "./grid";
 import { TILE_HEIGHT, depthOf, gridToScreen, tileDiamond } from "./iso";
@@ -34,14 +35,21 @@ const WALK_TILES_PER_SECOND = 2.5;
 
 interface Actor {
   container: Phaser.GameObjects.Container;
+  marker: Phaser.GameObjects.Text;
   position: Point;
   target: Point;
+  agent: AgentState;
+  displayed?: DisplayedZone;
 }
+
+const REPLAN_INTERVAL_MS = 250;
 
 export class OfficeScene extends Phaser.Scene {
   private readonly map: OfficeMap;
   private readonly actors = new Map<string, Actor>();
   private state: OfficeState;
+  private seats = new Map<string, Point>();
+  private sinceReplan = 0;
 
   constructor(map: OfficeMap, initial: OfficeState) {
     super("office");
@@ -65,13 +73,13 @@ export class OfficeScene extends Phaser.Scene {
     if (!this.sys.isActive()) {
       return;
     }
-    const seats = assignSeats(this.map, state);
+    this.seats = assignSeats(this.map, state);
     const alive = new Set<string>();
     for (const agent of state.agents) {
       alive.add(agent.id);
-      const target = targetTile(this.map, agent, seats);
       const actor = this.actors.get(agent.id) ?? this.spawn(agent);
-      actor.target = target;
+      actor.agent = agent;
+      this.plan(actor, Date.now());
     }
     for (const [id, actor] of this.actors) {
       if (!alive.has(id)) {
@@ -81,7 +89,26 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
+  /** 폭주 병합을 거친 표시 구역으로 목적지를 정하고, 추정 상태를 구분해 표시한다. */
+  private plan(actor: Actor, now: number): void {
+    actor.displayed = nextDisplayedZone(actor.displayed, actor.agent, now);
+    actor.target = targetTile(this.map, actor.agent, this.seats, actor.displayed.zone);
+    const inferred = actor.agent.confidence === "inferred";
+    actor.container.setAlpha(inferred ? 0.55 : 1);
+    actor.marker.setVisible(inferred || actor.agent.turn_state === "WAITING_USER");
+    actor.marker.setText(actor.agent.turn_state === "WAITING_USER" ? "!" : "?");
+  }
+
   update(_time: number, deltaMs: number): void {
+    this.sinceReplan += deltaMs;
+    if (this.sinceReplan >= REPLAN_INTERVAL_MS) {
+      // 체류 시간 때문에 미뤄 둔 목적지 변경을 다시 확인한다.
+      this.sinceReplan = 0;
+      const now = Date.now();
+      for (const actor of this.actors.values()) {
+        this.plan(actor, now);
+      }
+    }
     const step = (WALK_TILES_PER_SECOND * deltaMs) / 1000;
     for (const actor of this.actors.values()) {
       const dx = actor.target.x - actor.position.x;
@@ -106,8 +133,13 @@ export class OfficeScene extends Phaser.Scene {
     const body = this.add.rectangle(0, -10, 12, 16, lead ? 0x2f4f8f : 0x8f6f2f);
     const head = this.add.rectangle(0, -22, 10, 10, 0xf0c8a0);
     const badge = this.add.rectangle(0, -10, 4, 4, lead ? 0xf0d040 : 0xffffff);
-    container.add([body, head, badge]);
-    const actor = { container, position: start, target: start };
+    // "?"는 추정 상태, "!"는 관측된 승인 대기.
+    const marker = this.add
+      .text(0, -38, "?", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
+      .setOrigin(0.5)
+      .setVisible(false);
+    container.add([body, head, badge, marker]);
+    const actor: Actor = { container, marker, position: start, target: start, agent };
     this.actors.set(agent.id, actor);
     return actor;
   }

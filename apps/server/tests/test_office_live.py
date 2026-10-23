@@ -103,6 +103,7 @@ def test_snapshot_contains_only_own_state_without_raw_content(
     assert len(snapshot["sessions"]) == 1 and snapshot["sessions"][0]["lifecycle"] == "OPEN"
     agent = snapshot["agents"][0]
     assert (agent["turn_state"], agent["activity"], agent["role"]) == ("WORKING", "reading", "lead")
+    assert agent["confidence"] == "observed"
     # 서버 ID만 노출한다. Collector가 보낸 세션·에이전트 ID와 토큰은 나오지 않는다.
     dumped = json.dumps(snapshot)
     assert str(sid) not in dumped and str(lead) not in dumped

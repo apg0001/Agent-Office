@@ -75,6 +75,7 @@ def _apply_agent(
         select(
             states.c.turn_state,
             states.c.activity,
+            states.c.confidence,
             states.c.state_version,
             states.c.last_event_occurred_at,
             states.c.last_event_sequence,
@@ -100,13 +101,15 @@ def _apply_agent(
     values: dict[str, object] = {}
     if newer:
         values.update(last_event_occurred_at=occurred_at, last_event_sequence=sequence)
+    confidence_changed = newer and changed != current and row.confidence != confidence
     if changed != current:
         values.update(
             turn_state=changed.turn_state,
             activity=changed.activity,
+            confidence=confidence,
             state_version=row.state_version + 1,
         )
-    if changed != current or lifetime:
+    if changed != current or lifetime or confidence_changed:
         # 화면에 보이는 값이 바뀌었을 때만 실시간 전달 대상이 된다.
         values.update(change_seq=_next_change(), updated_at=func.clock_timestamp())
     if values:
