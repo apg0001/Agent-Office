@@ -14,12 +14,11 @@
 - 브랜치: `feat/#21-codex-app-server-poc` (`develop` `fa8d321`, PR #84 병합 결과에서 생성)
 - 상태: 비로그인·격리 `CODEX_HOME` 실측 4회, 보고서·ADR-0002·프로브·테스트 완료. PR·CI 진행
 - 직전 완료: #20, PR https://github.com/apg0001/Agent-Office/pull/84, merge commit `fa8d321`, Issue 종료, Epic #2 체크 갱신
-- EP-02 잔여: #18(보류) 하나. #21 병합 후 Epic #2는 #18 때문에 열린 상태로 둔다
-- 보류 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
-- #18 브랜치: `feat/#18-codex-desktop-poc` (`develop` `9145d8c` 병합 완료, PR 없음)
+- EP-02 잔여: #18 하나. 실측 완료, PR 리뷰 대기. #18 병합 전까지 Epic #2는 열린 상태로 둔다
+- 재개 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
+- #18 브랜치: `feat/#18-codex-desktop-poc` (PR 직전 `develop` `8dec412` 병합 완료, `develop` 대상 PR 생성·병합은 소유자 승인 대기)
 - 기준 브랜치: `develop` (`fa8d321`, PR #84 병합 결과)
-- 상태: **#18 보류(소유자 결정, 2026-10-23).** 작업 호스트가 Windows PC에서 Raspberry Pi 5(Linux arm64)로 바뀌었고, Pi에는 Codex Desktop이 없으며 Desktop UI 자동화도 금지돼 있어 실측할 수 없음. app-server 비-UI 관측은 #18이 아니라 #21 범위로 둠
-- 재개 조건: Codex Desktop이 설치된 PC에서 소유자 또는 수동 운영자가 합성 세션을 직접 조작할 수 있을 때
+- #18 상태: 2026-10-23 Windows PC에서 재개. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작(에이전트 UI 자동화 없음). Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md)
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
 - 호스트 전환: 이 Raspberry Pi가 이후 서비스 호스팅 서버가 될 예정(소유자 안내). 아래 환경 기준선 참고
@@ -160,8 +159,17 @@
 73. `tests/poc/codex/app_server_probe.py`(stdio·unix WebSocket 클라이언트, 원문 없는 요약) 작성. 같은 서버·다른 서버 2클라이언트 실험 4회 재현: 같은 프로세스에서만 목록 노출·첫 턴 후 `thread/resume` 합류·`turn/*`/`item/*` 수신, 다른 프로세스는 부착 불가.
 74. 격리 daemon 실험: 로그인 없는 `codex exec`는 인증 실패로 daemon에 thread를 만들지 않아 CLI·Desktop의 daemon 공유는 판정 불가. daemon `stop` 후 남은 `pid-update-loop`을 경로 확인 후 종료. `pkill -f` 패턴이 자기 셸과 일치해 명령이 중단된 사고 1회(이후 `[c]odex` 패턴 사용).
 75. ADR-0002(Hook 1차·JSONL 2차·app-server 기본 미사용) 제안, 테스트 4개 추가, pytest 60개·Ruff·mypy strict 통과.
+76. #18 재개(Windows PC): Desktop 패키지·번들 CLI 버전과 Hook 기능 플래그를 읽기 전용으로 확인. 사용자 Codex 로그·DB 원문 미열람.
+77. #18 `desktop_session.py`(prepare/mark/summarize/cleanup)와 Hook 프로브 하위 에이전트·승인 필드 확장. 소유자가 Desktop UI에서 6단계 합성 시나리오 수행.
+78. #18 Hook 미신뢰 상태 0건 → Desktop 설정에서 신뢰 후 21건 기록. 전역 `config.toml`의 소유 섹션 13개(`projects` 1, `hooks.state` 12)만 제거하고 앱 자체 변경 1건은 보존. 읽기 전용 `.git` 삭제 실패를 수정·회귀 테스트화.
 
-## 이번 변경 요약(#21)
+## 이번 변경 요약(#18)
+
+- [Codex Desktop Hook 실측](poc/codex-desktop.md)과 [`tests/poc/codex`](../tests/poc/codex/README.md) Desktop 수동 세션 하네스.
+- 관측: `UserPromptSubmit`·`PreToolUse`·`PostToolUse`·`PermissionRequest`·`SubagentStart/Stop`·`Stop`·`SessionEnd`. `PostToolUse`는 Desktop에서 관측(CLI `exec`는 미관측), `PermissionRequest`에는 `tool_use_id` 없음.
+- 미관측·미실행: `SessionStart`, compact, `Interrupt`, 승인 허용, 반복 실측. Desktop은 1회 부분 관측으로만 표시.
+
+## 이전 완료 변경 요약(#21)
 
 - [Codex app-server 관측 범위와 제한](poc/codex-app-server.md)과 [ADR-0002](decisions/0002-collector-source-priority.md).
 - app-server는 같은 프로세스의 thread만 관측 가능하고 제어 소켓이 실행·쓰기 권한 채널이므로 Collector 기본 경로에서 제외.
@@ -211,6 +219,8 @@
 | GitHub Actions 원격 CI | 통과 | PR #81 최신 run `39890099009`: Python·Node·Go·Compose·Secret Scan과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
+| 실제 Codex Desktop Hook 이벤트 | 부분 통과 | #18: Windows Desktop 합성 1회, 8종 관측·`SessionStart` 미관측, Pre/Post `tool_use_id` 4/4·Subagent `agent_id` 1/1 일치 |
+| Windows 호스트 Python 회귀(#18) | 부분 통과 | `develop` `8dec412` 병합 후 pytest 62 통과·2 실패·1 skip. 실패는 #19 transcript 템플릿·#21 `socket.AF_UNIX`의 Windows 비호환(#18 변경 무관, Linux CI 대상). Ruff·server mypy·Codex 프로브 mypy strict 통과, Gitleaks 작업 트리 61.12MB leak 0 |
 | 실제 Claude Code Hook 이벤트 | 부분 통과 | Pi Linux arm64, 2.1.308 `-p` 합성 10회: 9종 관측, 반복 재현, `tool_use_id`·`agent_id` 상관관계 일치; 대화형·승인 대기 미실측. 상세 #19 보고서 |
 | Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: #19 포함 pytest 34개 통과(Starlette deprecation 경고 1개), Ruff lint·format, server mypy, Claude 프로브 mypy strict 통과. 호스트에는 pytest·`python3-venv` 없음 |
 | Pi 호스트 Node·Go 회귀 | 미실행 | Node·Go 호스트 미설치. CI 원격 결과로 대체 확인 |
@@ -230,7 +240,7 @@
 3. ADR-0002는 "제안됨" 상태다. 소유자에게 검토를 요청하고, 승인되면 상태를 "승인됨"으로 바꾼다.
 4. 다음 Issue: EP-02가 #18을 제외하고 끝나므로 의존성상 EP-03 #22(PostgreSQL ERD·인덱스·마이그레이션) 또는 EP-04 #29(Codex·Claude 어댑터·샘플 파서, #20 fixture 재사용)로 진행한다. 서버 상태 엔진(EP-05)이 둘 다 필요하므로 #22를 먼저 권장한다.
 5. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
-6. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때만. 같은 PC에서 로그인한 CLI·Desktop의 app-server daemon 공유 여부도 함께 확인한다(#21 후속).
+6. #18: `gh pr checks <#18 PR 번호> --watch`로 CI를 확인하고, 소유자 승인 후에만 `gh pr merge <#18 PR 번호> --merge`, `gh issue close 18`, Epic #2 체크리스트를 갱신한다. 반복 실측·`SessionStart` 재확인은 Desktop PC에서 `python tests/poc/codex/desktop_session.py prepare`부터 소유자 조작으로 수행한다. 로그인한 CLI·Desktop의 app-server daemon 공유 확인은 #21 후속이다.
 7. #19·#20 후속 후보: 대화형 TUI의 승인 대기·`Notification`·중단·compact·fork 관측(소유자 조작 필요).
 
 ## 알려진 위험과 결정 대기
@@ -248,6 +258,9 @@
 - #17 실행으로 Codex가 관리하는 합성 세션 transcript 8개가 사용자 Codex 상태에 생성됐다. 원본 도구 기록을 임의 삭제하지 않는 원칙에 따라 그대로 두었으며 실제 사용자 내용은 없다.
 - Codex CLI 0.162.0-alpha.17.2에서 inline `PostToolUse`가 네 번 모두 미관측이었다. 공식 문서와 차이가 있으므로 이 버전의 Hook만으로 `tool.completed`를 만들지 않는다.
 - 임시 프로젝트 `hooks.json`은 `--ignore-user-config` 비대화형 조합에서 발견되지 않았고 inline `-c` Hook은 동작했다. 대화형 신뢰 UI와 일반 프로젝트 탐색 지원은 아직 주장하지 않는다.
+- #18 Desktop 실측은 1회이고 `SessionStart`가 미관측이다. Hook 신뢰 전에 세션이 시작됐을 가능성이 있어 미지원으로 단정하지 않으며, 반복 실측 전 Desktop 지원을 표시하지 않는다.
+- #18 실행으로 Codex가 관리하는 합성 Desktop 세션 transcript가 사용자 Codex 상태에 남았다. 원본 기록 삭제 금지 원칙에 따라 그대로 두었다.
+- #19·#21 테스트 2개가 Windows에서 실패한다(Linux 전용 가정). 별도 Issue로 Windows 건너뛰기 또는 수정 여부를 결정해야 한다.
 - Computer Use 안전 지침은 ChatGPT/Codex Desktop UI 자동화를 금지한다. #18의 Desktop 상호작용은 사용자/수동 운영자가 수행해야 하며, 자동화 우회나 보안·신뢰 프롬프트 조작을 시도하지 않는다.
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
