@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
-import { call, messageFor, tokenFromHash } from "./api";
+import { call, messageFor, pendingInvite, tokenFromHash } from "./api";
 
 interface FieldProps {
   label: string;
@@ -116,7 +116,13 @@ export function SignupPage() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      const result = await call("POST", "/api/v1/auth/signup", { email, password, display_name: name });
+      const invite = pendingInvite();
+      const result = await call("POST", "/api/v1/auth/signup", {
+        email,
+        password,
+        display_name: name,
+        ...(invite ? { invite_token: invite } : {}),
+      });
       setDone(result.ok);
       return result.error;
     });

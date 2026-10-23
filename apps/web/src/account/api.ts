@@ -63,7 +63,7 @@ const MESSAGES: Record<string, string> = {
   email_not_verified: "이메일 확인이 아직 끝나지 않았습니다. 받은 메일의 링크를 열어 주세요.",
   approval_pending: "관리자 승인을 기다리고 있습니다.",
   signup_closed: "지금은 가입을 받지 않습니다.",
-  invite_required: "초대받은 사용자만 가입할 수 있습니다.",
+  invite_required: "초대받은 사용자만 가입할 수 있습니다. 받은 초대 링크를 먼저 열고, 초대받은 이메일로 가입하세요.",
   invalid_email: "이메일 형식이 올바르지 않습니다.",
   password_too_short: "비밀번호는 10자 이상이어야 합니다.",
   password_too_long: "비밀번호는 128자 이하여야 합니다.",
@@ -111,7 +111,7 @@ export function tokenFromHash(hash: string): string | null {
   return match ? match[1]! : null;
 }
 
-export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup";
+export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite";
 
 export function routeFor(pathname: string): Route {
   const routes: Record<string, Route> = {
@@ -120,6 +120,30 @@ export function routeFor(pathname: string): Route {
     "/verify-email": "verify",
     "/reset-password": "reset",
     "/setup": "setup",
+    "/invite": "invite",
   };
   return routes[pathname.replace(/\/+$/, "") || "/"] ?? "office";
+}
+
+export const INVITE_STORAGE_KEY = "ao_invite_token";
+
+/** 초대 토큰을 이 탭에만 잠시 보관한다(가입·로그인 후 돌아와 수락). */
+export function pendingInvite(): string | null {
+  try {
+    return window.sessionStorage.getItem(INVITE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function rememberInvite(token: string | null): void {
+  try {
+    if (token) {
+      window.sessionStorage.setItem(INVITE_STORAGE_KEY, token);
+    } else {
+      window.sessionStorage.removeItem(INVITE_STORAGE_KEY);
+    }
+  } catch {
+    // 저장소를 못 쓰면 링크를 다시 열면 된다.
+  }
 }
