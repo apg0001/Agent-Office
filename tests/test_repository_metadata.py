@@ -125,12 +125,17 @@ def test_production_compose_uses_pinned_images_without_builds() -> None:
         assert "build" not in service, name
         assert service["restart"] == "always", name
         assert "no-new-privileges:true" in service["security_opt"], name
-    assert "ports" not in compose["services"]["postgres"]
-    for name in ("server", "web"):
+    # 호스트 포트는 proxy(#57)만 연다. 서버는 proxy가 넘긴 클라이언트 IP를 믿으므로 직접 노출되면 안 된다.
+    for name in ("postgres", "server", "web"):
+        assert "ports" not in compose["services"][name], name
+    for name in ("server", "web", "proxy"):
         service = compose["services"][name]
-        assert service["read_only"] is True
-        assert service["cap_drop"] == ["ALL"]
-        assert all(
-            port.startswith("${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:")
-            for port in service["ports"]
-        )
+        assert service["read_only"] is True, name
+        assert service["cap_drop"] == ["ALL"], name
+    proxy = compose["services"]["proxy"]
+    assert proxy.get("cap_add", []) == ["NET_BIND_SERVICE"]
+    assert re.search(r"@sha256:[0-9a-f]{64}\}$", proxy["image"]), proxy["image"]
+    assert proxy["ports"] and all(
+        port.startswith("${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:")
+        for port in proxy["ports"]
+    )

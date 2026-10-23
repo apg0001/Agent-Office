@@ -324,6 +324,15 @@
 | TEAM-T008 | SEC-002 존재 숨김 | 남의 팀·없는 팀 같은 404, 구성원 이메일 미노출 |
 | TEAM-T009 | AUTH-006 초대 가입 | INVITE_ONLY에서 초대 토큰·이메일 일치 시에만 가입 |
 
+## 원격 접속·HTTPS 검증 매핑(#57)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| NET-001 | OPS-001 단일 진입점 | 운영 Compose 실기동: proxy만 호스트 포트, `/api`·웹·SPA 경로 분기 |
+| NET-002 | OPS-002 실제 클라이언트 IP | 서버 로그가 클라이언트 IP 기록, 위조 `X-Forwarded-For` 무시 |
+| NET-003 | OPS-003 보안 헤더 | `X-Frame-Options`·`Referrer-Policy`·`nosniff`, `Server` 제거 |
+| NET-004 | DOC-001~003 가이드 | Tailscale·Cloudflare Tunnel·도메인 HTTPS·Nginx 절차와 위협 모델(외부 연동은 미검증 표시) |
+
 ## Go Collector 실행·진단 검증 매핑(#34)
 
 | 테스트 ID | 요구사항 | 검증 근거 |
