@@ -13,7 +13,7 @@
 - 활성 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
 - 브랜치: `feat/#18-codex-desktop-poc`
 - 기준 브랜치: `develop` (`f14668a`, PR #79 병합 결과)
-- 상태: Issue·브랜치 준비와 #17 결과 인수인계 완료, Desktop 안전 실측 설계 전
+- 상태: Issue·브랜치·인수인계 준비 완료. `computer-use` 안전 규칙상 Codex Desktop UI 자동화가 금지되어 수동 합성 세션 또는 비-UI 관측 경로 결정 대기
 - 직전 완료: #17, PR https://github.com/apg0001/Agent-Office/pull/79, merge commit `f14668a`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
@@ -100,6 +100,7 @@
 37. PR #79 생성 후 GitHub Actions run `39888754773`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
 38. PR #79 최신 run `39888846155`도 전체 통과 후 `develop` 병합, #17 종료와 Epic #2 체크리스트 동기화.
 39. #18 `feat/#18-codex-desktop-poc` 브랜치를 최신 `develop`에서 생성.
+40. `computer-use` 스킬과 필수 안전 지침을 확인. ChatGPT/Codex Desktop UI·Codex 확장 자동화 금지 규칙에 따라 앱 입력 없이 중단하고 수동 운영 절차가 필요함을 확인.
 
 ## 직전 완료 변경 요약(#17)
 
@@ -132,11 +133,11 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. `computer-use` 스킬 지침을 읽고 현재 Codex Desktop을 안전하게 관측할 수 있는 UI 범위와 중단 조건을 정한다.
-2. 기존 대화·사용자 transcript 원문을 열지 않고 Desktop 버전, 합성 세션 생성 가능 여부, Hook 신뢰 흐름을 확인한다.
-3. 합성 세션으로 시작·턴·도구·승인·하위 에이전트·종료 이벤트를 각각 시도하고 관측/미관측을 구조 통계로만 기록한다.
-4. CLI #17과 Desktop 결과가 같은 세션 저장소를 공유하는지 값이 아닌 경로 템플릿·HMAC 상관관계로 검증한다.
-5. 개인정보 회귀 테스트·호환성 보고서·인수인계를 갱신하고 PR의 필수 `CI Gate`를 통과시킨다.
+1. 사용자 또는 수동 운영자가 별도 합성 Desktop 세션을 직접 실행할 수 있는지 확인한다. Computer Use로 Codex UI를 자동화하지 않는다.
+2. 수동 실행이 가능하면 #17 프로브를 Desktop이 연 임시 작업공간에 연결하되 Hook 정의·신뢰 동작은 운영자가 직접 검토한다.
+3. 시작·턴·안전한 읽기 도구·승인·하위 에이전트·종료를 하나씩 수행하고 관측/미관측을 구조 통계로만 기록한다.
+4. 수동 실행이 불가능하면 #18에 미실행 사유를 남기고, #21 app-server의 허용된 비-UI 관측으로 확인 가능한 범위를 별도 검증한다.
+5. CLI #17과 Desktop 결과의 저장소 공유 여부를 값이 아닌 경로 템플릿·HMAC으로 비교하고 개인정보 회귀 테스트·호환성 보고서를 갱신한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -148,6 +149,7 @@
 - #17 실행으로 Codex가 관리하는 합성 세션 transcript 8개가 사용자 Codex 상태에 생성됐다. 원본 도구 기록을 임의 삭제하지 않는 원칙에 따라 그대로 두었으며 실제 사용자 내용은 없다.
 - Codex CLI 0.162.0-alpha.17.2에서 inline `PostToolUse`가 네 번 모두 미관측이었다. 공식 문서와 차이가 있으므로 이 버전의 Hook만으로 `tool.completed`를 만들지 않는다.
 - 임시 프로젝트 `hooks.json`은 `--ignore-user-config` 비대화형 조합에서 발견되지 않았고 inline `-c` Hook은 동작했다. 대화형 신뢰 UI와 일반 프로젝트 탐색 지원은 아직 주장하지 않는다.
+- Computer Use 안전 지침은 ChatGPT/Codex Desktop UI 자동화를 금지한다. #18의 Desktop 상호작용은 사용자/수동 운영자가 수행해야 하며, 자동화 우회나 보안·신뢰 프롬프트 조작을 시도하지 않는다.
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.
