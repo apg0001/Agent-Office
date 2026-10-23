@@ -1,0 +1,11 @@
+name: agent-office
+
+services:
+  postgres:
+    restart: always
+
+  server:
+    restart: always
+
+  web:
+    restart: always
