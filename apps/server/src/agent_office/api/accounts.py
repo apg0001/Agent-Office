@@ -17,6 +17,7 @@ from sqlalchemy import Connection, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from agent_office import audit
+from agent_office.api import teams
 from agent_office.api.auth import CurrentSessionResponse, SessionUser
 from agent_office.api.deps import DbConnection
 from agent_office.auth import accounts, mailer, passwords
@@ -56,6 +57,8 @@ class SignupRequest(StrictModel):
     email: str = Field(max_length=accounts.MAX_EMAIL_LENGTH)
     password: str = Field(max_length=1024)
     display_name: str = Field(min_length=1, max_length=80)
+    # 초대 전용 정책에서 팀 초대 링크로 가입할 때(#27).
+    invite_token: str | None = Field(default=None, max_length=256)
 
 
 class TokenRequest(StrictModel):
@@ -92,11 +95,11 @@ def require_same_origin(request: Request) -> None:
 SameOrigin = Annotated[None, Depends(require_same_origin)]
 
 
-def _client(request: Request) -> str:
+def client_host(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _limit(limiter: KeyedRateLimiter, key: str) -> None:
+def enforce_limit(limiter: KeyedRateLimiter, key: str) -> None:
     retry = limiter.hit(key)
     if retry is not None:
         raise HTTPException(
@@ -110,8 +113,8 @@ def _bad_request(code: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=code)
 
 
-def _require_mail() -> mailer.Mailer:
-    sender = mailer.get_mailer()
+def _require_mail(connection: Connection) -> mailer.Mailer:
+    sender = mailer.get_mailer(connection)
     if not sender.configured:
         # 메일을 보낼 수 없으면 검증·복구가 불가능한 계정을 만들지 않는다.
         raise HTTPException(
@@ -120,29 +123,31 @@ def _require_mail() -> mailer.Mailer:
     return sender
 
 
-def _link(path: str, token: str) -> str:
+def _link(connection: Connection, path: str, token: str) -> str:
     # 토큰은 URL 조각(#)에 넣어 서버 접근 로그·Referer에 남지 않게 한다.
-    return f"{mailer.public_url()}{path}#token={token}"
+    return f"{mailer.public_url(connection)}{path}#token={token}"
 
 
 @router.post("/signup", status_code=status.HTTP_202_ACCEPTED, response_model=AcceptedResponse)
 def signup(
     body: SignupRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> AcceptedResponse:
-    _limit(signup_limiter, f"signup:{_client(request)}")
+    enforce_limit(signup_limiter, f"signup:{client_host(request)}")
     policy = accounts.signup_policy(connection)
     if policy == "CLOSED":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="signup_closed")
-    if policy == "INVITE_ONLY":
-        # 초대 수락 가입은 팀 초대(#27)에서 연다.
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invite_required")
     email = accounts.normalize_email(body.email)
+    if policy == "INVITE_ONLY" and (
+        email is None or teams.open_invitation(connection, body.invite_token or "", email) is None
+    ):
+        # 초대받은 주소와 초대 토큰이 함께 맞아야 한다. 팀 합류는 로그인 후 수락에서 한다.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invite_required")
     if email is None:
         raise _bad_request("invalid_email")
     problem = passwords.password_problem(body.password)
     if problem:
         raise _bad_request(problem)
-    sender = _require_mail()
+    sender = _require_mail(connection)
     display_name = body.display_name.strip() or email.split("@")[0]
     try:
         with connection.begin_nested():
@@ -172,7 +177,7 @@ def signup(
             subject="Agent Office 이메일 확인",
             body=(
                 "아래 링크를 24시간 안에 열어 이메일을 확인하세요.\n"
-                f"{_link('/verify-email', token)}\n"
+                f"{_link(connection, '/verify-email', token)}\n"
                 "본인이 요청하지 않았다면 이 메일을 무시하세요."
             ),
         )
@@ -199,7 +204,7 @@ def _mark_verified(connection: Connection, user_id: uuid.UUID, *, activate: bool
 def verify_email(
     body: TokenRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> Response:
-    _limit(verify_limiter, f"verify:{_client(request)}")
+    enforce_limit(verify_limiter, f"verify:{client_host(request)}")
     user_id = accounts.consume_one_time_token(connection, schema.email_verifications, body.token)
     if user_id is None:
         raise _bad_request("invalid_token")
@@ -223,9 +228,9 @@ def login(
     connection: DbConnection,
     previous: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> CurrentSessionResponse:
-    _limit(login_ip_limiter, f"login:{_client(request)}")
+    enforce_limit(login_ip_limiter, f"login:{client_host(request)}")
     email = accounts.normalize_email(body.email)
-    _limit(login_email_limiter, f"login:{email or '-'}")
+    enforce_limit(login_email_limiter, f"login:{email or '-'}")
     users = schema.users
     row = (
         connection.execute(
@@ -258,16 +263,28 @@ def login(
             .where(users.c.id == row.id)
             .values(password_hash=passwords.hash_password(body.password))
         )
-    token = session_service.issue_session(connection, row.id, replaces_token=previous)
-    session_service.set_session_cookie(response, token)
     audit.record(connection, "auth.login", "success", actor_user_id=row.id)
+    return start_session(
+        connection,
+        response,
+        SessionUser(id=row.id, display_name=row.display_name, instance_role=row.instance_role),
+        previous,
+    )
+
+
+def start_session(
+    connection: Connection, response: Response, user: SessionUser, previous: str | None
+) -> CurrentSessionResponse:
+    """새 브라우저 세션을 발급해 쿠키로 내보낸다. 최초 관리자 생성(#66)도 쓴다."""
+    token = session_service.issue_session(connection, user.id, replaces_token=previous)
+    session_service.set_session_cookie(response, token)
     expires_at = connection.execute(
         select(schema.login_sessions.c.expires_at).where(
             schema.login_sessions.c.token_hash == token_hash(token)
         )
     ).scalar_one()
     return CurrentSessionResponse(
-        user=SessionUser(id=row.id, display_name=row.display_name, instance_role=row.instance_role),
+        user=user,
         csrf_token=session_service.csrf_token_for(token),
         expires_at=expires_at,
     )
@@ -281,13 +298,13 @@ def login(
 def request_password_reset(
     body: ResetRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> AcceptedResponse:
-    _limit(reset_ip_limiter, f"reset:{_client(request)}")
-    sender = _require_mail()
+    enforce_limit(reset_ip_limiter, f"reset:{client_host(request)}")
+    sender = _require_mail(connection)
     email = accounts.normalize_email(body.email)
     accepted = AcceptedResponse(status="reset_sent_if_exists")
     if email is None:
         return accepted
-    _limit(reset_email_limiter, f"reset:{email}")
+    enforce_limit(reset_email_limiter, f"reset:{email}")
     users = schema.users
     user_id = connection.execute(
         select(users.c.id).where(users.c.email == email, users.c.status != "disabled")
@@ -304,7 +321,7 @@ def request_password_reset(
             subject="Agent Office 비밀번호 재설정",
             body=(
                 "아래 링크를 1시간 안에 열어 새 비밀번호를 정하세요.\n"
-                f"{_link('/reset-password', token)}\n"
+                f"{_link(connection, '/reset-password', token)}\n"
                 "본인이 요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않습니다."
             ),
         )
@@ -316,7 +333,7 @@ def request_password_reset(
 def confirm_password_reset(
     body: ResetConfirm, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> Response:
-    _limit(verify_limiter, f"reset-confirm:{_client(request)}")
+    enforce_limit(verify_limiter, f"reset-confirm:{client_host(request)}")
     problem = passwords.password_problem(body.password)
     if problem:
         raise _bad_request(problem)

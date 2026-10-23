@@ -611,6 +611,17 @@ instance_settings = Table(
     CheckConstraint("key ~ '^[a-z][a-z0-9_.]{0,63}$'", name="key_format"),
 )
 
+instance_secrets = Table(
+    "instance_secrets",
+    metadata,
+    # 인스턴스 비밀(SMTP 암호, OAuth client secret). AES-256-GCM 암호문만 둔다(#67).
+    Column("key", String(64), primary_key=True),
+    Column("ciphertext", LargeBinary, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    _fk("updated_by_user_id", "users.id", ondelete="SET NULL", nullable=True),
+    CheckConstraint("key ~ '^[a-z][a-z0-9_.]{0,63}$'", name="key_format"),
+)
+
 notification_channels = Table(
     "notification_channels",
     metadata,

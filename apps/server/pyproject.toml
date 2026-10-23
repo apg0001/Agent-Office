@@ -10,12 +10,17 @@ requires-python = ">=3.13"
 dependencies = [
   "alembic>=1.20,<2",
   "argon2-cffi>=25.1,<26",
+  "cryptography>=50,<51",
   "fastapi>=0.159,<0.160",
   "psycopg[binary]>=3.3,<4",
   "pydantic>=2.14,<3",
   "sqlalchemy>=2.1,<2.2",
   "uvicorn[standard]>=0.54,<0.55",
 ]
+
+[project.scripts]
+# 최초 관리자 bootstrap 토큰을 운영자 콘솔에만 출력한다(#66).
+agent-office-bootstrap = "agent_office.setup.bootstrap:main"
 
 [project.optional-dependencies]
 dev = [
