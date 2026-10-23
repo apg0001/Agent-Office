@@ -313,7 +313,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율, 소유자 재개 지시 후): #54·#55 팀 사무실·실시간 범위(`api/office.py`에 팀 범위·공유 프로젝트 필터, 매 주기 권한 재검사) → #31 Hook 설치·도구 버전 감지(Go, `collector/core/internal/service` 소유 표시 방식 재사용) → #41 OS 키체인·토큰 교체 → #68 운영 설정·진단 UI / 병렬 #34 실행·진단(서브에이전트, PR 생성 후 `git merge origin/develop`·추적표 충돌 해결·CI 확인 후 병합). 이후 #27 팀, EP-08/09/11/12. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다. #33 PR은 서브에이전트가 만든 뒤 `git merge origin/develop`·추적표 충돌 해결·CI 확인 후 병합한다.
+4. 진행 순서(자율, 소유자 재개 지시 후): #54·#55 팀 사무실·실시간 범위(`api/office.py`에 팀 범위·공유 프로젝트 필터, 매 주기 권한 재검사) → #31 Hook 설치·도구 버전 감지(Go, `collector/core/internal/service` 소유 표시 방식 재사용) → #41 OS 키체인·토큰 교체 → #68 운영 설정·진단 UI. 이후 EP-08/09/11/12 나머지. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
