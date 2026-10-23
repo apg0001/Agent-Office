@@ -13,3 +13,7 @@ Hook과 transcript를 함께 읽을 때는 [중복 제거와 tail 규칙](../../
 ## Go 구현(#29)
 
 어댑터 코드는 `collector/core/internal/adapter`(공통 후보·중복 제거), `.../adapter/claude`(Hook·transcript 줄), `.../adapter/codex`(Hook)에 있습니다. 패키지 구조, 화이트리스트, 버전 검증 수준(`verified`/`partial`/`unverified`), 활동 분류와 참조 구현 일치 검증은 [Collector 입력 어댑터](../../docs/architecture/collector-adapters.md)에 정리했습니다. 이 디렉터리는 문서 위치로 유지합니다.
+
+## transcript 탐색·tail(#30)
+
+Claude transcript 파일 탐색(`subagents/` 포함, 심볼릭 링크 미추적)과 체크포인트 기반 tail은 `collector/core/internal/tail`에 있습니다. 파일은 읽기 전용으로만 열고, 완결 줄 바이트를 `claude.ParseTranscriptLine`에 넘깁니다. 규칙과 참조 구현과의 차이, Windows·macOS 미검증 범위는 [Collector transcript 탐색·tail](../../docs/architecture/collector-tail.md)에 정리했습니다.

@@ -158,3 +158,14 @@
 | ADP-004 | EVT-007 프라이버시 | 민감 필드·도구 이름·하위 에이전트 유형·식별자 위치의 sentinel이 후보·오류 문자열에 0건, 정확한 키 일치, Codex 합성 fixture 원문 패턴 0건 |
 | ADP-005 | EVT-001 enum 정합 | 후보 enum이 이벤트 v1 `provider`·`source`·`event_type`·`activity`·`confidence` 값의 부분집합 |
 | ADP-006 | COL-004 fail-open | 크기 상한·깨진 JSON·깊은 중첩 typed 오류, `recover`, 퍼즈 시드 테스트(로컬 30초 퍼즈 약 96만 회 실패 0) |
+
+## Go Collector tail 검증 매핑(#30)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| TAIL-001 | COL-005 JSONL 완결 줄 읽기 | `tail_test.go`: 참조 구현 tail 테스트 10종 이식(partial, BOM+CRLF, 깨진 줄 3건, 재시작, truncate, 같은 크기 재작성, 로테이션, 파일 없음, 권한 거부(root·Windows 건너뜀), 1MiB 초과 줄) |
+| TAIL-002 | COL-008 재시작 복구 | 버전형 체크포인트 JSON 왕복 후 재개 시 재방출 0, 다른 버전 `ErrCheckpointVersion`, 퍼즈·무작위 200회 시나리오에서 조각 append·재시작·읽기 상한을 섞어도 중복·유실 0 |
+| TAIL-003 | COL-005 로테이션 | `rotation_test.go`: 열린 핸들로 이전 파일 꼬리 drain 후 새 파일 처음부터, 이름 변경 후 재생성 전 `missing` 중 drain, 삭제 후 재생성 `rotated` |
+| TAIL-004 | COL-003 탐색 | `discover_test.go`: `projects/<p>/<s>.jsonl`·`subagents/<a>.jsonl` 분류, 깊이 상한, 개수 상한, 심볼릭 링크 3종 미추적, 읽을 수 없는 디렉터리 건너뜀, 안정 `Rel`·`ID` |
+| TAIL-005 | EVT-007 읽기 전용·프라이버시 | `readonly_test.go`: 탐색·tail 전후 감시 루트 항목 수·내용·mode·mtime 불변, 루트 오류에 경로 없음, 상태 enum·sentinel 오류만 |
+| TAIL-006 | COL-005 어댑터 연동 | `fixture_test.go`: #20 합성 transcript를 Claude 배치로 놓고 탐색→tail→`ParseTranscriptLine` 후보가 직접 파싱 결과와 동일 |
