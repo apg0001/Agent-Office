@@ -5,6 +5,7 @@
 
 import type { OfficeMap, Point, ZoneKind } from "./grid";
 import { walkableTiles } from "./grid";
+import { mixHash } from "./presence";
 import type { Activity, AgentState, OfficeState, TurnState } from "./types";
 
 export function zoneForActivity(activity: Activity, turnState: TurnState): ZoneKind {
@@ -26,18 +27,26 @@ export function zoneForActivity(activity: Activity, turnState: TurnState): ZoneK
   }
 }
 
-/** 세션별 자리(임시 규칙): 세션 ID 정렬 순서대로 빈 자리를 채운다. #48에서 재사용 규칙으로 교체. */
+export const DESKS_PER_ROW = 7;
+
+/** 책상 번호를 모두 담을 업무석 줄 수(최소 2줄). 필요할 때만 늘어난다. */
+export function deskRowsFor(state: OfficeState): number {
+  const highest = Math.max(-1, ...state.sessions.map((session) => session.desk_slot ?? -1));
+  return Math.max(2, Math.ceil((highest + 1) / DESKS_PER_ROW));
+}
+
+/** 세션별 자리. 서버가 배정한 책상 번호를 그대로 쓴다(새로고침·다른 브라우저에서도 같은 자리). */
 export function assignSeats(map: OfficeMap, state: OfficeState): Map<string, Point> {
   const seats = new Map<string, Point>();
-  const sessions = [...state.sessions]
-    .filter((session) => session.lifecycle !== "ENDED")
-    .sort((a, b) => a.id.localeCompare(b.id));
-  sessions.forEach((session, index) => {
-    const seat = map.seats[index];
+  for (const session of state.sessions) {
+    if (session.desk_slot === null) {
+      continue;
+    }
+    const seat = map.seats[session.desk_slot];
     if (seat) {
       seats.set(session.id, seat);
     }
-  });
+  }
   return seats;
 }
 
@@ -47,6 +56,7 @@ export function targetTile(
   agent: AgentState,
   seats: Map<string, Point>,
   zone: ZoneKind = zoneForActivity(agent.activity, agent.turn_state),
+  variant = 0,
 ): Point {
   const seat = seats.get(agent.session_id);
   if (zone === "desk" && seat) {
@@ -60,13 +70,5 @@ export function targetTile(
   if (tiles.length === 0) {
     return map.entrance;
   }
-  return tiles[hash(agent.id) % tiles.length] ?? map.entrance;
-}
-
-function hash(value: string): number {
-  let result = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    result = (result * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return result;
+  return tiles[(mixHash(agent.id) + variant) % tiles.length] ?? map.entrance;
 }

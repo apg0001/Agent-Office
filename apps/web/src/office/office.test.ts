@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assignSeats, targetTile, zoneForActivity } from "./behavior";
+import { assignSeats, deskRowsFor, targetTile, zoneForActivity } from "./behavior";
 import { contains, createDefaultOffice, isWalkable, tileAt, walkableTiles } from "./grid";
 import { depthOf, gridToScreen, screenToGrid, tileDiamond } from "./iso";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
@@ -89,10 +89,23 @@ describe("behavior", () => {
     expect(targetTile(map, child!, seats)).toEqual({ x: seat.x + 1, y: seat.y });
   });
 
-  it("does not seat ended sessions", () => {
-    const state = createSyntheticOffice({ sessions: 2, subagentsPerSession: 0 });
-    state.sessions[0]!.lifecycle = "ENDED";
-    expect(assignSeats(map, state).size).toBe(1);
+  it("uses the server desk slot and leaves returned desks empty", () => {
+    const state = createSyntheticOffice({ sessions: 3, subagentsPerSession: 0 });
+    state.sessions[0]!.desk_slot = 5;
+    state.sessions[1]!.desk_slot = null;
+    const seats = assignSeats(map, state);
+    expect(seats.get(state.sessions[0]!.id)).toEqual(map.seats[5]);
+    expect(seats.has(state.sessions[1]!.id)).toBe(false);
+  });
+
+  it("grows desk rows only when slots exceed capacity", () => {
+    const state = createSyntheticOffice({ sessions: 1, subagentsPerSession: 0 });
+    expect(deskRowsFor(state)).toBe(2);
+    state.sessions[0]!.desk_slot = 13;
+    expect(deskRowsFor(state)).toBe(2);
+    state.sessions[0]!.desk_slot = 29;
+    expect(deskRowsFor(state)).toBe(5);
+    expect(createDefaultOffice(5).seats).toHaveLength(35);
   });
 });
 
@@ -103,6 +116,15 @@ describe("synthetic adapter", () => {
     expect(first.agents).toHaveLength(9);
     expect(advanceSynthetic(first, 4)).toEqual(advanceSynthetic(first, 4));
     expect(advanceSynthetic(first, 1).agents).not.toEqual(first.agents);
+  });
+
+  it("creates unique, well-formed synthetic ids", () => {
+    const state = createSyntheticOffice({ sessions: 20, subagentsPerSession: 2 });
+    const ids = [...state.sessions, ...state.agents].map((item) => item.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
   });
 
   it("refuses to advance server data", () => {
