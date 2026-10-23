@@ -1,0 +1,34 @@
+# Agent Office 단일 진입점(#57). 브라우저는 이 주소 하나로 웹과 API·WebSocket을 같은 출처로 쓴다.
+# 컨테이너 안에서는 8080/8443을 듣고, Compose가 호스트 포트를 연결한다.
+{
+	admin off
+	http_port 8080
+	https_port 8443
+	# 도메인을 지정하지 않으면(기본 :8080) 자동 HTTPS를 쓰지 않는다. TLS는 Tunnel·Tailscale이 맡는다.
+}
+
+{$AGENT_OFFICE_SITE_ADDRESS::8080} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		-Server
+	}
+
+	# API·WebSocket은 서버로. Caddy는 신뢰하지 않는 클라이언트가 보낸 X-Forwarded-For를 덮어쓴다.
+	handle /api/* {
+		reverse_proxy server:8000
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
+
+	log {
+		# 접근 로그에는 메일 링크 토큰이 남지 않는다(토큰은 URL 조각 #으로 전달되어 서버로 오지 않음).
+		output stdout
+		format json
+	}
+}
