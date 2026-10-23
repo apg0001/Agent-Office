@@ -611,6 +611,15 @@ instance_settings = Table(
     CheckConstraint("key ~ '^[a-z][a-z0-9_.]{0,63}$'", name="key_format"),
 )
 
+deleted_users = Table(
+    "deleted_users",
+    metadata,
+    # 삭제한 계정의 ID만 남긴다(이메일·이름 없음).
+    # 백업을 복원하면 보존 작업이 이 목록으로 다시 지운다(#39).
+    Column("user_id", UUID(as_uuid=True), primary_key=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
 instance_secrets = Table(
     "instance_secrets",
     metadata,

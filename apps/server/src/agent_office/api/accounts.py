@@ -16,10 +16,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Connection, func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from agent_office import audit
+from agent_office import audit, retention
 from agent_office.api import teams
 from agent_office.api.auth import CurrentSessionResponse, SessionUser
-from agent_office.api.deps import DbConnection
+from agent_office.api.deps import CsrfDep, DbConnection, UserDep
 from agent_office.auth import accounts, mailer, passwords
 from agent_office.auth import sessions as session_service
 from agent_office.auth.sessions import SESSION_COOKIE
@@ -352,3 +352,61 @@ def confirm_password_reset(
     session_service.revoke_all(connection, user_id)
     audit.record(connection, "auth.password_reset", "success", actor_user_id=user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class DeleteAccountRequest(StrictModel):
+    confirm_email: str = Field(max_length=accounts.MAX_EMAIL_LENGTH)
+    password: str | None = Field(default=None, max_length=1024)
+
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    body: DeleteAccountRequest, user: UserDep, _csrf: CsrfDep, connection: DbConnection
+) -> Response:
+    """계정 삭제(#39). 이메일을 다시 입력하고, 비밀번호가 있는 계정은 비밀번호도 확인한다.
+
+    지워지는 것: 계정·장치·세션·이벤트·프로젝트·공유·혼자인 팀. 감사 로그에는 사용자 ID만 남고
+    (행위자 연결은 끊김), 삭제 기록(`deleted_users`)은 백업 복원 후 재삭제에 쓴다.
+    """
+    users, members = schema.users, schema.team_members
+    row = connection.execute(
+        select(users.c.email, users.c.password_hash, users.c.instance_role).where(
+            users.c.id == user.id
+        )
+    ).one()
+    if accounts.normalize_email(body.confirm_email) != row.email:
+        raise _bad_request("confirm_email_mismatch")
+    if row.password_hash is not None and not passwords.verify_password(
+        row.password_hash, body.password or ""
+    ):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
+    if row.instance_role == "SUPER_ADMIN":
+        others = connection.execute(
+            select(func.count())
+            .select_from(users)
+            .where(
+                users.c.instance_role == "SUPER_ADMIN",
+                users.c.status == "active",
+                users.c.id != user.id,
+            )
+        ).scalar_one()
+        if others == 0:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="last_super_admin")
+    other_members = members.alias("other_members")
+    shared_team = connection.execute(
+        select(members.c.team_id)
+        .join(
+            other_members,
+            (other_members.c.team_id == members.c.team_id) & (other_members.c.user_id != user.id),
+        )
+        .where(members.c.user_id == user.id, members.c.role == "OWNER")
+        .limit(1)
+    ).first()
+    if shared_team is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="owner_must_transfer")
+    connection.execute(schema.deleted_users.insert().values(user_id=user.id))
+    retention.remove_user(connection, user.id)
+    audit.record(connection, "account.deleted", "success", target_type="user", target_id=user.id)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    session_service.clear_session_cookie(response)
+    return response
