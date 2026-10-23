@@ -1,6 +1,6 @@
 # API 문서 상태
 
-공통 이벤트 JSON Schema와 OpenAPI 계약은 #15에서 확정합니다. 현재 구현된 엔드포인트는 민감정보를 포함하지 않는 `GET /api/v1/system/health`뿐입니다.
+공통 이벤트 JSON Schema와 수집 payload 계약은 #15에서 확정했습니다. 상세 내용은 [Collector 이벤트 수집 계약 v1](event-ingestion-v1.md)을 참고하세요. 현재 실제 구현된 엔드포인트는 민감정보를 포함하지 않는 `GET /api/v1/system/health`뿐이며, 이벤트 수집 엔드포인트는 아직 구현 전입니다.
 
 예정 범위:
 

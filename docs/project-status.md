@@ -10,11 +10,11 @@
 
 ## 현재 위치
 
-- 활성 작업: #14 `EP-01/ISS-02 Git 규칙·브랜치 보호·PR/Issue 템플릿`
-- 브랜치: `docs/#14-git-governance`
-- 기준 브랜치: `develop` (`3914632`, PR #75 병합 결과)
-- 상태: 이슈/PR 템플릿·보호 규칙·자동 구조 검사 구현 및 검증 완료, 커밋·PR 대기
-- 직전 완료: #13, PR https://github.com/apg0001/Agent-Office/pull/75, merge commit `3914632`
+- 활성 작업: #15 `EP-01/ISS-03 이벤트 JSON Schema·공통 타입·API 계약`
+- 브랜치: `feat/#15-event-contract`
+- 기준 브랜치: `develop` (`6d5f35f`, PR #76 병합 결과)
+- 상태: 이벤트·배치 JSON Schema, TypeScript 타입, 합성 fixture, 계약 테스트와 API 문서 구현 후 최종 검증 중
+- 직전 완료: #14, PR https://github.com/apg0001/Agent-Office/pull/76, merge commit `6d5f35f`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음
 
@@ -24,7 +24,7 @@
 - 원격: `https://github.com/apg0001/Agent-Office.git`.
 - 로컬 `gh`로 라벨 생성과 Issue 쓰기 성공.
 - 별도 GitHub 앱 커넥터의 이슈 생성은 `403 Resource not accessible by integration`; 이후 쓰기는 검증된 로컬 `gh`만 사용.
-- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). #13은 완료·종료됨.
+- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). #13·#14는 완료·종료됨.
 - 각 Epic 본문에 실제 하위 이슈 체크리스트와 의존성을 연결함.
 
 ### 실제 번호 매핑
@@ -74,22 +74,27 @@
 11. #14 브랜치 생성, 구조화 Issue 폼·PR 템플릿·GitHub 운영 문서·메타데이터 테스트 작성.
 12. `main`과 `develop`에 관리자 포함 PR·대화 해결 필수, force-push·삭제 금지 보호 규칙을 적용하고 GitHub API로 재검증.
 13. #14 변경에 대해 pytest 4개, Ruff, mypy, Node typecheck·Vitest·production build를 실행해 통과 확인.
+14. PR #76을 보호된 `develop`에 병합하고 #14 종료.
+15. #15 브랜치에서 닫힌 필드 집합의 이벤트 v1, 배치 요청·응답 JSON Schema와 공통 TypeScript 타입 작성.
+16. 유효 fixture 4개와 무효 fixture 9개, Draft 2020-12·화이트리스트·타입 동기화 계약 테스트와 API 의미 문서 작성.
+17. 첫 검사에서 `date-time` 검사기가 시간대 없는 값을 허용하는 문제를 발견해 `Z` 또는 `±HH:MM` 패턴을 추가하고 재검사 통과.
+18. TypeScript 테스트까지 정적 검사 범위에 포함하면서 Node 내장 타입 설정 누락을 발견해 `@types/node`와 전용 build tsconfig를 추가하고 재검사 통과.
+19. 상위 Epic #1 체크리스트에서 실제 병합 완료된 #13·#14를 완료 상태로 동기화.
 
-## 직전 완료 변경 요약(#13)
+## 직전 완료 변경 요약(#14)
 
-- 루트: README, ignore/editor 설정, npm workspace, Python 개발 의존성.
-- 서버: 최소 FastAPI health API, 테스트, 컨테이너 정의.
-- 웹: React/Vite/TypeScript/Phaser 패키지, 출시 전 상태 화면, 테스트, 컨테이너 정의.
-- Collector: 독립 Go 모듈과 수집 비활성 진입점.
-- 배포: PostgreSQL/server/web 개발 Compose와 안전한 환경 예시.
-- 문서: 아키텍처, 개발 설치, 호환성, 운영 placeholder, ADR, 요구사항 추적, 인수인계.
+- 구조화 Issue 폼 4종과 blank issue 차단·보안 문의 경로.
+- 검증·프라이버시·배포·인수인계를 기록하는 PR 템플릿.
+- `main`·`develop` 보호 규칙과 한국어 Issue/PR/커밋 운영 기준.
+- 템플릿 YAML과 필수 PR 섹션을 검사하는 저장소 메타데이터 테스트.
 
 ## 검증 상태
 
 | 검사 | 상태 | 근거 |
 |---|---|---|
-| Python 설치/pytest/Ruff/mypy | 통과 | pytest 1개 통과(Starlette TestClient deprecation 경고 1개), Ruff·mypy 오류 0 |
-| npm install/typecheck/test/build | 통과 | Vitest 1개 통과, TypeScript 오류 0, Vite production build 성공 |
+| Python 설치/pytest/Ruff/mypy | 통과 | pytest 19개 통과(Starlette TestClient deprecation 경고 1개), Ruff·mypy 오류 0 |
+| npm install/typecheck/test/build | 통과 | 이벤트 계약 3개+웹 1개 Vitest 통과, TypeScript 오류 0, 두 workspace build 성공 |
+| 이벤트 JSON Schema 계약 | 통과 | Draft 2020-12 스키마 3개, 유효 4개·무효 9개 fixture, 닫힌 허용 필드 집합 검증 |
 | Go fmt/vet/race test | 통과 | `golang:1.24-bookworm`; 패키지는 현재 테스트 파일 없음 |
 | Compose config | 통과 | `docker compose ... config --quiet` 성공 |
 | Docker image build | 통과 | FastAPI server와 React/nginx web 이미지 빌드 성공 |
@@ -103,11 +108,11 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. diff·비밀·개인 경로 최종 검사를 실행하고 결과를 이 문서에 반영한다.
-2. #14 변경을 한국어 커밋으로 묶어 push하고 `develop` 대상 PR을 생성한다.
-3. PR 본문에 실제 검사 결과와 보호 규칙 설정 근거를 기록한 뒤 자체 리뷰한다.
-4. 보호 규칙을 통과해 병합하고 #14를 닫는다.
-5. `develop`을 갱신한 뒤 #15 이벤트 JSON Schema·공통 타입·API 계약을 시작한다.
+1. 전체 diff를 자체 리뷰하고 Python·Node 검사와 diff·비밀 패턴 검사를 마지막으로 실행한다.
+2. #15 변경을 한국어 커밋으로 묶어 push하고 `develop` 대상 PR을 생성한다.
+3. PR에 실패→수정 이력, 실제 검사 결과, 미구현 서버 참조 검증·멱등 저장 범위를 기록한다.
+4. 리뷰·병합 후 #15와 상위 Epic 체크리스트를 갱신한다.
+5. `develop`을 갱신한 뒤 #16 자동 테스트·CI 기초 작업을 시작한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -116,4 +121,6 @@
 - 로컬 8000 포트가 이미 사용 중이어서 Compose smoke test는 18000/15173 포트로 수행했다.
 - Claude CLI가 없어 관련 검증은 수행할 수 없다.
 - Codex 로컬 DB/JSONL 원문은 민감정보 보호를 위해 아직 읽지 않았다. #17/#18에서 스키마 키와 안전한 합성 fixture만 추출한다.
+- 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
+- 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.

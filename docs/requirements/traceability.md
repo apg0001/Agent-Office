@@ -20,3 +20,12 @@
 | DOC-001~004 | #13~#16, #57, #65, #69 |
 
 전체 백로그는 #1~#12 Epic과 #13~#74 세부 이슈로 등록되어 있습니다.
+
+## 이벤트 계약 v1 검증 매핑
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| CT-EVT-001 | EVT-001 스키마 버전·enum·길이/형식 제한 | Draft 2020-12 자체 검사, 유효·무효 fixture, TypeScript 상수 일치 테스트 |
+| CT-EVT-002 | EVT-002 이벤트 멱등 키 | 필수 UUID `event_id`, 배치 중복 fixture, ACK 계약 문서 |
+| CT-EVT-004 | EVT-004 부모-자식 관계 | nullable UUID `parent_agent_id`, 루트·하위 에이전트 fixture, 서버 참조 검증 책임 명시 |
+| CT-EVT-007 | EVT-007 프라이버시 최소화 | `additionalProperties: false`, 정확한 허용 필드 집합 테스트, 자유 형식 오류 필드 거부 fixture |
