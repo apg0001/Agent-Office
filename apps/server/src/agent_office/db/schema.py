@@ -274,6 +274,26 @@ Index(
     postgresql_where=devices.c.revoked_at.is_(None),
 )
 
+device_registration_codes = Table(
+    "device_registration_codes",
+    metadata,
+    _uuid_pk(),
+    _fk("user_id", "users.id", ondelete="CASCADE"),
+    # 사용자가 웹에서 받아 Collector에 입력하는 단기 일회용 코드. 해시만 저장한다.
+    Column("code_hash", LargeBinary(32), nullable=False),
+    _created_at(),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("consumed_at", DateTime(timezone=True), nullable=True),
+    _fk("device_id", "devices.id", ondelete="SET NULL", nullable=True),
+    UniqueConstraint("code_hash"),
+    CheckConstraint("expires_at > created_at", name="expiry_after_creation"),
+    CheckConstraint(
+        "consumed_at IS NULL OR consumed_at >= created_at", name="consumed_after_creation"
+    ),
+)
+Index("ix_device_registration_codes_user_id", device_registration_codes.c.user_id)
+Index("ix_device_registration_codes_expires_at", device_registration_codes.c.expires_at)
+
 device_credentials = Table(
     "device_credentials",
     metadata,

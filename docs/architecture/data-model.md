@@ -51,7 +51,7 @@ erDiagram
 | 팀 OWNER 정확히 1명 | 최대 1명: 부분 고유 인덱스. 최소 1명: 커밋 시점 지연 제약 트리거. 같은 트랜잭션에서 강등→승격으로 소유권 이전 |
 | 사용자-팀 관계 고유 | `team_members` PK `(team_id, user_id)` |
 | 열린 초대 중복 방지 | `(team_id, email)` 부분 고유(수락·철회 전) |
-| 토큰 원문 미저장 | 세션·인증·초대·장치 토큰은 SHA-256 해시(`bytea(32)`)만 고유 저장 |
+| 토큰 원문 미저장 | 세션·인증·초대·장치 토큰과 장치 등록 코드(`device_registration_codes`, #26)는 SHA-256 해시(`bytea(32)`)만 고유 저장 |
 | 일회용 토큰 | `consumed_at` 기록 후 재사용 금지(검증은 서비스 계층, 시간 순서는 DB 검사) |
 | 장치 이름 | 사용자별 활성 장치 이름 대소문자 무시 고유 |
 | 세션 식별자 충돌 방지 | 이벤트의 `session_id`는 `agent_sessions.collector_session_id`로 저장하고 `(device_id, provider, collector_session_id)` 고유. 서버 PK와 분리 |

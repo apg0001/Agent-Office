@@ -8,27 +8,22 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import secrets
 import uuid
-from collections.abc import Iterator
-from importlib.resources import files
 from typing import Any
 
 import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
-from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import Engine, String, create_engine, inspect, text
+from conftest import alembic_config
+from sqlalchemy import Engine, String, inspect, text
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.engine import Connection, make_url
+from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 
 from agent_office.db import schema
-from agent_office.db.config import DATABASE_URL_ENV
 
-ADMIN_URL_ENV = "AGENT_OFFICE_TEST_DATABASE_URL"
 FORBIDDEN_COLUMN_WORDS = {
     "prompt",
     "command",
@@ -72,48 +67,6 @@ def test_event_columns_match_event_v1_whitelist() -> None:
     assert set(schema.activity_events.columns.keys()) == event_v1 | server_only
 
 
-def _admin_url() -> str:
-    url = os.environ.get(ADMIN_URL_ENV)
-    if url:
-        return url
-    if os.environ.get("AGENT_OFFICE_REQUIRE_DB_TESTS") == "1":
-        pytest.fail(f"{ADMIN_URL_ENV} is required in this environment")
-    pytest.skip(f"{ADMIN_URL_ENV} is not set; PostgreSQL schema tests not run")
-
-
-def _alembic_config() -> Config:
-    config = Config()
-    config.set_main_option("script_location", str(files("agent_office.db") / "migrations"))
-    return config
-
-
-@pytest.fixture
-def database(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
-    admin_url = make_url(_admin_url())
-    name = f"ao_test_{secrets.token_hex(6)}"
-    admin = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-    with admin.connect() as connection:
-        connection.execute(text(f'CREATE DATABASE "{name}"'))
-    url = admin_url.set(database=name).render_as_string(hide_password=False)
-    monkeypatch.setenv(DATABASE_URL_ENV, url)
-    try:
-        yield url
-    finally:
-        with admin.connect() as connection:
-            connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
-        admin.dispose()
-
-
-@pytest.fixture
-def engine(database: str) -> Iterator[Engine]:
-    command.upgrade(_alembic_config(), "head")
-    created = create_engine(database)
-    try:
-        yield created
-    finally:
-        created.dispose()
-
-
 def test_migration_head_matches_metadata(engine: Engine) -> None:
     with engine.connect() as connection:
         context = MigrationContext.configure(connection, opts={"compare_type": True})
@@ -123,7 +76,7 @@ def test_migration_head_matches_metadata(engine: Engine) -> None:
 
 
 def test_downgrade_removes_everything_and_upgrade_is_repeatable(engine: Engine) -> None:
-    config = _alembic_config()
+    config = alembic_config()
 
     command.downgrade(config, "base")
     with engine.connect() as connection:
