@@ -8,6 +8,9 @@
 //	agent-office-collector diagnose [--json] [--offline]
 //	agent-office-collector service install|uninstall [--activate]
 //	agent-office-collector service print [--os linux|darwin|windows] [--exe PATH]
+//	agent-office-collector hooks install|uninstall [--tool claude] [--yes] [--scope user]
+//	agent-office-collector hooks status [--tool claude|codex]
+//	agent-office-collector hooks print [--tool claude|codex] [--os linux|darwin|windows] [--exe PATH]
 //	agent-office-collector version
 //
 // 어떤 명령도 장치 토큰·등록 코드·로컬 경로 원문·이벤트 내용을 출력하지 않는다.
@@ -64,6 +67,8 @@ type Env struct {
 	RunOptions func(*runner.Options)
 	// HookTimeout은 hook stdin 읽기 상한이다.
 	HookTimeout time.Duration
+	// ToolVersion은 `<도구> --version`에서 버전 문자열만 돌려준다(hooks 명령).
+	ToolVersion func(tool string) (string, error)
 }
 
 func (e *Env) defaults() {
@@ -115,6 +120,9 @@ func (e *Env) defaults() {
 	if e.Context == nil {
 		e.Context = context.Background()
 	}
+	if e.ToolVersion == nil {
+		e.ToolVersion = detectToolVersion
+	}
 	if e.HookTimeout <= 0 {
 		e.HookTimeout = 2 * time.Second
 	}
@@ -153,6 +161,8 @@ func Main(args []string, env Env) int {
 		return cmdStatus(rest, env, true)
 	case "service":
 		return cmdService(rest, env)
+	case "hooks":
+		return cmdHooks(rest, env)
 	case "help", "-h", "--help":
 		usage(env.Stdout)
 		return ExitOK
@@ -173,6 +183,10 @@ func usage(w io.Writer) {
   diagnose [--json] [--offline]                                안전한 진단 정보(경로·토큰·내용 없음)
   service install|uninstall [--activate]                       OS 사용자 자동 시작 정의 설치/제거
   service print [--os linux|darwin|windows] [--exe PATH]       자동 시작 정의 미리보기
+  hooks install|uninstall [--tool claude] [--yes] [--scope user]
+                                                               Claude Code 사용자 설정에 Hook 추가/제거(미리보기 후 --yes로 적용, 백업)
+  hooks status [--tool claude|codex]                           Hook 설치 상태와 도구 버전 검증 수준
+  hooks print [--tool claude|codex] [--os OS] [--exe PATH]     Hook 항목 미리보기(Codex는 print 전용)
   version
 `)
 }
