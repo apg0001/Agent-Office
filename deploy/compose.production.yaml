@@ -45,9 +45,15 @@ services:
       # 관리 화면에서 저장하는 SMTP 암호·OAuth secret 암호화 키(32바이트 URL-safe base64, #67).
       AGENT_OFFICE_SECRET_KEY: ${AGENT_OFFICE_SECRET_KEY:-}
       AGENT_OFFICE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_office}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-agent_office}
-    # 기본은 루프백에만 바인딩한다. 외부 공개는 리버스 프록시·Tunnel(#57)을 통해서만 한다.
-    ports:
-      - "${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AGENT_OFFICE_HTTP_PORT:-8000}:8000"
+      # 서버는 호스트 포트를 열지 않고 proxy만 접근한다. 그래서 proxy가 넘긴 X-Forwarded-For를 믿고
+      # 실제 클라이언트 IP로 속도 제한을 건다(uvicorn --proxy-headers).
+      FORWARDED_ALLOW_IPS: "*"
+      # 메일 링크 기준 주소(관리 화면 설정이 우선). 접속 방식별 값은 docs/installation/remote-access.md.
+      AGENT_OFFICE_PUBLIC_URL: ${AGENT_OFFICE_PUBLIC_URL:-}
+      # 접속 주소와 다른 출처에서 WebSocket·로그인을 허용할 때만(쉼표 구분).
+      AGENT_OFFICE_ALLOWED_ORIGINS: ${AGENT_OFFICE_ALLOWED_ORIGINS:-}
+      # HTTPS가 아닌 LAN 직접 접속에서만 false. 기본은 Secure 쿠키.
+      AGENT_OFFICE_COOKIE_SECURE: ${AGENT_OFFICE_COOKIE_SECURE:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,13 +63,46 @@ services:
   web:
     image: ${AGENT_OFFICE_WEB_IMAGE:?AGENT_OFFICE_WEB_IMAGE is required (tag@digest)}
     <<: *hardening
-    ports:
-      - "${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AGENT_OFFICE_WEB_PORT:-8080}:8080"
     depends_on:
       server:
         condition: service_healthy
     logging: *default-logging
     restart: always
 
+  # 유일하게 호스트 포트를 여는 서비스(#57). 기본은 루프백 HTTP이고, Tailscale·Cloudflare Tunnel·
+  # 도메인 HTTPS 구성은 docs/installation/remote-access.md를 따른다.
+  proxy:
+    image: ${AGENT_OFFICE_PROXY_IMAGE:-caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d}
+    read_only: true
+    cap_drop: [ALL]
+    # 이미지의 caddy 실행 파일에 cap_net_bind_service 파일 권한이 붙어 있어, 이 권한이 없으면 실행 자체가
+    # 거부된다(#57 실측). 컨테이너 안에서는 8080/8443만 쓴다.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    environment:
+      # 비우면 :8080(HTTP). 공개 도메인(예: office.example.com)을 넣으면 Caddy가 인증서를 자동 발급한다.
+      AGENT_OFFICE_SITE_ADDRESS: ${AGENT_OFFICE_SITE_ADDRESS:-:8080}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - "${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AGENT_OFFICE_HTTP_PORT:-8080}:8080"
+      - "${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AGENT_OFFICE_HTTPS_PORT:-8443}:8443"
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/v1/system/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+    restart: always
+
 volumes:
   postgres-data:
+  caddy-data:
+  caddy-config:
