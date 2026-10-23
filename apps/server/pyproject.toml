@@ -17,6 +17,10 @@ dependencies = [
   "uvicorn[standard]>=0.54,<0.55",
 ]
 
+[project.scripts]
+# 최초 관리자 bootstrap 토큰을 운영자 콘솔에만 출력한다(#66).
+agent-office-bootstrap = "agent_office.setup.bootstrap:main"
+
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<0.29",

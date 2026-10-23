@@ -92,11 +92,11 @@ def require_same_origin(request: Request) -> None:
 SameOrigin = Annotated[None, Depends(require_same_origin)]
 
 
-def _client(request: Request) -> str:
+def client_host(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _limit(limiter: KeyedRateLimiter, key: str) -> None:
+def enforce_limit(limiter: KeyedRateLimiter, key: str) -> None:
     retry = limiter.hit(key)
     if retry is not None:
         raise HTTPException(
@@ -129,7 +129,7 @@ def _link(path: str, token: str) -> str:
 def signup(
     body: SignupRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> AcceptedResponse:
-    _limit(signup_limiter, f"signup:{_client(request)}")
+    enforce_limit(signup_limiter, f"signup:{client_host(request)}")
     policy = accounts.signup_policy(connection)
     if policy == "CLOSED":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="signup_closed")
@@ -199,7 +199,7 @@ def _mark_verified(connection: Connection, user_id: uuid.UUID, *, activate: bool
 def verify_email(
     body: TokenRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> Response:
-    _limit(verify_limiter, f"verify:{_client(request)}")
+    enforce_limit(verify_limiter, f"verify:{client_host(request)}")
     user_id = accounts.consume_one_time_token(connection, schema.email_verifications, body.token)
     if user_id is None:
         raise _bad_request("invalid_token")
@@ -223,9 +223,9 @@ def login(
     connection: DbConnection,
     previous: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> CurrentSessionResponse:
-    _limit(login_ip_limiter, f"login:{_client(request)}")
+    enforce_limit(login_ip_limiter, f"login:{client_host(request)}")
     email = accounts.normalize_email(body.email)
-    _limit(login_email_limiter, f"login:{email or '-'}")
+    enforce_limit(login_email_limiter, f"login:{email or '-'}")
     users = schema.users
     row = (
         connection.execute(
@@ -258,16 +258,28 @@ def login(
             .where(users.c.id == row.id)
             .values(password_hash=passwords.hash_password(body.password))
         )
-    token = session_service.issue_session(connection, row.id, replaces_token=previous)
-    session_service.set_session_cookie(response, token)
     audit.record(connection, "auth.login", "success", actor_user_id=row.id)
+    return start_session(
+        connection,
+        response,
+        SessionUser(id=row.id, display_name=row.display_name, instance_role=row.instance_role),
+        previous,
+    )
+
+
+def start_session(
+    connection: Connection, response: Response, user: SessionUser, previous: str | None
+) -> CurrentSessionResponse:
+    """새 브라우저 세션을 발급해 쿠키로 내보낸다. 최초 관리자 생성(#66)도 쓴다."""
+    token = session_service.issue_session(connection, user.id, replaces_token=previous)
+    session_service.set_session_cookie(response, token)
     expires_at = connection.execute(
         select(schema.login_sessions.c.expires_at).where(
             schema.login_sessions.c.token_hash == token_hash(token)
         )
     ).scalar_one()
     return CurrentSessionResponse(
-        user=SessionUser(id=row.id, display_name=row.display_name, instance_role=row.instance_role),
+        user=user,
         csrf_token=session_service.csrf_token_for(token),
         expires_at=expires_at,
     )
@@ -281,13 +293,13 @@ def login(
 def request_password_reset(
     body: ResetRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> AcceptedResponse:
-    _limit(reset_ip_limiter, f"reset:{_client(request)}")
+    enforce_limit(reset_ip_limiter, f"reset:{client_host(request)}")
     sender = _require_mail()
     email = accounts.normalize_email(body.email)
     accepted = AcceptedResponse(status="reset_sent_if_exists")
     if email is None:
         return accepted
-    _limit(reset_email_limiter, f"reset:{email}")
+    enforce_limit(reset_email_limiter, f"reset:{email}")
     users = schema.users
     user_id = connection.execute(
         select(users.c.id).where(users.c.email == email, users.c.status != "disabled")
@@ -316,7 +328,7 @@ def request_password_reset(
 def confirm_password_reset(
     body: ResetConfirm, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> Response:
-    _limit(verify_limiter, f"reset-confirm:{_client(request)}")
+    enforce_limit(verify_limiter, f"reset-confirm:{client_host(request)}")
     problem = passwords.password_problem(body.password)
     if problem:
         raise _bad_request(problem)

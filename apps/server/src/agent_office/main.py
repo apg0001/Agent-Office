@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 
-from agent_office.api import accounts, auth, devices, events, office
+from agent_office.api import accounts, auth, devices, events, office, setup
 from agent_office.http_limits import BodySizeLimitMiddleware
 from agent_office.validation import validation_error_handler
 
@@ -32,6 +32,7 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.include_router(auth.router)
 app.include_router(accounts.router)
+app.include_router(setup.router)
 app.include_router(devices.router)
 app.include_router(events.router)
 app.include_router(office.router)
