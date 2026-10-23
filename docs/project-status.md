@@ -10,11 +10,11 @@
 
 ## 현재 위치
 
-- 활성 작업: #17 `EP-02/ISS-01 Codex CLI Hook/JSONL 실측`
-- 브랜치: `feat/#17-codex-hook-poc`
-- 기준 브랜치: `develop` (`7a3cfb1`, PR #78 병합 결과)
-- 상태: 개인정보 축약 PoC 하네스·실측·문서 완료, PR #79 첫 원격 `CI Gate` 통과, 최종 문서 commit·재검증·병합 대기
-- 직전 완료: #16, PR https://github.com/apg0001/Agent-Office/pull/78, merge commit `7a3cfb1`; Epic #1 종료
+- 활성 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
+- 브랜치: `feat/#18-codex-desktop-poc`
+- 기준 브랜치: `develop` (`f14668a`, PR #79 병합 결과)
+- 상태: Issue·브랜치 준비와 #17 결과 인수인계 완료, Desktop 안전 실측 설계 전
+- 직전 완료: #17, PR https://github.com/apg0001/Agent-Office/pull/79, merge commit `f14668a`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
 
@@ -24,7 +24,7 @@
 - 원격: `https://github.com/apg0001/Agent-Office.git`.
 - 로컬 `gh`로 라벨 생성과 Issue 쓰기 성공.
 - 별도 GitHub 앱 커넥터의 이슈 생성은 `403 Resource not accessible by integration`; 이후 쓰기는 검증된 로컬 `gh`만 사용.
-- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). Epic #1과 #13~#16은 완료·종료됨.
+- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). Epic #1과 #13~#17은 완료·종료됨.
 - 각 Epic 본문에 실제 하위 이슈 체크리스트와 의존성을 연결함.
 
 ### 실제 번호 매핑
@@ -98,13 +98,15 @@
 35. #17 변경 포함 Python 24개, Node, Go, Compose, actionlint 전체 회귀 검사를 로컬에서 통과.
 36. #17 작업 트리 약 60.94MB를 Gitleaks 8.30.1로 검사하고 비밀 0건 확인.
 37. PR #79 생성 후 GitHub Actions run `39888754773`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
+38. PR #79 최신 run `39888846155`도 전체 통과 후 `develop` 병합, #17 종료와 Epic #2 체크리스트 동기화.
+39. #18 `feat/#18-codex-desktop-poc` 브랜치를 최신 `develop`에서 생성.
 
-## 직전 완료 변경 요약(#16)
+## 직전 완료 변경 요약(#17)
 
-- Python·Node·Go·Compose·Secret Scan과 이를 집계하는 `CI Gate` workflow.
-- OpenAPI, workflow 구조, action SHA 고정 자동 검사.
-- 최소 Actions 권한과 고정 action commit/image digest.
-- `main`·`develop` strict `CI Gate` 보호 규칙과 로컬 재현 문서.
+- 원문 없이 Hook 입력·Codex JSONL·합성 transcript 구조만 축약하는 PoC 하네스.
+- 민감 값·경로 미보존, fail-open, transcript 범위 제한 회귀 테스트 3개.
+- Codex CLI inline 합성 실행 4회와 이벤트·중복·종료 의미 실측 보고서.
+- `PostToolUse` 미관측을 숨기지 않은 호환성·정규화 제한과 후속 범위.
 
 ## 검증 상태
 
@@ -121,7 +123,7 @@
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
 | GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자·대화 해결·strict `CI Gate` 활성, 승인 0, force-push·삭제 비활성 |
-| GitHub Actions 원격 CI | 통과 | PR #78 최신 run `39887399508`: 하위 5개 job과 `CI Gate` 모두 성공 |
+| GitHub Actions 원격 CI | 통과 | PR #79 최신 run `39888846155`: 하위 5개 job과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
@@ -130,11 +132,11 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. PR #79와 원격 run 근거를 반영한 문서 commit을 push한다.
-2. 최신 commit의 필수 `CI Gate` 재통과를 확인하고 PoC 프라이버시·미지원 판정을 자체 리뷰한다.
-3. 보호 규칙을 유지한 채 PR #79를 `develop`에 병합한다.
-4. #17과 Epic #2 체크리스트를 완료 처리한다.
-5. #18 Codex Desktop 세션·도구·하위 에이전트 실측을 시작한다.
+1. `computer-use` 스킬 지침을 읽고 현재 Codex Desktop을 안전하게 관측할 수 있는 UI 범위와 중단 조건을 정한다.
+2. 기존 대화·사용자 transcript 원문을 열지 않고 Desktop 버전, 합성 세션 생성 가능 여부, Hook 신뢰 흐름을 확인한다.
+3. 합성 세션으로 시작·턴·도구·승인·하위 에이전트·종료 이벤트를 각각 시도하고 관측/미관측을 구조 통계로만 기록한다.
+4. CLI #17과 Desktop 결과가 같은 세션 저장소를 공유하는지 값이 아닌 경로 템플릿·HMAC 상관관계로 검증한다.
+5. 개인정보 회귀 테스트·호환성 보고서·인수인계를 갱신하고 PR의 필수 `CI Gate`를 통과시킨다.
 
 ## 알려진 위험과 결정 대기
 
