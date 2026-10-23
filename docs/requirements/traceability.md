@@ -267,3 +267,13 @@
 | ACC-006 | SEC-004 열거·남용 방지 | 실패 응답 동일, 중복 가입 응답 동일, 이메일별 속도 제한 429 |
 | ACC-007 | 교차 사이트 | 다른 Origin·폼 형식 403 |
 | ACC-008 | SMTP 미설정 | 503, 계정 미생성 |
+
+## Go Collector 큐·전송 검증 매핑(#33)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| QUEUE-001 | COL-007 로컬 영속 큐 | `queue_test.go`: SQLite WAL·`synchronous=FULL`·`busy_timeout`·스키마 버전(새 버전 거부), 파일 0600, 레코드·sequence·결정적 ID·체크포인트 한 트랜잭션, 잘못된 레코드 시 무커밋, 상한 초과 drop-oldest 개수 |
+| QUEUE-002 | COL-009 재시작 복구 | 재시작 후 같은 `event_id`(무작위 포함)·순서, sequence 이어짐, 영속 결정적 ID로 키 이벤트 재방출 0, 미기록 sequence 비영속 |
+| QUEUE-003 | EVT-002 멱등 재전송 | `transport_test.go`: 서버 저장 후 응답 전 연결 끊김 → 재시작 → 같은 본문·ID 재전송 → `duplicate` ACK 삭제, accepted·duplicate만 삭제, 잘못된 응답 7종 ACK 없음, 계약 fixture 응답 처리 |
+| QUEUE-004 | COL-008 배치·재시도 | 500건·1MiB(설정 한도) 분할, 5xx·429 full jitter 지수 백오프와 `Retry-After` 하한, 타임아웃, 401·403 정지(큐 유지), 422 이분 탐색, retryable·알 수 없는 거부 코드, `max_attempts` dead-letter |
+| QUEUE-005 | COL-007·SEC-006 프라이버시 | Hook 원문·ID 필드, 체크포인트 경로, 거부 코드 sentinel이 DB 본 파일·WAL·오류 문자열에 없음, 전송 오류에 본문·토큰·URL 없음 |

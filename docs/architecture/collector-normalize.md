@@ -11,7 +11,7 @@
 | API | 역할 |
 |---|---|
 | `Event` | v1 13개 필드만 가진 구조체. JSON 태그가 스키마 `required`·`properties`와 정확히 같음 |
-| `New(Options) (*Normalizer, error)` | 장치 UUID, `SequenceStore`, 영속화된 중복 제거 키(`SeenKeys`)로 시작 |
+| `New(Options) (*Normalizer, error)` | 장치 UUID, `SequenceStore`, 영속화된 중복 제거 키(`SeenKeys`) 또는 결정적 `event_id` 집합(`SeenEventIDs`, #33 큐가 사용)으로 시작 |
 | `Normalizer.Normalize(Input) (Record, Outcome)` | 후보 1건 → `accepted`/`duplicate`/`dropped_unknown`/`dropped_invalid` |
 | `Normalizer.Counters()`, `SeenKeys()` | 개수(원문 없음), #33이 영속화할 중복 제거 키 |
 | `NewPipeline(n)`, `Pipeline.Hook(provider, runtime, payload, observedAt)`, `Pipeline.Transcript(tail.Result, runtime, observedAt)` | 어댑터 + 정규화. 고루틴 없음 |
@@ -53,7 +53,7 @@ UUIDv5는 추측 가능한 원본 ID에 대한 익명화를 보장하지 않습�
 
 - `Normalizer`는 장치 UUID로 `adapter.Deduplicator`를 만들고, enum 정리를 마친 후보로 키를 계산합니다. `unknown`으로 바뀐 후보는 키가 없습니다.
 - Hook 우선이면 transcript 키 이벤트가 억제되고(`duplicate`), 순서가 바뀌어도 통과 키 집합과 `event_id`는 같습니다.
-- `SeenKeys()`에는 원본 참조가 들어 있으므로 로컬 큐(#33)에만 저장하고 서버·로그로 보내지 않습니다.
+- `SeenKeys()`에는 원본 참조가 들어 있습니다. #33 큐는 이 키 대신 그 UUIDv5인 결정적 `event_id`만 저장하고 `Options.SeenEventIDs`로 복원합니다([로컬 큐](collector-queue.md)).
 - 처리 순서는 검증 → 중복 판정 → sequence 발급 → `event_id`입니다. #33은 중복 제거 키, sequence, 큐 기록을 한 트랜잭션으로 커밋해야 중간 실패로 이벤트를 잃지 않습니다.
 
 ## fail-open과 개수

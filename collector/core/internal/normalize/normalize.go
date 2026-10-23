@@ -50,6 +50,10 @@ type Options struct {
 	Sequences SequenceStore
 	// SeenKeys는 영속화된 중복 제거 키 집합이다(#33). 재시작 후 같은 키를 다시 보내지 않는다.
 	SeenKeys []string
+	// SeenEventIDs는 영속화된 결정적 event_id 집합이다(#33). 결정적 event_id는 중복 제거 키의
+	// UUIDv5이므로 원본 참조를 저장하지 않고도 재시작 후 같은 키를 거른다. SQLite 큐는
+	// 원본 키 대신 이 값을 저장한다.
+	SeenEventIDs []string
 	// MaxFutureSkew가 0이면 DefaultMaxFutureSkew다.
 	MaxFutureSkew time.Duration
 }
@@ -59,6 +63,7 @@ type Normalizer struct {
 	deviceID string
 	seq      SequenceStore
 	dedup    *adapter.Deduplicator
+	seenIDs  map[string]struct{}
 	skew     time.Duration
 	counters Counters
 }
@@ -77,8 +82,13 @@ func New(opts Options) (*Normalizer, error) {
 	if skew <= 0 {
 		skew = DefaultMaxFutureSkew
 	}
+	seenIDs := make(map[string]struct{}, len(opts.SeenEventIDs))
+	for _, id := range opts.SeenEventIDs {
+		seenIDs[id] = struct{}{}
+	}
 	return &Normalizer{
 		deviceID: device,
+		seenIDs:  seenIDs,
 		seq:      seq,
 		dedup:    adapter.NewDeduplicator(device, opts.SeenKeys...),
 		skew:     skew,
@@ -156,6 +166,11 @@ func (n *Normalizer) normalize(in Input) (Record, Outcome) {
 	keyed.EventType = adapter.EventType(eventType)
 	if ref := keyed.DedupRef(); ref != "" && !adapter.ValidRef(ref) {
 		return Record{}, OutcomeDroppedInvalid
+	}
+	if key := adapter.DedupKey(n.deviceID, keyed); key != "" {
+		if _, ok := n.seenIDs[adapter.UUIDv5(adapter.EventIDNamespace, key)]; ok {
+			return Record{}, OutcomeDuplicate
+		}
 	}
 	if !n.dedup.Accept(keyed) {
 		return Record{}, OutcomeDuplicate
