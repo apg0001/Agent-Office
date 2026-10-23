@@ -113,7 +113,7 @@ Hook payload에는 도구 버전이 없으므로 호출자가 로컬에서 감�
 
 ## 후속 범위
 
-- #30: transcript tail(체크포인트·로테이션). 이 패키지는 줄 단위 파서만 제공
+- #30: transcript 탐색·tail(체크포인트·로테이션)은 [Collector transcript 탐색·tail](collector-tail.md)의 `internal/tail`이 맡고, 이 패키지는 줄 단위 파서만 제공
 - #31: Hook 설치·버전 감지로 `Runtime` 채우기
 - #32: 후보 → 이벤트 v1 정규화(`device_id`·`agent_id` UUID 매핑, `parent_agent_id`, `occurred_at`, `sequence`, `unverified` 후보 송신 정책)
 - #33: SQLite 큐에 키 집합·무작위 `event_id` 영속화
