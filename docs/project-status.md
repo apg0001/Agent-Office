@@ -10,13 +10,13 @@
 
 ## 현재 위치
 
-- 활성 작업: #16 `EP-01/ISS-04 자동 테스트·CI 기초 및 익명 fixture 생성`
-- 브랜치: `chore/#16-ci-foundation`
-- 기준 브랜치: `develop` (`3da0665`, PR #77 병합 결과)
-- 상태: CI workflow의 첫 GitHub-hosted 전체 실행 통과, `main`·`develop` 필수 `CI Gate` 적용 완료, PR #78 후속 문서 commit·최종 CI 대기
-- 직전 완료: #15, PR https://github.com/apg0001/Agent-Office/pull/77, merge commit `3da0665`
+- 활성 작업: #17 `EP-02/ISS-01 Codex CLI Hook/JSONL 실측`
+- 브랜치: `feat/#17-codex-hook-poc`
+- 기준 브랜치: `develop` (`7a3cfb1`, PR #78 병합 결과)
+- 상태: 개인정보 축약 PoC 하네스·실측·문서 완료, PR #79 첫 원격 `CI Gate` 통과, 최종 문서 commit·재검증·병합 대기
+- 직전 완료: #16, PR https://github.com/apg0001/Agent-Office/pull/78, merge commit `7a3cfb1`; Epic #1 종료
 - 배포/릴리스: 수행하지 않음
-- 실제 사용자 수집: 수행하지 않음
+- 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
 
 ## GitHub 연결과 백로그
 
@@ -24,7 +24,7 @@
 - 원격: `https://github.com/apg0001/Agent-Office.git`.
 - 로컬 `gh`로 라벨 생성과 Issue 쓰기 성공.
 - 별도 GitHub 앱 커넥터의 이슈 생성은 `403 Resource not accessible by integration`; 이후 쓰기는 검증된 로컬 `gh`만 사용.
-- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). #13~#15는 완료·종료됨.
+- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). Epic #1과 #13~#16은 완료·종료됨.
 - 각 Epic 본문에 실제 하위 이슈 체크리스트와 의존성을 연결함.
 
 ### 실제 번호 매핑
@@ -89,19 +89,28 @@
 26. 병렬 로컬 검사 직후 Vite `dist/index.html` 잠금으로 `EPERM`이 1회 발생했으나 잔류 Vite 프로세스가 없음을 확인하고 단독 build 재실행에 성공. GitHub Linux runner에는 해당 Windows 파일 잠금이 적용되지 않음.
 27. PR #78 GitHub Actions run `39887244474`에서 Python·Node·Go·Compose·Secret Scan과 집계 `CI Gate` 모두 통과.
 28. `main`·`develop` 보호 규칙에 strict 필수 상태 검사 `CI Gate`를 추가하고 GitHub API로 두 브랜치 설정을 재조회해 확인.
+29. PR #78 최신 run `39887399508`도 전체 통과 후 `develop` 병합, #16과 Epic #1 종료.
+30. #17 브랜치에서 Hook 입력·transcript·`codex exec --json`을 원문 없이 구조 통계로 축약하는 합성 PoC 하네스 작성.
+31. 공식 OpenAI Hooks 문서와 로컬 `codex-cli 0.162.0-alpha.17.2` help·stable Hook feature를 확인.
+32. 첫 실행의 Windows CP949/UTF-8 디코딩 실패를 수정하고, 임시 프로젝트 Hook 탐색과 inline config 주입을 분리 검증.
+33. inline Hook 합성 실행 4회에서 시작·프롬프트 제출·도구 전·Stop·세션 종료를 매회 1번 관측. `PostToolUse`는 파싱/크기 실패가 아닌 0회로 반복 확인.
+34. 합성 세션 transcript가 `sessions/<number>/<number>/<number>/<redacted>.jsonl`에 append되고 종료 시 21개 유효 JSON 줄인 것을 원문 없이 확인.
+35. #17 변경 포함 Python 24개, Node, Go, Compose, actionlint 전체 회귀 검사를 로컬에서 통과.
+36. #17 작업 트리 약 60.94MB를 Gitleaks 8.30.1로 검사하고 비밀 0건 확인.
+37. PR #79 생성 후 GitHub Actions run `39888754773`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
 
-## 직전 완료 변경 요약(#15)
+## 직전 완료 변경 요약(#16)
 
-- 이벤트 v1과 Collector 배치 요청·응답 JSON Schema 3개.
-- JSON Schema enum·필수 필드와 동기화되는 공통 TypeScript 타입.
-- 유효 4개·무효 9개 합성 fixture와 Python/TypeScript 계약 테스트.
-- 멱등 ACK, 부모 관계, 개인정보 화이트리스트와 미구현 서버 책임을 구분한 API 문서.
+- Python·Node·Go·Compose·Secret Scan과 이를 집계하는 `CI Gate` workflow.
+- OpenAPI, workflow 구조, action SHA 고정 자동 검사.
+- 최소 Actions 권한과 고정 action commit/image digest.
+- `main`·`develop` strict `CI Gate` 보호 규칙과 로컬 재현 문서.
 
 ## 검증 상태
 
 | 검사 | 상태 | 근거 |
 |---|---|---|
-| Python 설치/pytest/Ruff/mypy | 통과 | pytest 21개 통과(Starlette TestClient deprecation 경고 1개), Ruff lint·format·mypy 오류 0 |
+| Python 설치/pytest/Ruff/mypy | 통과 | pytest 24개 통과(Starlette TestClient deprecation 경고 1개), Ruff lint·format·mypy 오류 0 |
 | npm install/typecheck/test/build | 통과 | 이벤트 계약 3개+웹 1개 Vitest 통과, TypeScript 오류 0, 두 workspace build 성공 |
 | 이벤트 JSON Schema 계약 | 통과 | Draft 2020-12 스키마 3개, 유효 4개·무효 9개 fixture, 닫힌 허용 필드 집합 검증 |
 | FastAPI OpenAPI 계약 | 통과 | `openapi-spec-validator` 0.9.0, health path 포함 문서 검증 |
@@ -112,20 +121,20 @@
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
 | GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자·대화 해결·strict `CI Gate` 활성, 승인 0, force-push·삭제 비활성 |
-| GitHub Actions 원격 CI | 통과 | PR #78 run `39887244474`: 하위 5개 job과 `CI Gate` 모두 성공 |
+| GitHub Actions 원격 CI | 통과 | PR #78 최신 run `39887399508`: 하위 5개 job과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
-| 실제 Codex Hook 이벤트 | 미실행 | #17, #18 |
+| 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
 | diff 공백·비밀·개인 경로 검사 | 통과 | `git diff --check`, 대표 비밀/절대경로 패턴 일치 0 |
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. 보호 규칙과 원격 run 근거를 반영한 후속 문서 commit을 push한다.
-2. 최신 commit에서 GitHub-hosted 다섯 job과 필수 `CI Gate`가 다시 통과하는지 확인한다.
-3. PR #78 자체 리뷰 후 보호 규칙을 통과해 `develop`에 병합한다.
-4. #16과 상위 Epic #1 체크리스트를 완료 처리하고 Epic 완료 조건을 대조한다.
-5. `develop`을 갱신한 뒤 #17 Codex Hook 안전 PoC를 시작한다.
+1. PR #79와 원격 run 근거를 반영한 문서 commit을 push한다.
+2. 최신 commit의 필수 `CI Gate` 재통과를 확인하고 PoC 프라이버시·미지원 판정을 자체 리뷰한다.
+3. 보호 규칙을 유지한 채 PR #79를 `develop`에 병합한다.
+4. #17과 Epic #2 체크리스트를 완료 처리한다.
+5. #18 Codex Desktop 세션·도구·하위 에이전트 실측을 시작한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -133,7 +142,10 @@
 - 호스트 Go는 없지만 공식 Go 컨테이너로 현재 모듈 검증을 완료했다.
 - 로컬 8000 포트가 이미 사용 중이어서 Compose smoke test는 18000/15173 포트로 수행했다.
 - Claude CLI가 없어 관련 검증은 수행할 수 없다.
-- Codex 로컬 DB/JSONL 원문은 민감정보 보호를 위해 아직 읽지 않았다. #17/#18에서 스키마 키와 안전한 합성 fixture만 추출한다.
+- 기존 사용자 Codex DB/JSONL 원문은 읽지 않았다. #17에서는 Hook이 직접 제공한 합성 세션 transcript만 구조 키·개수로 축약했으며 원문은 저장소에 남기지 않았다.
+- #17 실행으로 Codex가 관리하는 합성 세션 transcript 8개가 사용자 Codex 상태에 생성됐다. 원본 도구 기록을 임의 삭제하지 않는 원칙에 따라 그대로 두었으며 실제 사용자 내용은 없다.
+- Codex CLI 0.162.0-alpha.17.2에서 inline `PostToolUse`가 네 번 모두 미관측이었다. 공식 문서와 차이가 있으므로 이 버전의 Hook만으로 `tool.completed`를 만들지 않는다.
+- 임시 프로젝트 `hooks.json`은 `--ignore-user-config` 비대화형 조합에서 발견되지 않았고 inline `-c` Hook은 동작했다. 대화형 신뢰 UI와 일반 프로젝트 탐색 지원은 아직 주장하지 않는다.
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.
