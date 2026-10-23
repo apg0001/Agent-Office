@@ -110,8 +110,8 @@ def _bad_request(code: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=code)
 
 
-def _require_mail() -> mailer.Mailer:
-    sender = mailer.get_mailer()
+def _require_mail(connection: Connection) -> mailer.Mailer:
+    sender = mailer.get_mailer(connection)
     if not sender.configured:
         # 메일을 보낼 수 없으면 검증·복구가 불가능한 계정을 만들지 않는다.
         raise HTTPException(
@@ -120,9 +120,9 @@ def _require_mail() -> mailer.Mailer:
     return sender
 
 
-def _link(path: str, token: str) -> str:
+def _link(connection: Connection, path: str, token: str) -> str:
     # 토큰은 URL 조각(#)에 넣어 서버 접근 로그·Referer에 남지 않게 한다.
-    return f"{mailer.public_url()}{path}#token={token}"
+    return f"{mailer.public_url(connection)}{path}#token={token}"
 
 
 @router.post("/signup", status_code=status.HTTP_202_ACCEPTED, response_model=AcceptedResponse)
@@ -142,7 +142,7 @@ def signup(
     problem = passwords.password_problem(body.password)
     if problem:
         raise _bad_request(problem)
-    sender = _require_mail()
+    sender = _require_mail(connection)
     display_name = body.display_name.strip() or email.split("@")[0]
     try:
         with connection.begin_nested():
@@ -172,7 +172,7 @@ def signup(
             subject="Agent Office 이메일 확인",
             body=(
                 "아래 링크를 24시간 안에 열어 이메일을 확인하세요.\n"
-                f"{_link('/verify-email', token)}\n"
+                f"{_link(connection, '/verify-email', token)}\n"
                 "본인이 요청하지 않았다면 이 메일을 무시하세요."
             ),
         )
@@ -294,7 +294,7 @@ def request_password_reset(
     body: ResetRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> AcceptedResponse:
     enforce_limit(reset_ip_limiter, f"reset:{client_host(request)}")
-    sender = _require_mail()
+    sender = _require_mail(connection)
     email = accounts.normalize_email(body.email)
     accepted = AcceptedResponse(status="reset_sent_if_exists")
     if email is None:
@@ -316,7 +316,7 @@ def request_password_reset(
             subject="Agent Office 비밀번호 재설정",
             body=(
                 "아래 링크를 1시간 안에 열어 새 비밀번호를 정하세요.\n"
-                f"{_link('/reset-password', token)}\n"
+                f"{_link(connection, '/reset-password', token)}\n"
                 "본인이 요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 바뀌지 않습니다."
             ),
         )

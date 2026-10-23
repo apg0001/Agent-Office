@@ -203,7 +203,7 @@ def test_signup_closed_by_default_and_without_mail(
 
     set_policy(engine, "PUBLIC_VERIFIED_EMAIL")
     monkeypatch.delenv(mailer.PUBLIC_URL_ENV, raising=False)
-    mailer.set_mailer(mailer.SmtpMailer(None))
+    mailer.set_mailer(mailer.SmtpMailer(None, None))
     try:
         response = signup(client)
         assert response.status_code == 503

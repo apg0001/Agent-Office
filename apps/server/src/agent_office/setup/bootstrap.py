@@ -15,8 +15,8 @@ import uuid
 from typing import Any
 
 from sqlalchemy import Connection, func, select
-from sqlalchemy.dialects.postgresql import insert
 
+from agent_office import instance
 from agent_office.db import schema
 from agent_office.security import constant_time_equal
 
@@ -30,27 +30,12 @@ class BootstrapUnavailable(Exception):
     """이미 관리자가 있거나 설치가 끝나 토큰을 발급할 수 없다."""
 
 
-def _get(connection: Connection, key: str, *, lock: bool = False) -> Any:
-    query = select(schema.instance_settings.c.value).where(schema.instance_settings.c.key == key)
-    if lock:
-        query = query.with_for_update()
-    return connection.execute(query).scalar_one_or_none()
+_get = instance.get_value
+_delete = instance.delete_value
 
 
 def _put(connection: Connection, key: str, value: Any) -> None:
-    table = schema.instance_settings
-    statement = insert(table).values(key=key, value=value)
-    connection.execute(
-        statement.on_conflict_do_update(
-            index_elements=[table.c.key],
-            set_={"value": statement.excluded.value, "updated_at": func.now()},
-        )
-    )
-
-
-def _delete(connection: Connection, key: str) -> None:
-    table = schema.instance_settings
-    connection.execute(table.delete().where(table.c.key == key))
+    instance.put_value(connection, key, value)
 
 
 def setup_completed(connection: Connection) -> bool:
@@ -112,12 +97,8 @@ def consume_token(connection: Connection, token: str) -> bool:
 
 def complete_setup(connection: Connection, user_id: uuid.UUID) -> None:
     """설치 완료 잠금. 이후 bootstrap 토큰 발급은 거부된다."""
-    _put(connection, COMPLETED_KEY, True)
+    instance.put_value(connection, COMPLETED_KEY, True, user_id)
     _delete(connection, BOOTSTRAP_KEY)
-    table = schema.instance_settings
-    connection.execute(
-        table.update().where(table.c.key == COMPLETED_KEY).values(updated_by_user_id=user_id)
-    )
 
 
 def main() -> int:
