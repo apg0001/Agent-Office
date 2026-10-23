@@ -10,12 +10,11 @@
 
 ## 현재 위치
 
-- 활성 작업: #80 `마스터 개발 프롬프트 v0.8 원문·요구사항 기준선 보존`
-- 브랜치: `docs/#80-master-prompt-baseline`
-- 기준 브랜치: `develop` (`f14668a`, PR #79 병합 결과)
-- 상태: 외부 원문과 동일한 저장소 스냅샷·SHA-256·섹션 추적·무결성 테스트 작성 완료, 전체 검증과 PR 준비 중
-- 보류 작업: #18은 `feat/#18-codex-desktop-poc` 원격 브랜치의 `3f39495`에 안전하게 보존했으며 #80 병합 후 재개
-- 직전 완료: #17, PR https://github.com/apg0001/Agent-Office/pull/79, merge commit `f14668a`
+- 활성 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
+- 재개 브랜치: `feat/#18-codex-desktop-poc` (`3f39495`; 최신 `develop` 반영 필요)
+- 기준 브랜치: `develop` (PR #81 병합 결과를 반영해 재개)
+- 상태: #80 원문 기준선 보존과 원격 `CI Gate` 검증 완료. #18은 수동 합성 Desktop 세션 또는 비-UI 관측 경로 결정 대기
+- 직전 완료: #80, PR https://github.com/apg0001/Agent-Office/pull/81, Actions run `39889981917`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
 
@@ -106,6 +105,7 @@
 42. #18 작업 브랜치를 원격 `3f39495`에 보존한 채 최신 `develop`에서 `docs/#80-master-prompt-baseline` 생성.
 43. 외부 마스터 프롬프트에 대표 비밀·개인 절대경로 패턴이 없음을 확인하고 44,535바이트 원문을 변경 없이 `docs/specifications`에 복사.
 44. 원본·저장소 사본 SHA-256 `76bf1febe43afa60072e11f232885709e24f4a4fb619067935426adfafd4c17b` 일치, 14개 요구사항 범위와 문서 링크를 검사하는 테스트 3개 추가.
+45. PR #81 생성 후 GitHub Actions run `39889981917`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
 
 ## 직전 완료 변경 요약(#17)
 
@@ -129,7 +129,7 @@
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
 | GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자·대화 해결·strict `CI Gate` 활성, 승인 0, force-push·삭제 비활성 |
-| GitHub Actions 원격 CI | 통과 | PR #79 최신 run `39888846155`: 하위 5개 job과 `CI Gate` 모두 성공; #80은 PR 생성 후 재검증 예정 |
+| GitHub Actions 원격 CI | 통과 | PR #81 run `39889981917`: Python·Node·Go·Compose·Secret Scan과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
@@ -139,10 +139,10 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. #80 변경의 전체 로컬 검사와 원격 `CI Gate`를 통과시키고 `develop` 대상 PR을 병합한다.
-2. 병합 후 `feat/#18-codex-desktop-poc`에 최신 `develop` 기준선을 반영하고 #18을 재개한다.
-3. 사용자 또는 수동 운영자가 별도 합성 Desktop 세션을 직접 실행할 수 있는지 확인한다. Computer Use로 Codex UI를 자동화하지 않는다.
-4. 수동 실행이 가능하면 #17 프로브를 Desktop이 연 임시 작업공간에 연결하되 Hook 정의·신뢰 동작은 운영자가 직접 검토한다.
+1. `feat/#18-codex-desktop-poc`에 PR #81이 반영된 최신 `develop` 기준선을 병합하고 #18을 재개한다.
+2. 사용자 또는 수동 운영자가 별도 합성 Desktop 세션을 직접 실행할 수 있는지 확인한다. Computer Use로 Codex UI를 자동화하지 않는다.
+3. 수동 실행이 가능하면 #17 프로브를 Desktop이 연 임시 작업공간에 연결하되 Hook 정의·신뢰 동작은 운영자가 직접 검토한다.
+4. 시작·턴·안전한 읽기 도구·승인·하위 에이전트·종료를 하나씩 수행하고 관측/미관측을 구조 통계로만 기록한다.
 5. 수동 실행이 불가능하면 #18에 미실행 사유를 남기고, #21 app-server의 허용된 비-UI 관측으로 확인 가능한 범위를 별도 검증한다.
 
 ## 알려진 위험과 결정 대기
