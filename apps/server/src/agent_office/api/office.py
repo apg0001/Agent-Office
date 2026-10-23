@@ -8,12 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-import os
 import uuid
 from typing import Any
-from urllib.parse import urlsplit
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import Connection, Row, func, or_, select, true
 from starlette.concurrency import run_in_threadpool
 
@@ -21,6 +19,7 @@ from agent_office.api.deps import DbConnection, UserDep, authenticate_session
 from agent_office.auth.sessions import SESSION_COOKIE
 from agent_office.db import schema
 from agent_office.db.engine import get_engine
+from agent_office.origin import origin_allowed
 from agent_office.state.engine import connection_state, effective_lifecycle
 
 # 종료된 세션은 퇴근 연출을 위해 이 시간 동안 스냅샷에 남긴다.
@@ -29,7 +28,8 @@ POLL_INTERVAL_SECONDS = 1.0
 # 늦게 커밋된 트랜잭션도 놓치지 않도록 매 조회마다 이 기간을 다시 본다(중복은 change_seq로 거름).
 CHANGE_LOOKBACK = dt.timedelta(seconds=30)
 PING_INTERVAL_SECONDS = 25.0
-ALLOWED_ORIGINS_ENV = "AGENT_OFFICE_ALLOWED_ORIGINS"
+# 상세 패널 타임라인에 보여 줄 최근 이벤트 수(#51).
+TIMELINE_LIMIT = 50
 CLOSE_UNAUTHORIZED = 4401
 CLOSE_FORBIDDEN_ORIGIN = 4403
 
@@ -193,16 +193,79 @@ def office_snapshot(user: UserDep, connection: DbConnection) -> dict[str, Any]:
     return build_snapshot(connection, user.id)
 
 
+def build_agent_detail(
+    connection: Connection, user_id: uuid.UUID, agent_id: uuid.UUID
+) -> dict[str, Any] | None:
+    """에이전트 상세(#51). 소유하지 않은 에이전트는 존재 여부도 드러내지 않도록 None."""
+    now: dt.datetime = connection.execute(select(func.now())).scalar_one()
+    agents, events, steps = schema.agents, schema.activity_events, schema.plan_steps
+    session_id = connection.execute(
+        select(agents.c.session_id).where(agents.c.id == agent_id)
+    ).scalar_one_or_none()
+    if session_id is None:
+        return None
+    devices = _devices(connection, user_id)
+    session_rows = _session_rows(
+        connection, [d.id for d in devices], schema.agent_sessions.c.id == session_id
+    )
+    if not session_rows:
+        return None
+    session_row = session_rows[0]
+    device = next(d for d in devices if d.id == session_row.device_id)
+    connection_of = {device.id: connection_state(device.last_seen_at, now)}
+    members = _agent_rows(connection, [session_id], true())
+    agent = next(a for a in members if a.id == agent_id)
+    timeline = connection.execute(
+        select(
+            events.c.event_type,
+            events.c.activity,
+            events.c.confidence,
+            events.c.source,
+            events.c.occurred_at,
+        )
+        .where(events.c.session_id == session_id, events.c.agent_id == agent_id)
+        .order_by(events.c.occurred_at.desc(), events.c.sequence.desc())
+        .limit(TIMELINE_LIMIT)
+    ).all()
+    plan = connection.execute(
+        select(steps.c.step_index, steps.c.status)
+        .where(steps.c.session_id == session_id)
+        .order_by(steps.c.step_index)
+    ).all()
+    return {
+        "agent": _agent_json(agent),
+        "session": _session_json(session_row, connection_of, now),
+        "device": _device_json(device, now),
+        "parent": next((_agent_json(a) for a in members if a.id == agent.parent_agent_id), None),
+        "children": [_agent_json(a) for a in members if a.parent_agent_id == agent_id],
+        # 이벤트 종류·활동·신뢰도·시각만. 도구 입력·명령·경로 같은 원문은 서버에 없다.
+        "timeline": [
+            {
+                "event_type": e.event_type,
+                "activity": e.activity,
+                "confidence": e.confidence,
+                "source": e.source,
+                "occurred_at": _iso(e.occurred_at),
+            }
+            for e in timeline
+        ],
+        # 계획은 순서와 상태만 저장한다(본문 없음).
+        "plan_steps": [{"step_index": p.step_index, "status": p.status} for p in plan],
+    }
+
+
+@router.get("/api/v1/office/agents/{agent_id}")
+def agent_detail(agent_id: uuid.UUID, user: UserDep, connection: DbConnection) -> dict[str, Any]:
+    """사무실 캐릭터 상세 패널용. 본인 장치의 에이전트만 조회한다."""
+    detail = build_agent_detail(connection, user.id, agent_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return detail
+
+
 def _origin_allowed(websocket: WebSocket) -> bool:
-    """교차 사이트 WebSocket 하이재킹 방지. 브라우저가 보낸 Origin은 같은 호스트여야 한다."""
-    origin = websocket.headers.get("origin")
-    if origin is None:
-        # Origin이 없는 비브라우저 클라이언트는 피해자 쿠키를 쓸 수 없다.
-        return True
-    allowed = {o.strip() for o in os.environ.get(ALLOWED_ORIGINS_ENV, "").split(",") if o.strip()}
-    if origin in allowed:
-        return True
-    return urlsplit(origin).netloc == websocket.headers.get("host")
+    """교차 사이트 WebSocket 하이재킹 방지."""
+    return origin_allowed(websocket.headers.get("origin"), websocket.headers.get("host"))
 
 
 def _with_connection(function: Any, *args: Any) -> Any:

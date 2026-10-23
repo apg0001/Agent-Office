@@ -48,6 +48,7 @@ def send_event(
     *,
     minute: int,
     activity: str = "unknown",
+    parent: uuid.UUID | None = None,
 ) -> None:
     occurred = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=30) + dt.timedelta(minutes=minute)
     event = {
@@ -56,7 +57,7 @@ def send_event(
         "device_id": device["device_id"],
         "session_id": str(session_id),
         "agent_id": str(agent_id),
-        "parent_agent_id": None,
+        "parent_agent_id": str(parent) if parent else None,
         "provider": "claude",
         "source": "hook",
         "event_type": event_type,
@@ -206,3 +207,53 @@ def test_other_users_changes_are_not_delivered(client: TestClient, engine: Engin
 
     assert all(s["device_id"] == device["device_id"] for s in delta["sessions"])
     assert len(delta["agents"]) == 1
+
+
+def test_agent_detail_shows_relations_and_safe_timeline(client: TestClient, engine: Engine) -> None:
+    session, device = owner(client, engine)
+    sid, lead, child = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    send_event(client, device, sid, lead, "session.started", minute=0)
+    send_event(client, device, sid, lead, "tool.started", minute=1, activity="delegating")
+    send_event(
+        client, device, sid, child, "agent.started", minute=2, activity="reading", parent=lead
+    )
+    snapshot = client.get("/api/v1/office", headers=session_cookie(session)).json()
+    lead_id = next(a["id"] for a in snapshot["agents"] if a["role"] == "lead")
+    child_id = next(a["id"] for a in snapshot["agents"] if a["role"] == "subagent")
+
+    lead_detail = client.get(f"/api/v1/office/agents/{lead_id}", headers=session_cookie(session))
+    assert lead_detail.status_code == 200
+    body = lead_detail.json()
+    assert body["device"]["name"] and body["device"]["connection"] == "ONLINE"
+    assert body["session"]["lifecycle"] == "OPEN" and body["parent"] is None
+    assert [c["id"] for c in body["children"]] == [child_id]
+    # 최신순, 이벤트 종류·활동·시각만.
+    assert [e["event_type"] for e in body["timeline"]] == ["tool.started", "session.started"]
+    assert set(body["timeline"][0]) == {
+        "event_type",
+        "activity",
+        "confidence",
+        "source",
+        "occurred_at",
+    }
+    assert body["plan_steps"] == []
+    dumped = json.dumps(body)
+    assert str(sid) not in dumped and str(lead) not in dumped
+
+    child_detail = client.get(
+        f"/api/v1/office/agents/{child_id}", headers=session_cookie(session)
+    ).json()
+    assert child_detail["parent"]["id"] == lead_id and child_detail["children"] == []
+
+
+def test_agent_detail_hides_other_users_agents(client: TestClient, engine: Engine) -> None:
+    session, _ = owner(client, engine)
+    stranger_session, stranger = owner(client, engine)
+    send_event(client, stranger, uuid.uuid4(), uuid.uuid4(), "session.started", minute=0)
+    snapshot = client.get("/api/v1/office", headers=session_cookie(stranger_session)).json()
+    foreign = snapshot["agents"][0]["id"]
+
+    for target in (foreign, str(uuid.uuid4())):
+        response = client.get(f"/api/v1/office/agents/{target}", headers=session_cookie(session))
+        assert response.status_code == 404
+    assert client.get(f"/api/v1/office/agents/{foreign}").status_code == 401
