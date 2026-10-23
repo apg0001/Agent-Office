@@ -68,6 +68,8 @@ export class OfficeScene extends Phaser.Scene {
   private camera: CameraState = initialCamera;
   /** 자동 초점 상태가 바뀌면 화면(React)에 알린다. */
   onCameraChange: (state: CameraState) => void = () => undefined;
+  /** 캐릭터를 클릭하면 상세 패널(#51)을 연다. */
+  onSelect: (agentId: string) => void = () => undefined;
 
   constructor(map: OfficeMap, initial: OfficeState) {
     super("office");
@@ -301,6 +303,13 @@ export class OfficeScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false);
     container.add([body, head, badge, marker, status]);
+    container.setSize(16, 32).setInteractive({ useHandCursor: true });
+    container.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+      // 드래그(카메라 이동)로 끝난 클릭은 선택으로 보지 않는다.
+      if (pointer.getDistance() < 6) {
+        this.onSelect(agent.id);
+      }
+    });
     const actor: Actor = {
       container,
       marker,

@@ -22,6 +22,21 @@
 
 세션 쿠키 인증. `200 {type: "snapshot", server_time, devices, sessions, agents}`.
 
+## `GET /api/v1/office/agents/{agent_id}` (#51)
+
+세션 쿠키 인증. 캐릭터 상세 패널용으로, 본인 장치의 에이전트만 조회합니다. 다른 사용자의 에이전트와 없는 ID는 같은 `404`라 존재 여부가 드러나지 않습니다.
+
+`200 {agent, session, device, parent, children, timeline, plan_steps}`
+
+| 필드 | 내용 |
+|---|---|
+| `agent`·`session`·`device` | 스냅샷과 같은 모양 |
+| `parent`·`children` | 같은 세션의 상위·하위 에이전트(스냅샷 에이전트 모양) |
+| `timeline` | 이 에이전트의 최근 이벤트 50개, 최신순. `event_type`·`activity`·`confidence`·`source`·`occurred_at`만 담음 |
+| `plan_steps` | 세션 계획의 `step_index`·`status`만. 계획 본문은 저장하지 않음 |
+
+도구 입력·명령·경로·프롬프트는 서버에 저장되지 않으므로 응답에도 없습니다. 팀 공유 범위는 #54·#55에서 같은 권한 검사 구조로 추가합니다.
+
 ## `WS /api/v1/live`
 
 | 단계 | 동작 |
@@ -44,4 +59,4 @@
 
 - 연결마다 1초 주기로 DB를 조회합니다. 30세션·소수 사용자 규모(Pi 목표) 기준이며, 부하 실측은 #63에서 합니다. 필요하면 PostgreSQL `LISTEN/NOTIFY`로 바꿉니다.
 - 클라이언트 메시지(구독 범위 변경 등)는 아직 받지 않습니다.
-- 계획 진행도·타임라인은 #38입니다.
+- 계획 단계(`plan_steps`)를 채우는 수집 경로는 아직 없습니다. 이벤트 스키마 v1에 단계 필드가 없어 상세의 `plan_steps`는 현재 항상 빈 목록입니다(#38).
