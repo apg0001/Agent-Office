@@ -435,3 +435,22 @@ h1 {
   border-color: rgba(255, 140, 120, 0.5);
   background: #4a1d1d;
 }
+
+.side-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 1rem;
+}
+
+.office.compact {
+  margin: 0;
+}
+
+.office.compact .office-canvas {
+  min-height: 320px;
+}
+
+.office-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}

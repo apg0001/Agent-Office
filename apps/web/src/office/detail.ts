@@ -3,6 +3,7 @@
  * 원문(프롬프트·명령·경로·계획 본문)은 서버에도 없으므로 여기에도 없다.
  */
 
+import { type OfficeScope, PERSONAL } from "./liveSource";
 import type { Activity, AgentState, DeviceState, OfficeState, SessionState } from "./types";
 
 export interface TimelineEntry {
@@ -47,20 +48,21 @@ export function detailFromState(state: OfficeState, agentId: string): AgentDetai
   };
 }
 
-export function detailPath(agentId: string, teamId: string | null = null): string {
+export function detailPath(agentId: string, scope: OfficeScope = PERSONAL): string {
   const agent = encodeURIComponent(agentId);
-  return teamId
-    ? `/api/v1/teams/${encodeURIComponent(teamId)}/office/agents/${agent}`
-    : `/api/v1/office/agents/${agent}`;
+  if (scope.kind === "team") {
+    return `/api/v1/teams/${encodeURIComponent(scope.teamId)}/office/agents/${agent}`;
+  }
+  return scope.kind === "combined" ? `/api/v1/office/combined/agents/${agent}` : `/api/v1/office/agents/${agent}`;
 }
 
 export async function fetchAgentDetail(
   agentId: string,
   fetcher: typeof fetch = fetch,
-  teamId: string | null = null,
+  scope: OfficeScope = PERSONAL,
 ): Promise<AgentDetail | null> {
   try {
-    const response = await fetcher(detailPath(agentId, teamId), {
+    const response = await fetcher(detailPath(agentId, scope), {
       credentials: "same-origin",
     });
     return response.ok ? ((await response.json()) as AgentDetail) : null;

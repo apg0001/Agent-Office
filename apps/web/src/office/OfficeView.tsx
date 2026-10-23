@@ -5,7 +5,7 @@ import { AgentPanel } from "./AgentPanel";
 import { deskRowsFor } from "./behavior";
 import { detailFromState, fetchAgentDetail, type AgentDetail } from "./detail";
 import { createDefaultOffice } from "./grid";
-import { connectLive, hasSession, scopeFromSearch } from "./liveSource";
+import { type OfficeScope, PERSONAL, connectLive, hasSession, scopeFromSearch, searchFor } from "./liveSource";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
 import type { DataSource, OfficeState } from "./types";
 
@@ -18,17 +18,25 @@ interface TeamOption {
   name: string;
 }
 
-/** 내 사무실과 내가 속한 팀 사무실 중 하나를 고른다. 바꾸면 그 범위로 다시 연결한다. */
-function ScopePicker({ team }: { team: string | null }) {
+/** 내가 속한 팀 목록. 범위 선택·나란히 보기가 쓴다. */
+export function useTeams(): TeamOption[] {
   const [teams, setTeams] = useState<TeamOption[]>([]);
-
   useEffect(() => {
     void fetch("/api/v1/teams", { credentials: "same-origin" })
       .then((response) => (response.ok ? response.json() : []))
       .then((list: TeamOption[]) => setTeams(list))
       .catch(() => setTeams([]));
   }, []);
+  return teams;
+}
 
+function scopeValue(scope: OfficeScope): string {
+  return scope.kind === "team" ? `team:${scope.teamId}` : scope.kind;
+}
+
+/** 내 사무실·통합·나란히·팀 사무실 중 하나를 고른다. 바꾸면 그 범위로 다시 연결한다. */
+export function ScopePicker({ scope }: { scope: OfficeScope }) {
+  const teams = useTeams();
   if (teams.length === 0) {
     return null;
   }
@@ -36,15 +44,20 @@ function ScopePicker({ team }: { team: string | null }) {
     <label className="scope-picker">
       사무실{" "}
       <select
-        value={team ?? ""}
+        value={scopeValue(scope)}
         onChange={(event) => {
           const value = event.target.value;
-          window.location.assign(value ? `/?team=${encodeURIComponent(value)}` : "/");
+          const next: OfficeScope = value.startsWith("team:")
+            ? { kind: "team", teamId: value.slice(5) }
+            : { kind: value as "personal" | "combined" | "side" };
+          window.location.assign(`/${searchFor(next)}`);
         }}
       >
-        <option value="">내 사무실</option>
+        <option value="personal">내 사무실</option>
+        <option value="combined">통합 사무실(내 것 + 팀 공유)</option>
+        <option value="side">나란히 보기</option>
         {teams.map((option) => (
-          <option key={option.id} value={option.id}>
+          <option key={option.id} value={`team:${option.id}`}>
             팀: {option.name}
           </option>
         ))}
@@ -53,9 +66,26 @@ function ScopePicker({ team }: { team: string | null }) {
   );
 }
 
-export function OfficeView() {
+const SCOPE_NOTES: Record<OfficeScope["kind"], string> = {
+  personal: "",
+  team: " · 팀 사무실(공유된 프로젝트만)",
+  combined: " · 통합 사무실(내 것 + 팀에 공유된 것, 중복 없이)",
+  side: "",
+};
+
+interface OfficeViewProps {
+  /** 생략하면 주소(`?team=`·`?view=`)에서 읽는다. */
+  scope?: OfficeScope;
+  /** 나란히 보기용 작은 화면: 안내·선택 상자를 숨기고 높이를 줄인다. */
+  compact?: boolean;
+  title?: string;
+}
+
+export function OfficeView({ scope: given, compact = false, title }: OfficeViewProps = {}) {
   const host = useRef<HTMLDivElement>(null);
-  const [team] = useState(() => (typeof window === "undefined" ? null : scopeFromSearch(window.location.search)));
+  const [scope] = useState<OfficeScope>(
+    () => given ?? (typeof window === "undefined" ? PERSONAL : scopeFromSearch(window.location.search)),
+  );
   const [source, setSource] = useState<DataSource>("synthetic");
   const [online, setOnline] = useState(false);
   const [autoFocus, setAutoFocus] = useState(true);
@@ -94,7 +124,7 @@ export function OfficeView() {
         type: Phaser.AUTO,
         parent: element,
         width: element.clientWidth || 960,
-        height: 560,
+        height: compact ? 320 : 560,
         backgroundColor: "#2b2d31",
         pixelArt: true,
         scene,
@@ -112,7 +142,7 @@ export function OfficeView() {
       };
       if (live) {
         setSource("server");
-        const handle = connectLive(show, setOnline, team);
+        const handle = connectLive(show, setOnline, scope);
         stop = handle.close;
         return;
       }
@@ -141,7 +171,7 @@ export function OfficeView() {
       return undefined;
     }
     let current = true;
-    void fetchAgentDetail(selected, fetch, team).then((detail) => {
+    void fetchAgentDetail(selected, fetch, scope).then((detail) => {
       if (current) {
         setRemote(detail);
       }
@@ -149,7 +179,7 @@ export function OfficeView() {
     return () => {
       current = false;
     };
-  }, [source, selected, changeSeq, team]);
+  }, [source, selected, changeSeq, scope]);
   // 실시간 상태가 최신이므로 기본 정보는 로컬, 타임라인·계획만 서버 응답을 쓴다.
   const detail =
     local && remote?.agent.id === local.agent.id
@@ -157,7 +187,7 @@ export function OfficeView() {
       : local;
 
   return (
-    <section className="office" aria-label="사무실">
+    <section className={compact ? "office compact" : "office"} aria-label={title ?? "사무실"}>
       {source === "synthetic" ? (
         <p className="synthetic-badge" role="status">
           합성 데이터(데모) — 실제 관측이 아닙니다
@@ -166,12 +196,13 @@ export function OfficeView() {
         <>
           <p className="live-badge" role="status">
             {online ? "실시간 연결됨" : "서버 연결 끊김 — 재접속 중"}
-            {team ? " · 팀 사무실(공유된 프로젝트만)" : ""}
+            {SCOPE_NOTES[scope.kind]}
           </p>
-          <ScopePicker team={team} />
+          {!compact && <ScopePicker scope={scope} />}
         </>
       )}
-      <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>
+      {title && <h3 className="office-title">{title}</h3>}
+      {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
       {!autoFocus && (
         <button type="button" className="focus-button" onClick={() => resume.current()}>
           자동 초점 다시 켜기

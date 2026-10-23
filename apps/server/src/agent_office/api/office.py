@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Connection, Row, func, or_, select, true, update
+from sqlalchemy import Connection, Row, func, or_, select, true, union, update
 from sqlalchemy import null as sql_null
 from starlette.concurrency import run_in_threadpool
 
@@ -306,12 +306,16 @@ def _team_snapshot_if_member(
     return build_team_snapshot(connection, team_id)
 
 
-async def _live_team(
-    websocket: WebSocket, token: str | None, user_id: uuid.UUID, team_id: uuid.UUID
+async def _live_scoped(
+    websocket: WebSocket,
+    token: str | None,
+    user_id: uuid.UUID,
+    build: Any,
+    *args: Any,
 ) -> None:
-    """팀 사무실 실시간. 매 주기 로그인 세션과 팀 구성원 자격을 다시 확인하고 팀 스냅샷을 다시
+    """팀·통합 사무실 실시간. 매 주기 로그인 세션과 범위 자격을 다시 확인하고 스냅샷을 다시
     계산한다(Pi 규모 기준). 공유 해제·탈퇴·추방은 다음 주기(1초 이내)에 반영된다."""
-    snapshot = await run_in_threadpool(_with_connection, _team_snapshot_if_member, team_id, user_id)
+    snapshot = await run_in_threadpool(_with_connection, build, *args)
     if snapshot is None:
         await websocket.close(code=CLOSE_SCOPE_UNAVAILABLE)
         return
@@ -331,9 +335,7 @@ async def _live_team(
             if still is None or still.id != user_id:
                 await websocket.close(code=CLOSE_UNAUTHORIZED)
                 return
-            current = await run_in_threadpool(
-                _with_connection, _team_snapshot_if_member, team_id, user_id
-            )
+            current = await run_in_threadpool(_with_connection, build, *args)
             if current is None:
                 await websocket.close(code=CLOSE_SCOPE_UNAVAILABLE)
                 return
@@ -367,7 +369,10 @@ async def live(websocket: WebSocket) -> None:
         except ValueError:
             await websocket.close(code=CLOSE_SCOPE_UNAVAILABLE)
             return
-        await _live_team(websocket, token, user.id, team_id)
+        await _live_scoped(websocket, token, user.id, _team_snapshot_if_member, team_id, user.id)
+        return
+    if websocket.query_params.get("view") == "combined":
+        await _live_scoped(websocket, token, user.id, build_combined_snapshot, user.id)
         return
     await websocket.accept()
 
@@ -509,11 +514,16 @@ def _team_session_ids(connection: Connection, team_id: uuid.UUID, now: dt.dateti
     )
 
 
-def build_team_snapshot(connection: Connection, team_id: uuid.UUID) -> dict[str, Any]:
-    """팀 사무실 스냅샷. 장치 이름 대신 소유자 표시 이름을 쓰고, 책상은 표시용 순번이다."""
-    now: dt.datetime = connection.execute(select(func.now())).scalar_one()
+def _scoped_snapshot(
+    connection: Connection,
+    now: dt.datetime,
+    visible: Any,
+    scope: dict[str, str],
+    viewer_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    """보이는 세션 집합으로 만든 스냅샷. 남의 장치는 PC 이름 대신 소유자 표시 이름을 쓰고,
+    책상은 화면용 순번(시작 순서)이다. 세션은 한 번만 나온다(여러 팀에 공유돼도)."""
     sessions, devices, users = schema.agent_sessions, schema.devices, schema.users
-    visible = _team_session_ids(connection, team_id, now)
     session_rows = list(
         connection.execute(
             select(
@@ -536,7 +546,13 @@ def build_team_snapshot(connection: Connection, team_id: uuid.UUID) -> dict[str,
     device_rows: list[Any] = (
         list(
             connection.execute(
-                select(devices.c.id, users.c.display_name.label("name"), devices.c.last_seen_at)
+                select(
+                    devices.c.id,
+                    devices.c.name.label("device_name"),
+                    devices.c.owner_user_id,
+                    users.c.display_name,
+                    devices.c.last_seen_at,
+                )
                 .select_from(devices.join(users, users.c.id == devices.c.owner_user_id))
                 .where(devices.c.id.in_(device_ids))
             ).all()
@@ -551,23 +567,68 @@ def build_team_snapshot(connection: Connection, team_id: uuid.UUID) -> dict[str,
     for row in session_rows:
         item = _session_json(row, connection_of, now)
         if item["lifecycle"] != "ENDED":
-            # 팀 배치는 시작 순서대로 앞 책상부터. 개인 사무실 책상 번호와는 별개다.
             item["desk_slot"] = desk
             desk += 1
         session_json.append(item)
     return {
         "type": "snapshot",
-        "scope": {"kind": "team", "team_id": str(team_id)},
+        "scope": scope,
         "server_time": now.isoformat(),
-        "devices": [_device_json(d, now) for d in device_rows],
+        "devices": [
+            {
+                "id": str(d.id),
+                "name": d.device_name if d.owner_user_id == viewer_id else d.display_name,
+                "connection": connection_state(d.last_seen_at, now),
+            }
+            for d in device_rows
+        ],
         "sessions": session_json,
         "agents": [_agent_json(a) for a in agent_rows],
     }
 
 
+def build_team_snapshot(connection: Connection, team_id: uuid.UUID) -> dict[str, Any]:
+    """팀 사무실 스냅샷. 팀 화면에서는 내 장치도 표시 이름으로 보인다(팀원과 같은 화면)."""
+    now: dt.datetime = connection.execute(select(func.now())).scalar_one()
+    return _scoped_snapshot(
+        connection,
+        now,
+        _team_session_ids(connection, team_id, now),
+        {"kind": "team", "team_id": str(team_id)},
+        None,
+    )
+
+
+def build_combined_snapshot(connection: Connection, user_id: uuid.UUID) -> dict[str, Any]:
+    """통합 큰 사무실(#53): 내 세션 + 내가 속한 모든 팀에 보이는 세션을 한 번씩."""
+    now: dt.datetime = connection.execute(select(func.now())).scalar_one()
+    sessions, devices, members = schema.agent_sessions, schema.devices, schema.team_members
+    own = (
+        select(sessions.c.id)
+        .select_from(sessions.join(devices, devices.c.id == sessions.c.device_id))
+        .where(
+            devices.c.owner_user_id == user_id,
+            devices.c.revoked_at.is_(None),
+            or_(sessions.c.lifecycle != "ENDED", sessions.c.ended_at > now - ENDED_SESSION_GRACE),
+        )
+    )
+    team_ids = list(
+        connection.execute(select(members.c.team_id).where(members.c.user_id == user_id)).scalars()
+    )
+    parts = [own, *(_team_session_ids(connection, t, now) for t in team_ids)]
+    visible = union(*parts).subquery()
+    return _scoped_snapshot(connection, now, select(visible.c.id), {"kind": "combined"}, user_id)
+
+
 def _require_team(connection: Connection, team_id: uuid.UUID, user_id: uuid.UUID) -> None:
     if not team_member(connection, team_id, user_id):
         raise HTTPException(status_code=404, detail="not_found")
+
+
+@router.get("/api/v1/office/combined")
+def combined_office(user: UserDep, connection: DbConnection) -> dict[str, Any]:
+    """통합 큰 사무실 스냅샷(#53). 이벤트는 한 번만 저장되고 화면 배치만 다르다."""
+    return build_combined_snapshot(connection, user.id)
 
 
 @router.get("/api/v1/teams/{team_id}/office")
@@ -609,3 +670,22 @@ def team_agent_detail(
         select(schema.users.c.display_name).where(schema.users.c.id == owner)
     ).scalar_one()
     return detail
+
+
+@router.get("/api/v1/office/combined/agents/{agent_id}")
+def combined_agent_detail(
+    agent_id: uuid.UUID, user: UserDep, connection: DbConnection
+) -> dict[str, Any]:
+    """통합 사무실의 상세: 내 에이전트면 개인 상세, 아니면 그것이 보이는 팀의 상세."""
+    own = build_agent_detail(connection, user.id, agent_id)
+    if own is not None:
+        return own
+    members = schema.team_members
+    for team_id in connection.execute(
+        select(members.c.team_id).where(members.c.user_id == user.id)
+    ).scalars():
+        try:
+            return team_agent_detail(team_id, agent_id, user, connection)
+        except HTTPException:
+            continue
+    raise HTTPException(status_code=404, detail="not_found")
