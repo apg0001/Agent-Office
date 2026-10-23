@@ -11,7 +11,8 @@
 | Codex lifecycle hooks | CLI 합성 세션 | 부분 지원 실측 | inline Hook만 확인; Desktop·승인·interrupt·subagent 미실측. #17, #18 |
 | Codex app-server | CLI 명령 제공 여부 미실측 | 미검증 | #21 |
 | Claude Code CLI | Windows | 실행 파일 미설치 | #19 |
-| Claude Code CLI | Raspberry Pi 5, `2.1.308` | 설치 확인, Hook/JSONL 미실측 | #19 |
+| Claude Code CLI | Raspberry Pi 5 Linux arm64, `2.1.308`, `-p` | 부분 지원 실측 | 합성 10회; 시작·턴·도구 전/후·하위 에이전트 시작/종료·권한 요청·Stop·종료 관측. 대화형 TUI·승인 대기·`Notification`·compact 미실측. #19 |
+| Claude Code CLI | Windows·macOS | 미실측 | #19 결과를 확장 적용하지 않음 |
 | Go toolchain | Windows | 호스트 미설치 | 공식 Go 1.24 컨테이너로 fmt/vet/race test 통과 |
 | Docker CLI | 29.8.1 | 엔진 기동·검증 | server/web build와 개발 Compose smoke test 통과 |
 | Docker Compose | v5.5.1 | 구성·기동 검증 | 개발 및 production overlay config 통과 |
