@@ -16,8 +16,12 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 EVENT_SCHEMA = load_json(SCHEMA_DIRECTORY / "event-v1.schema.json")
-REQUEST_SCHEMA = load_json(SCHEMA_DIRECTORY / "collector-event-batch-request-v1.schema.json")
-RESPONSE_SCHEMA = load_json(SCHEMA_DIRECTORY / "collector-event-batch-response-v1.schema.json")
+REQUEST_SCHEMA = load_json(
+    SCHEMA_DIRECTORY / "collector-event-batch-request-v1.schema.json"
+)
+RESPONSE_SCHEMA = load_json(
+    SCHEMA_DIRECTORY / "collector-event-batch-response-v1.schema.json"
+)
 SCHEMAS = (EVENT_SCHEMA, REQUEST_SCHEMA, RESPONSE_SCHEMA)
 REGISTRY = Registry().with_resources(
     (schema["$id"], Resource.from_contents(schema)) for schema in SCHEMAS
@@ -57,7 +61,9 @@ def test_valid_fixtures_pass(fixture: Path) -> None:
     assert validation_errors(fixture) == []
 
 
-@pytest.mark.parametrize("fixture", fixture_paths("invalid"), ids=lambda path: path.name)
+@pytest.mark.parametrize(
+    "fixture", fixture_paths("invalid"), ids=lambda path: path.name
+)
 def test_invalid_fixtures_fail(fixture: Path) -> None:
     assert validation_errors(fixture), f"무효 fixture가 통과함: {fixture.name}"
 

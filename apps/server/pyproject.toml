@@ -18,6 +18,7 @@ dev = [
   "httpx>=0.28,<0.29",
   "jsonschema>=4.26,<5",
   "mypy>=2.4,<3",
+  "openapi-spec-validator>=0.9,<0.10",
   "pytest>=9.1,<10",
   "pyyaml>=6,<7",
   "ruff>=0.17,<0.18",

@@ -10,11 +10,11 @@
 
 ## 현재 위치
 
-- 활성 작업: #15 `EP-01/ISS-03 이벤트 JSON Schema·공통 타입·API 계약`
-- 브랜치: `feat/#15-event-contract`
-- 기준 브랜치: `develop` (`6d5f35f`, PR #76 병합 결과)
-- 상태: 이벤트·배치 JSON Schema, TypeScript 타입, 합성 fixture, 계약 테스트와 API 문서 구현 후 최종 검증 중
-- 직전 완료: #14, PR https://github.com/apg0001/Agent-Office/pull/76, merge commit `6d5f35f`
+- 활성 작업: #16 `EP-01/ISS-04 자동 테스트·CI 기초 및 익명 fixture 생성`
+- 브랜치: `chore/#16-ci-foundation`
+- 기준 브랜치: `develop` (`3da0665`, PR #77 병합 결과)
+- 상태: Python·Node·Go·Compose·Gitleaks와 단일 `CI Gate` workflow 구현, 로컬 재현 통과, GitHub-hosted 실행 전
+- 직전 완료: #15, PR https://github.com/apg0001/Agent-Office/pull/77, merge commit `3da0665`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음
 
@@ -24,7 +24,7 @@
 - 원격: `https://github.com/apg0001/Agent-Office.git`.
 - 로컬 `gh`로 라벨 생성과 Issue 쓰기 성공.
 - 별도 GitHub 앱 커넥터의 이슈 생성은 `403 Resource not accessible by integration`; 이후 쓰기는 검증된 로컬 `gh`만 사용.
-- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). #13·#14는 완료·종료됨.
+- 등록 이슈: 74개 = Epic 12개(#1~#12) + 세부 작업 62개(#13~#74). #13~#15는 완료·종료됨.
 - 각 Epic 본문에 실제 하위 이슈 체크리스트와 의존성을 연결함.
 
 ### 실제 번호 매핑
@@ -80,27 +80,38 @@
 17. 첫 검사에서 `date-time` 검사기가 시간대 없는 값을 허용하는 문제를 발견해 `Z` 또는 `±HH:MM` 패턴을 추가하고 재검사 통과.
 18. TypeScript 테스트까지 정적 검사 범위에 포함하면서 Node 내장 타입 설정 누락을 발견해 `@types/node`와 전용 build tsconfig를 추가하고 재검사 통과.
 19. 상위 Epic #1 체크리스트에서 실제 병합 완료된 #13·#14를 완료 상태로 동기화.
+20. PR #77을 보호된 `develop`에 병합하고 #15 종료·Epic 체크리스트 동기화.
+21. #16 브랜치에서 최소 권한, 동시 실행 취소, 릴리스 commit SHA 고정, Python·Node·Go·Compose·Secret Scan과 집계 `CI Gate` workflow 작성.
+22. FastAPI 생성 OpenAPI 규격 검사와 workflow 구조·액션 SHA 고정 테스트를 추가.
+23. 첫 로컬 재현에서 import 정렬, 기존 Python 포맷, production Compose overlay 조합 오류를 발견해 수정. Windows의 Go 컨테이너 인용 문제는 CI 문제가 아니라 로컬 명령 래핑 문제로 확인하고 분리 실행해 통과.
+24. Gitleaks 8.30.1로 전체 Git 이력 6개 commit을 스캔해 비밀 0건 확인.
+25. actionlint 1.7.12로 workflow 문법·표현식을 검사하고 CI에서는 동일 이미지를 digest로 고정.
+26. 병렬 로컬 검사 직후 Vite `dist/index.html` 잠금으로 `EPERM`이 1회 발생했으나 잔류 Vite 프로세스가 없음을 확인하고 단독 build 재실행에 성공. GitHub Linux runner에는 해당 Windows 파일 잠금이 적용되지 않음.
 
-## 직전 완료 변경 요약(#14)
+## 직전 완료 변경 요약(#15)
 
-- 구조화 Issue 폼 4종과 blank issue 차단·보안 문의 경로.
-- 검증·프라이버시·배포·인수인계를 기록하는 PR 템플릿.
-- `main`·`develop` 보호 규칙과 한국어 Issue/PR/커밋 운영 기준.
-- 템플릿 YAML과 필수 PR 섹션을 검사하는 저장소 메타데이터 테스트.
+- 이벤트 v1과 Collector 배치 요청·응답 JSON Schema 3개.
+- JSON Schema enum·필수 필드와 동기화되는 공통 TypeScript 타입.
+- 유효 4개·무효 9개 합성 fixture와 Python/TypeScript 계약 테스트.
+- 멱등 ACK, 부모 관계, 개인정보 화이트리스트와 미구현 서버 책임을 구분한 API 문서.
 
 ## 검증 상태
 
 | 검사 | 상태 | 근거 |
 |---|---|---|
-| Python 설치/pytest/Ruff/mypy | 통과 | pytest 19개 통과(Starlette TestClient deprecation 경고 1개), Ruff·mypy 오류 0 |
+| Python 설치/pytest/Ruff/mypy | 통과 | pytest 21개 통과(Starlette TestClient deprecation 경고 1개), Ruff lint·format·mypy 오류 0 |
 | npm install/typecheck/test/build | 통과 | 이벤트 계약 3개+웹 1개 Vitest 통과, TypeScript 오류 0, 두 workspace build 성공 |
 | 이벤트 JSON Schema 계약 | 통과 | Draft 2020-12 스키마 3개, 유효 4개·무효 9개 fixture, 닫힌 허용 필드 집합 검증 |
+| FastAPI OpenAPI 계약 | 통과 | `openapi-spec-validator` 0.9.0, health path 포함 문서 검증 |
 | Go fmt/vet/race test | 통과 | `golang:1.24-bookworm`; 패키지는 현재 테스트 파일 없음 |
-| Compose config | 통과 | `docker compose ... config --quiet` 성공 |
+| Compose config | 통과 | 개발 구성과 base+production overlay `config --quiet` 성공 |
+| GitHub Actions 문법 | 통과 | actionlint 1.7.12, 오류 0; CI 이미지는 SHA-256 digest 고정 |
 | Docker image build | 통과 | FastAPI server와 React/nginx web 이미지 빌드 성공 |
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
 | GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자 적용·대화 해결 활성, 승인 0, 필수 상태 검사 없음, force-push·삭제 비활성 |
+| GitHub Actions 원격 CI | 미실행 | workflow push/PR 전. PR에서 실제 job 결과를 확인해야 함 |
+| Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex Hook 이벤트 | 미실행 | #17, #18 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
@@ -108,11 +119,11 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. 전체 diff를 자체 리뷰하고 Python·Node 검사와 diff·비밀 패턴 검사를 마지막으로 실행한다.
-2. #15 변경을 한국어 커밋으로 묶어 push하고 `develop` 대상 PR을 생성한다.
-3. PR에 실패→수정 이력, 실제 검사 결과, 미구현 서버 참조 검증·멱등 저장 범위를 기록한다.
-4. 리뷰·병합 후 #15와 상위 Epic 체크리스트를 갱신한다.
-5. `develop`을 갱신한 뒤 #16 자동 테스트·CI 기초 작업을 시작한다.
+1. CI 문서·workflow·검사 diff와 민감 패턴을 최종 리뷰한다.
+2. #16 초기 커밋을 push하고 `develop` 대상 PR을 생성해 GitHub-hosted 다섯 job과 `CI Gate` 결과를 확인한다.
+3. 실패하면 실제 로그 근거로 수정하고, 모두 통과하면 `main`·`develop` 보호 규칙의 필수 상태 검사에 정확한 `CI Gate` context를 추가한다.
+4. 보호 규칙 API 재조회 결과와 PR 번호를 문서에 반영해 후속 커밋을 push하고 최종 CI를 다시 통과시킨다.
+5. 병합 후 #16·Epic #1을 종료하고 #17 Codex Hook 안전 PoC를 시작한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -123,4 +134,5 @@
 - Codex 로컬 DB/JSONL 원문은 민감정보 보호를 위해 아직 읽지 않았다. #17/#18에서 스키마 키와 안전한 합성 fixture만 추출한다.
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
+- #16 workflow는 아직 GitHub-hosted runner에서 실행 전이다. 로컬 통과만으로 원격 CI 성공을 주장하지 않는다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.
