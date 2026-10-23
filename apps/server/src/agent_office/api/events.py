@@ -24,6 +24,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from agent_office.api.deps import CurrentDevice, DbConnection, DeviceDep
 from agent_office.db import schema
+from agent_office.state.store import apply_event
 
 MAX_BATCH_EVENTS = 500
 RETENTION_WINDOW = dt.timedelta(days=30)
@@ -318,6 +319,16 @@ def _store(
             raise _Rejected("event_id_conflict", retryable=False)
         return "duplicate"
 
+    apply_event(
+        connection,
+        session_id=session_id,
+        agent_id=agent_id,
+        event_type=event.event_type,
+        activity=event.activity,
+        confidence=event.confidence,
+        occurred_at=occurred,
+        sequence=event.sequence,
+    )
     sessions = schema.agent_sessions
     connection.execute(
         update(sessions)

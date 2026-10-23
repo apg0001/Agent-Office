@@ -25,7 +25,7 @@ CSRF 토큰은 #25에서 도입했습니다. #26 초기의 임시 `X-Agent-Offic
 | `POST /api/v1/devices/heartbeat` | 장치 | `{collector_version?, queue_depth?}` | `204`. `device_heartbeats` 기록, `last_seen_at`·버전 갱신 |
 | `POST /api/v1/devices/token/rotate` | 장치 | 없음 | `200 {device_token, previous_token_expires_at}`. 이전 토큰은 5분 유예 후 만료. 유예 중인 토큰으로 다시 회전하면 `409 rotation_in_progress` |
 | `POST /api/v1/devices/revoke` | 장치 | 없음 | `204`. Collector 로그아웃·제거 시 자기 장치와 모든 토큰 폐기 |
-| `GET /api/v1/devices` | 세션 | 없음 | `200 [{id, name, platform, collector_version, created_at, last_seen_at, revoked_at}]`. 자기 장치만 |
+| `GET /api/v1/devices` | 세션 | 없음 | `200 [{id, name, platform, collector_version, created_at, last_seen_at, revoked_at, connection}]`. 자기 장치만. `connection`은 마지막 heartbeat 기준 `ONLINE`/`DISCONNECTED`(120초, #36). 폐기된 장치는 항상 `DISCONNECTED` |
 | `POST /api/v1/devices/{device_id}/revoke` | 세션 + CSRF | 없음 | `204`. 다른 사용자의 장치는 존재 여부와 무관하게 `404 not_found` |
 
 입력 제약: `name` 1~80자(앞뒤 공백 제거), `platform`은 `windows`/`macos`/`linux`/`unknown`, `collector_version`은 `^[0-9A-Za-z.+-]{1,64}$`, `queue_depth` 0~10,000,000. 알 수 없는 필드는 `422`.

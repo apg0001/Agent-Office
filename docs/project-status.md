@@ -10,12 +10,14 @@
 
 ## 현재 위치
 
-- 활성 작업: #25 `EP-03/ISS-04 브라우저 세션 유지·쿠키 보호·로그아웃` (Pi, `feat/#25-browser-session`). PR 생성 후 소유자 승인 대기, 승인 전 병합하지 않음
-- 직전 완료(Pi): #35, PR https://github.com/apg0001/Agent-Office/pull/93, merge commit `f3feac8`, Issue 종료, Epic #5 체크 갱신. 그 전: #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
+- 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
+- 활성 작업 A(Pi, 직접): #36 `EP-05/ISS-02 세션 생명주기·턴·접속 상태 분리` (`feat/#36-state-engine`)
+- 활성 작업 B(Pi, 서브에이전트·별도 worktree): #29 `EP-04/ISS-01 Codex·Claude 어댑터 및 샘플 파서` (`feat/#29-collector-adapters`). `docs/project-status.md`는 작업 A가 통합 관리
+- 직전 완료(Pi): #25, PR https://github.com/apg0001/Agent-Office/pull/94, merge commit `21f2d61`, Issue 종료, Epic #3 체크 갱신. 그 전: #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
 - EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
-- 기준 브랜치: `develop` (`f3feac8`, PR #93 병합 결과)
+- 기준 브랜치: `develop` (`21f2d61`, PR #94 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
@@ -188,6 +190,10 @@
 104. #25 `feat/#25-browser-session` 생성. 세션 서비스(`issue_session`: 이전 세션 폐기·활성 20개 상한, 절대 30일·유휴 7일 만료, 5분 간격 사용 시각 갱신), 쿠키 속성(HttpOnly·Secure 기본·SameSite=Lax·Path=/), 세션 유도 CSRF 토큰(`X-CSRF-Token`, 상수 시간 비교)으로 #26 임시 헤더 대체.
 105. API: 현재 세션(CSRF 토큰 전달), 로그아웃, 전체 로그아웃(장치 토큰 유지), 세션 목록·개별 폐기. 감사 로그 4종. 테스트 헬퍼가 실제 `issue_session`을 쓰도록 변경.
 106. 세션 테스트 11개 추가, 서버 테스트 58개(PostgreSQL), Ruff, mypy strict 통과.
+107. 소유자 승인으로 PR #94 병합(`21f2d61`), #25 종료. 진행률: 세부 Issue 62개 중 14개, Epic 12개 중 2개(EP-01·EP-02) 완료.
+108. 소유자가 자율 진행(승인 자동, 병렬 최대 2, 토큰 70%)을 지시. #29 Go Collector 어댑터를 서브에이전트(별도 worktree)에 위임하고 #36을 직접 진행.
+109. #36 상태 엔진: 순수 전이 규칙(`state/engine.py`)과 트랜잭션 내 반영(`state/store.py`, 행 잠금), 수집 경로 연결, 장치 목록에 `connection` 필드. 테스트 17개 추가.
+110. Pi SD 카드 I/O 포화(PSI io 약 90%, 부하 평균 8~11) 발견. 원인은 저장소에 생성된 `node_modules`(197MB)를 테스트 컨테이너가 매번 복사한 것과 Go race 빌드의 디스크 캐시. `node_modules` 삭제, 컨테이너 작업 디렉터리·Go 캐시를 tmpfs로 전환.
 
 ## 이번 변경 요약(#22)
 
@@ -273,7 +279,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. #25 PR CI 확인 후 소유자 승인을 받아 병합하고 `gh issue close 25`, Epic #3 체크리스트(#25) 갱신. 다음 후보: #36 세션 생명주기·턴·접속 상태 분리(수집된 이벤트로 상태 계산), #23 이메일 가입·로그인(세션 발급 사용, SMTP 미설정 시 안전 동작), #33 Collector SQLite 큐·전송.
+4. 진행 순서(자율): #36 → #37 WebSocket·스냅샷 / 병렬 #29 → #30 tail → #32 정규화 → #33 큐·전송. 이후 #45~ 사무실 렌더러, #23 로그인, #27 팀. 각 PR은 CI 통과 후 병합(승인 자동)하고 Issue·Epic 체크리스트를 갱신한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
@@ -307,6 +313,7 @@
 - 부모 에이전트 순환은 DB FK로 막을 수 없다. 수집 API(#35)가 부모 존재·불변을 검증해야 한다.
 - 이벤트 수집 속도 제한은 서버 프로세스 메모리 기준이다. 다중 인스턴스·재시작 시 초기화되므로 #63에서 재검토한다.
 - 쿠키 인증 쓰기 요청은 #25부터 세션 유도 CSRF 토큰(`X-CSRF-Token`)을 요구한다. 로그인 엔드포인트(#23·#24)가 아직 없어 실제 브라우저 로그인 흐름은 미검증이다. 등록 코드·로그인 IP 속도 제한은 #28.
+- Pi SD 카드는 I/O가 병목이다. 테스트 컨테이너는 `--tmpfs`로 작업 디렉터리·빌드 캐시를 RAM에 두고, 저장소에 `node_modules`를 남기지 않는다(필요 시 컨테이너 안 tmpfs에서 `npm ci`). Go 컨테이너는 한 번에 하나만 돌린다.
 - Pi(SD 카드)에서 PostgreSQL 첫 기동이 2분 이상 걸릴 수 있다. healthcheck `start_period`를 줄이지 않는다.
 - Codex app-server 제어 소켓은 `command/exec`·`fs/writeFile`·샌드박스 밖 `thread/shellCommand`를 허용한다. Collector가 연결하면 실행 권한을 갖게 되므로 ADR-0002 개정 없이 연결하지 않는다.
 - `/tmp/codex-daemon-<uid>/`에 #21 실험용 해시 항목이 남았을 수 있다. 사용자 실제 daemon 항목과 구분할 수 없어 삭제하지 않았다.

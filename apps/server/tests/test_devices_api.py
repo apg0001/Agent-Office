@@ -45,6 +45,7 @@ def test_registration_flow_binds_device_to_code_owner(client: TestClient, engine
     assert [d["id"] for d in listed] == [device["device_id"]]
     assert listed[0]["collector_version"] == "0.1.0"
     assert listed[0]["last_seen_at"] is not None
+    assert listed[0]["connection"] == "ONLINE"
 
     with engine.connect() as connection:
         owner = connection.execute(
@@ -212,6 +213,7 @@ def test_self_revoke_and_owner_revoke(client: TestClient, engine: Engine) -> Non
 
     listed = client.get("/api/v1/devices", headers=session_cookie(session)).json()
     assert all(d["revoked_at"] is not None for d in listed)
+    assert all(d["connection"] == "DISCONNECTED" for d in listed)
 
 
 def test_disabled_owner_loses_device_access(client: TestClient, engine: Engine) -> None:
