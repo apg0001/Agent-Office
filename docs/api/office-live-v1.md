@@ -12,7 +12,7 @@
 |---|---|
 | `devices` | `id`, `name`, `connection`(`ONLINE`/`DISCONNECTED`) |
 | `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `change_seq` |
-| `agents` | `id`, `session_id`, `parent_agent_id`, `role`(`lead`/`subagent`), `turn_state`, `activity`, `state_version`, `started_at`, `ended_at`, `change_seq` |
+| `agents` | `id`, `session_id`, `parent_agent_id`, `role`(`lead`/`subagent`), `turn_state`, `activity`, `confidence`(현재 활동을 만든 이벤트의 `observed`/`inferred`, #47), `state_version`, `started_at`, `ended_at`, `change_seq` |
 
 - 스냅샷의 세션은 종료되지 않았거나 종료 후 10분이 지나지 않은 것입니다(퇴근 연출용).
 - 폐기된 장치와 그 세션은 포함하지 않습니다.

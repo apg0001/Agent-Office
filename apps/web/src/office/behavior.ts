@@ -46,8 +46,8 @@ export function targetTile(
   map: OfficeMap,
   agent: AgentState,
   seats: Map<string, Point>,
+  zone: ZoneKind = zoneForActivity(agent.activity, agent.turn_state),
 ): Point {
-  const zone = zoneForActivity(agent.activity, agent.turn_state);
   const seat = seats.get(agent.session_id);
   if (zone === "desk" && seat) {
     if (agent.role === "lead") {

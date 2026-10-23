@@ -118,3 +118,13 @@ h1 {
   color: #222;
   font-weight: 600;
 }
+
+.live-badge {
+  display: inline-block;
+  margin: 0 0 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: #3f8f5f;
+  color: #fff;
+  font-weight: 600;
+}

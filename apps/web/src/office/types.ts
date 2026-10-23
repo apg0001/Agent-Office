@@ -43,6 +43,8 @@ export interface AgentState {
   role: "lead" | "subagent";
   turn_state: TurnState;
   activity: Activity;
+  /** 현재 활동을 만든 이벤트가 관측인지 추정인지. 추정은 화면에서 구분해 그린다. */
+  confidence: "observed" | "inferred";
   state_version: number;
   started_at: string | null;
   ended_at: string | null;
