@@ -33,15 +33,18 @@ KNOWN_HOOK_EVENTS = {
 }
 SAFE_INPUT_FIELDS = {
     "agent_id",
+    "agent_transcript_path",
     "agent_type",
     "cwd",
     "hook_event_name",
+    "last_assistant_message",
     "model",
     "permission_mode",
     "prompt",
     "reason",
     "session_id",
     "source",
+    "stop_hook_active",
     "tool_input",
     "tool_name",
     "tool_response",
@@ -53,7 +56,24 @@ SAFE_INPUT_FIELDS = {
 SAFE_SOURCE_VALUES = {"startup", "resume", "clear", "compact", "fork"}
 SAFE_REASON_VALUES = {"other"}
 SAFE_TRIGGER_VALUES = {"manual", "auto"}
-SAFE_TOOL_VALUES = {"Bash", "apply_patch"}
+SAFE_TOOL_VALUES = {"Bash", "apply_patch", "spawn_agent", "update_plan"}
+SAFE_AGENT_TYPES = {"default", "explorer", "worker"}
+SAFE_PERMISSION_MODES = {
+    "acceptEdits",
+    "bypassPermissions",
+    "default",
+    "dontAsk",
+    "plan",
+}
+SAFE_TOOL_INPUT_KEYS = {
+    "command",
+    "description",
+    "justification",
+    "prefix_rule",
+    "sandbox_permissions",
+    "timeout_ms",
+    "workdir",
+}
 SAFE_TRANSCRIPT_TYPES = {
     "event_msg",
     "response_item",
@@ -88,6 +108,24 @@ def fingerprint(value: object, salt: str) -> str | None:
 
 def safe_enum(value: object, allowed: set[str]) -> str | None:
     return value if isinstance(value, str) and value in allowed else None
+
+
+def safe_tool_name(payload: dict[str, Any]) -> str | None:
+    if "tool_name" not in payload:
+        return None
+    tool_name = payload["tool_name"]
+    if isinstance(tool_name, str) and tool_name.startswith("mcp__"):
+        return "mcp"
+    return safe_enum(tool_name, SAFE_TOOL_VALUES) or "other"
+
+
+def tool_input_shape(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict):
+        return None
+    return {
+        "keys": sorted(SAFE_TOOL_INPUT_KEYS.intersection(value)),
+        "other_key_count": len(set(value).difference(SAFE_TOOL_INPUT_KEYS)),
+    }
 
 
 def redacted_path_shape(raw_path: object) -> dict[str, object]:
@@ -195,18 +233,33 @@ def sanitize(payload: dict[str, Any], raw_size: int, salt: str) -> dict[str, obj
         "session_fingerprint": fingerprint(payload.get("session_id"), salt),
         "turn_fingerprint": fingerprint(payload.get("turn_id"), salt),
         "tool_use_fingerprint": fingerprint(payload.get("tool_use_id"), salt),
+        "agent_fingerprint": fingerprint(payload.get("agent_id"), salt),
+        "agent_type": safe_enum(payload.get("agent_type"), SAFE_AGENT_TYPES)
+        or ("other" if "agent_type" in payload else None),
+        "permission_mode": safe_enum(
+            payload.get("permission_mode"), SAFE_PERMISSION_MODES
+        )
+        or ("other" if "permission_mode" in payload else None),
+        "stop_hook_active": payload.get("stop_hook_active")
+        if isinstance(payload.get("stop_hook_active"), bool)
+        else None,
         "source": safe_enum(payload.get("source"), SAFE_SOURCE_VALUES),
         "reason": safe_enum(payload.get("reason"), SAFE_REASON_VALUES),
         "trigger": safe_enum(payload.get("trigger"), SAFE_TRIGGER_VALUES),
-        "tool_name": safe_enum(payload.get("tool_name"), SAFE_TOOL_VALUES)
-        or ("other" if "tool_name" in payload else None),
+        "tool_name": safe_tool_name(payload),
+        "tool_input_shape": tool_input_shape(payload.get("tool_input")),
         "transcript": inspect_transcript(payload.get("transcript_path")),
     }
+    if "agent_transcript_path" in payload:
+        record["agent_transcript"] = inspect_transcript(
+            payload.get("agent_transcript_path")
+        )
     return record
 
 
-def append_record(record: dict[str, object]) -> None:
-    output = Path.cwd() / ".agent-office" / "poc" / "codex-hook-events.jsonl"
+def append_record(record: dict[str, object], output: Path | None = None) -> None:
+    if output is None:
+        output = Path.cwd() / ".agent-office" / "poc" / "codex-hook-events.jsonl"
     output.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(record, sort_keys=True)
     with output.open("a", encoding="utf-8", newline="\n") as stream:
@@ -216,7 +269,9 @@ def append_record(record: dict[str, object]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--run-salt")
+    parser.add_argument("--output", type=Path)
     arguments, _ = parser.parse_known_args()
+    output: Path | None = arguments.output
     run_salt = arguments.run_salt or os.environ.get("AGENT_OFFICE_POC_RUN_SALT")
     if not run_salt:
         return 0
@@ -229,7 +284,8 @@ def main() -> int:
                     "schema_version": "1.0",
                     "probe_status": "input_too_large",
                     "hook_event_name": "unknown",
-                }
+                },
+                output,
             )
         except OSError:
             pass
@@ -243,7 +299,8 @@ def main() -> int:
                     "schema_version": "1.0",
                     "probe_status": "invalid_json",
                     "hook_event_name": "unknown",
-                }
+                },
+                output,
             )
         except OSError:
             pass
@@ -252,7 +309,7 @@ def main() -> int:
         return 0
 
     try:
-        append_record(sanitize(payload, len(raw), run_salt))
+        append_record(sanitize(payload, len(raw), run_salt), output)
     except OSError:
         return 0
     return 0
