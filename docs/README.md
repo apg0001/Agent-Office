@@ -7,6 +7,7 @@
 - [개발 환경 설치](installation/development.md)
 - [구성 경계](configuration/README.md)
 - [요구사항 추적](requirements/traceability.md)
+- [Codex CLI Hook·JSONL 실측](poc/codex-cli-hooks.md)
 - [운영 Runbook](operations/runbook.md)
 - [백업·복원](operations/backup-restore.md)
 - [릴리스 절차](operations/release.md)
