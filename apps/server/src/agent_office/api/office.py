@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
-import os
 import uuid
 from typing import Any
-from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import Connection, Row, func, or_, select, true
@@ -21,6 +19,7 @@ from agent_office.api.deps import DbConnection, UserDep, authenticate_session
 from agent_office.auth.sessions import SESSION_COOKIE
 from agent_office.db import schema
 from agent_office.db.engine import get_engine
+from agent_office.origin import origin_allowed
 from agent_office.state.engine import connection_state, effective_lifecycle
 
 # 종료된 세션은 퇴근 연출을 위해 이 시간 동안 스냅샷에 남긴다.
@@ -31,7 +30,6 @@ CHANGE_LOOKBACK = dt.timedelta(seconds=30)
 PING_INTERVAL_SECONDS = 25.0
 # 상세 패널 타임라인에 보여 줄 최근 이벤트 수(#51).
 TIMELINE_LIMIT = 50
-ALLOWED_ORIGINS_ENV = "AGENT_OFFICE_ALLOWED_ORIGINS"
 CLOSE_UNAUTHORIZED = 4401
 CLOSE_FORBIDDEN_ORIGIN = 4403
 
@@ -266,15 +264,8 @@ def agent_detail(agent_id: uuid.UUID, user: UserDep, connection: DbConnection) -
 
 
 def _origin_allowed(websocket: WebSocket) -> bool:
-    """교차 사이트 WebSocket 하이재킹 방지. 브라우저가 보낸 Origin은 같은 호스트여야 한다."""
-    origin = websocket.headers.get("origin")
-    if origin is None:
-        # Origin이 없는 비브라우저 클라이언트는 피해자 쿠키를 쓸 수 없다.
-        return True
-    allowed = {o.strip() for o in os.environ.get(ALLOWED_ORIGINS_ENV, "").split(",") if o.strip()}
-    if origin in allowed:
-        return True
-    return urlsplit(origin).netloc == websocket.headers.get("host")
+    """교차 사이트 WebSocket 하이재킹 방지."""
+    return origin_allowed(websocket.headers.get("origin"), websocket.headers.get("host"))
 
 
 def _with_connection(function: Any, *args: Any) -> Any:

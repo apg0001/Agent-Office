@@ -11,13 +11,13 @@
 ## 현재 위치
 
 - 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
-- 활성 작업 A(Pi, 직접): #46 `EP-07/ISS-02 픽셀 캐릭터` (`feat/#46-pixel-sprites`)
+- 활성 작업 A(Pi, 직접): #23 `EP-03/ISS-02 이메일 가입·검증·로그인·복구` (`feat/#23-email-auth`)
 - 활성 작업 B(Pi, 서브에이전트·별도 worktree): #33 `EP-04/ISS-05 로컬 SQLite 큐·배치 전송·ACK·재시도` (`feat/#33-collector-queue`). `docs/project-status.md`는 작업 A가 통합 관리
-- 직전 완료(Pi): #51(PR #105, `fe6592d`), #32(PR #103, `4ed866c`, 서브에이전트), #50(PR #104, `bd5b25a`), #49(PR #102, `74d70c3`), #48(PR #101, `8a1d885`), #30(PR #98, `a589e62`, 서브에이전트), #47(PR #100, `09ea7b7`), #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
+- 직전 완료(Pi): #46(PR #106, `119ae9d`, Epic #7 종료), #51(PR #105, `fe6592d`), #32(PR #103, `4ed866c`, 서브에이전트), #50(PR #104, `bd5b25a`), #49(PR #102, `74d70c3`), #48(PR #101, `8a1d885`), #30(PR #98, `a589e62`, 서브에이전트), #47(PR #100, `09ea7b7`), #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
 - EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
 - 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
-- 기준 브랜치: `develop` (`fe6592d`, PR #105 병합 결과)
+- 기준 브랜치: `develop` (`119ae9d`, PR #106 병합 결과)
 - 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
@@ -212,6 +212,8 @@
 126. #51: `GET /api/v1/office/agents/{id}`(본인 장치만, 남의 것·없는 ID 모두 404, 최근 이벤트 50개 허용 필드만, 계획은 번호·상태만), 웹 상세 패널(클릭 선택·드래그 제외, 상위·하위 이동, Esc, 선택 대상 `change_seq` 변경 시 재조회, 합성 데이터는 타임라인 없음·합성 표시, 추정 표시). 서버 office 테스트 10개·웹 테스트 38개 통과. 계획 단계 수집 경로는 이벤트 스키마에 필드가 없어 #38로 남김.
 127. PR #105 병합(`fe6592d`), #51 종료. 진행률: 세부 Issue 62개 중 25개.
 128. #46: 외부 에셋 없는 픽셀 캐릭터(문자 격자→텍스처 캐시, 리드 왕관·하위 넥타이로 모양 구분, 장치별 옷 8색, 걷기 2프레임), 리드 라벨은 PC 이름 정리·10자 축약, 하위는 "하위". 클릭 판정을 캐릭터 이미지로 옮김. 웹 테스트 44개 통과.
+129. PR #106 병합(`119ae9d`), #46 종료. Epic #7(아이소메트릭 사무실) 세부 7개 모두 완료해 종료.
+130. #23: Argon2id(`argon2-cffi` 25.1) 비밀번호, 가입 정책(`auth.signup_policy`, 기본 CLOSED), 가입·이메일 확인·로그인·복구 API, 일회용 토큰 원자적 소비, 계정 존재 여부 숨김(동일 응답·더미 해시), 로그인 전 요청 Origin·JSON 검사, 메모리 속도 제한, SMTP 미설정 시 503·계정 미생성. Origin 검사를 `origin.py`로 분리해 WebSocket과 공유. 서버 테스트 173개 통과. 로컬 테스트 이미지 `agent-office-test:py313`에 argon2-cffi 추가(이미지 재생성 시 `pip install argon2-cffi==25.1.0`).
 
 ## 이번 변경 요약(#22)
 
@@ -297,7 +299,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율): #46 PR 병합 → #66 최초 관리자 → #23 로그인 / 병렬 #33 큐·전송(서브에이전트) → #34 백그라운드 수집. 이후 #27 팀, EP-08/09/11/12. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다. #33 PR은 서브에이전트가 만든 뒤 `git merge origin/develop`·추적표 충돌 해결·CI 확인 후 병합한다.
+4. 진행 순서(자율): #23 PR 병합 → #66 최초 관리자(`accounts.create_user` 재사용) → 웹 로그인·가입 화면 / 병렬 #33 큐·전송(서브에이전트) → #34 백그라운드 수집. 이후 #27 팀, EP-08/09/11/12. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다. #33 PR은 서브에이전트가 만든 뒤 `git merge origin/develop`·추적표 충돌 해결·CI 확인 후 병합한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
