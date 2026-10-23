@@ -81,6 +81,11 @@ const MESSAGES: Record<string, string> = {
   csrf_required: "세션이 바뀌었습니다. 새로고침 후 다시 시도하세요.",
   unauthorized: "로그인이 필요합니다.",
   network_error: "서버에 연결할 수 없습니다.",
+  already_member: "이미 팀 구성원입니다.",
+  owner_must_transfer: "소유자는 소유권을 넘긴 뒤에 나갈 수 있습니다.",
+  use_transfer: "소유자 지정은 소유권 넘기기로만 할 수 있습니다.",
+  too_many_teams: "속할 수 있는 팀 수(50개)를 넘었습니다.",
+  not_found: "찾을 수 없거나 권한이 없습니다.",
 };
 
 export function messageFor(code: string | null): string {
@@ -111,7 +116,7 @@ export function tokenFromHash(hash: string): string | null {
   return match ? match[1]! : null;
 }
 
-export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite";
+export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite" | "teams";
 
 export function routeFor(pathname: string): Route {
   const routes: Record<string, Route> = {
@@ -121,6 +126,7 @@ export function routeFor(pathname: string): Route {
     "/reset-password": "reset",
     "/setup": "setup",
     "/invite": "invite",
+    "/teams": "teams",
   };
   return routes[pathname.replace(/\/+$/, "") || "/"] ?? "office";
 }

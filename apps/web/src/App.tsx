@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./account/AccountPages";
 import { InvitePage } from "./account/InvitePage";
+import { TeamsPage } from "./account/TeamsPage";
 import { SetupWizard } from "./account/SetupWizard";
 import { type SessionInfo, call, routeFor } from "./account/api";
 import { OfficeView } from "./office/OfficeView";
@@ -35,6 +36,7 @@ function SessionBar() {
   };
   return (
     <nav className="session-bar" aria-label="계정">
+      <a href="/teams">팀</a>
       <span>{session.user.display_name}</span>
       <button type="button" onClick={() => void logout()}>
         로그아웃
@@ -54,10 +56,11 @@ export function App({ pathname }: { pathname?: string }) {
       reset: ResetPage,
       setup: SetupWizard,
       invite: InvitePage,
+      teams: TeamsPage,
     };
     const Page = pages[route];
     return (
-      <main className="shell account-shell">
+      <main className={`shell account-shell${route === "teams" ? " wide" : ""}`}>
         <p className="eyebrow">
           <a href="/">AGENT OFFICE</a>
         </p>
