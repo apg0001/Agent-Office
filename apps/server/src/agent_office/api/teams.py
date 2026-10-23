@@ -294,6 +294,16 @@ def remove_member(
     connection.execute(
         delete(members).where(members.c.team_id == team_id, members.c.user_id == member_id)
     )
+    # 팀을 떠난 사람의 공유는 함께 거둔다(팀 사무실에서 즉시 사라짐, #55).
+    projects, shares = schema.projects, schema.project_shares
+    connection.execute(
+        delete(shares).where(
+            shares.c.team_id == team_id,
+            shares.c.project_id.in_(
+                select(projects.c.id).where(projects.c.owner_user_id == member_id)
+            ),
+        )
+    )
     audit.record(
         connection,
         "team.left" if member_id == user.id else "team.member_removed",

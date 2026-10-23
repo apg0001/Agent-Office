@@ -21,7 +21,24 @@ export async function hasSession(fetcher: typeof fetch = fetch): Promise<boolean
   }
 }
 
-export function connectLive(onState: (state: OfficeState) => void, onStatus: (online: boolean) => void): LiveHandle {
+/** 실시간 주소. 팀 범위면 `?team=`을 붙인다(#54). */
+export function liveUrl(protocol: string, host: string, teamId: string | null): string {
+  const scheme = protocol === "https:" ? "wss:" : "ws:";
+  const query = teamId ? `?team=${encodeURIComponent(teamId)}` : "";
+  return `${scheme}//${host}/api/v1/live${query}`;
+}
+
+/** 현재 주소의 사무실 범위. 팀 ID가 아니면 개인 사무실. */
+export function scopeFromSearch(search: string): string | null {
+  const team = new URLSearchParams(search).get("team");
+  return team && /^[0-9a-f-]{36}$/i.test(team) ? team : null;
+}
+
+export function connectLive(
+  onState: (state: OfficeState) => void,
+  onStatus: (online: boolean) => void,
+  teamId: string | null = null,
+): LiveHandle {
   let socket: WebSocket | undefined;
   let state: OfficeState | undefined;
   let closed = false;
@@ -29,8 +46,7 @@ export function connectLive(onState: (state: OfficeState) => void, onStatus: (on
   let timer: number | undefined;
 
   const open = () => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    socket = new WebSocket(`${protocol}//${window.location.host}/api/v1/live`);
+    socket = new WebSocket(liveUrl(window.location.protocol, window.location.host, teamId));
     socket.onopen = () => {
       backoff = 1000;
       onStatus(true);
