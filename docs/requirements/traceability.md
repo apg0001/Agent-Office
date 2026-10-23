@@ -49,3 +49,46 @@
 | POC-CDX-003 | EVT-004~005 도구·상태 진실성 | `PreToolUse` 관측, `PostToolUse` 반복 미관측을 지원 제한으로 명시 |
 | POC-CDX-004 | EVT-007 프라이버시 | 원문 미저장, 허용 필드 타입·HMAC만 보존하는 프로브 회귀 테스트 |
 | POC-CDX-005 | EVT-002·006·008 중복·시간·유휴 | 단일 실행 중복 0 확인; 교차 소스 중복·유휴는 #20 후속 범위로 명시 |
+
+## Claude Code PoC 검증 매핑
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| POC-CLD-001 | COL-003~006 Hook·로컬 기록 관측 | Raspberry Pi 5 Linux arm64, Claude Code 2.1.308 합성 `-p` 실행 10회와 구조 축약 보고서 |
+| POC-CLD-002 | EVT-003 세션·턴 경계 | `SessionStart`/`UserPromptSubmit`/`Stop`/`SessionEnd`, `prompt_id` 상관관계, 하위 에이전트 알림 턴 기록 |
+| POC-CLD-003 | EVT-004 부모-자식 관계 | 병렬 하위 에이전트 2개 × 3회, Hook `agent_id`와 하위 transcript `agentId` 일치 |
+| POC-CLD-004 | EVT-005 도구·상태 진실성 | `PreToolUse`·`PostToolUse` `tool_use_id` 일치, `PermissionRequest` 자동 거부, 대화형 승인 대기 미검증 명시 |
+| POC-CLD-005 | EVT-007 프라이버시 | 원문 미저장·stdout 없음·`~/.claude` 밖 transcript 미열람 프로브 회귀 테스트 7개, 결과 원문 패턴 0건 |
+| POC-CLD-006 | COL-004 비침습 Hook | 비정상 종료·타임아웃 장애 주입에서 Claude 정상 완료, 사용자 설정 SHA-256 무변경 |
+| POC-CLD-007 | EVT-002·008 중복·유휴 | Hook·stream·transcript `tool_use_id` 일치, transcript 블록 중복 관측; `Stop` 단독 유휴 판정 금지. 교차 중복은 #20 |
+
+## Docker 이미지 검증 매핑(#56)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| IMG-001 | DIST-004 멀티아키텍처 이미지 | CI `Images (amd64)`·`Images (arm64)` 네이티브 빌드·아키텍처 확인, Pi arm64 실측 |
+| IMG-002 | DIST-005 digest 고정 | Dockerfile 베이스와 PostgreSQL 이미지 `태그@sha256` 고정 검사 테스트 |
+| IMG-003 | DIST-006 이미지 설치·소스 빌드 경로 | 개발 Compose(소스 빌드)와 독립 운영 Compose(`태그@digest`) 렌더링·기동 |
+| IMG-004 | OPS-001 health·재시작 | 이미지 `HEALTHCHECK`, `up --wait`, 프로세스 종료 후 자동 재시작 실측 |
+| IMG-005 | SEC 최소 권한 | 비루트 사용자, 읽기 전용 루트, `cap_drop: ALL`, 루프백 바인딩 테스트·실측 |
+| IMG-006 | OPS 배포 승인 | GHCR 게시 workflow가 `workflow_dispatch`·`image-publish` Environment로만 실행되는지 테스트 |
+
+## Hook·JSONL 중복 제거와 tail 검증 매핑(#20)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| DUP-001 | EVT-002 이중 수집 멱등 | 합성 fixture 처리 순서 무관 통과 키 집합, 키별 단일 UUIDv5 `event_id` |
+| DUP-002 | EVT-002 재시작 중복 0 | 영속 키 집합으로 transcript 전체 재처리 시 통과 0 |
+| DUP-003 | EVT-006 시간·순서 | 실측: Hook이 transcript보다 먼저 도착, resume append-only, `Stop` 누락 가능 |
+| TAIL-001 | COL-007 partial write·인코딩 | partial line 보류, BOM·CRLF·빈 줄, 깨진 줄·과대 줄 건너뛰기 테스트 |
+| TAIL-002 | COL-008 로테이션·truncate·재작성 | inode 변경, 크기 감소, 앞부분 지문 변경 시 처음부터 읽기 테스트 |
+| TAIL-003 | COL-009 재시작·권한 | 체크포인트 직렬화 재개, 파일 없음·권한 거부 fail-open 테스트 |
+
+## Codex app-server 검증 매핑(#21)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| APP-001 | COL-003 수집 경로 범위 | 같은 서버·다른 서버 2클라이언트 실험 4회, 프로토콜 스키마 105/85/10/1 |
+| APP-002 | EVT-003~005 thread·turn·item 알림 | 합류 전 상태 알림만, 첫 턴 후 `thread/resume` 합류 시 `turn/*`·`item/*` 수신 |
+| APP-003 | EVT-007 프라이버시 | 프로브가 메서드·키·오류 코드·HMAC만 출력, 단위 테스트 4개(WebSocket 프레이밍 포함) |
+| APP-004 | SEC 최소 권한 | 제어 소켓의 실행·쓰기 요청 존재 확인, 기본 미사용 결정(ADR-0002) |

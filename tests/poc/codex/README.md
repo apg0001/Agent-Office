@@ -22,6 +22,19 @@ Hook 프로브는 stdin 원문을 저장하지 않습니다. 다음 정보만 st
 
 `--dangerously-bypass-hook-trust`는 이 스크립트가 방금 생성하고 내용이 고정된 임시 Hook만 대상으로 사용합니다. 일반 사용자·프로젝트 Hook에는 이 옵션을 사용하지 않습니다.
 
+## app-server 부착 범위 프로브 (#21)
+
+`app_server_probe.py`는 임시 `CODEX_HOME`에서 app-server를 띄우고 두 클라이언트가 같은 thread를 볼 수 있는지 확인합니다. 로그인이 필요 없도록 모델 턴 대신 `thread/shellCommand`(`true`)와 `thread/name/set`만 보냅니다. 출력에는 메서드 이름, 응답 키, 오류 코드, 실행별 HMAC thread 지문만 남깁니다.
+
+```bash
+python3 tests/poc/codex/app_server_probe.py --confirm-synthetic-run
+```
+
+- 같은 서버: `codex app-server --listen unix://<임시 경로>`에 unix socket WebSocket 클라이언트 2개
+- 다른 서버: `codex app-server` stdio 프로세스 2개
+
+unix socket 경로 길이 제한(약 108바이트) 때문에 임시 디렉터리는 시스템 기본 위치에 만듭니다. 결과와 판단은 [보고서](../../../docs/poc/codex-app-server.md)를 따릅니다.
+
 ## Codex Desktop 수동 합성 세션 (#18)
 
 `desktop_session.py`는 Desktop UI를 자동화하지 않습니다. 운영자가 직접 Desktop에서

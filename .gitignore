@@ -21,6 +21,7 @@ bin/
 .env
 .env.*
 !deploy/.env.example
+!deploy/.env.production.example
 *.pem
 *.key
 
