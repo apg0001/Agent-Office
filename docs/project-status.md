@@ -10,15 +10,13 @@
 
 ## 현재 위치
 
-- 활성 작업: #21 `EP-02/ISS-05 Codex App Server 가능 범위와 제한 조사·실측`
-- 브랜치: `feat/#21-codex-app-server-poc` (`develop` `fa8d321`, PR #84 병합 결과에서 생성)
-- 상태: 비로그인·격리 `CODEX_HOME` 실측 4회, 보고서·ADR-0002·프로브·테스트 완료. PR·CI 진행
-- 직전 완료: #20, PR https://github.com/apg0001/Agent-Office/pull/84, merge commit `fa8d321`, Issue 종료, Epic #2 체크 갱신
-- EP-02 잔여: #18 하나. PR #86 소유자 병합 승인(2026-10-23). 병합 후 #18 종료, 반복 실측은 #87, Windows 테스트 비호환은 #88로 분리
-- 재개 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
-- #18 브랜치: `feat/#18-codex-desktop-poc` (PR 직전 `develop` `8dec412` 병합 완료, PR https://github.com/apg0001/Agent-Office/pull/86)
-- 기준 브랜치: `develop` (`fa8d321`, PR #84 병합 결과)
-- #18 상태: 2026-10-23 Windows PC에서 재개. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작(에이전트 UI 자동화 없음). Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md)
+- 활성 작업: #22 `EP-03/ISS-01 PostgreSQL ERD·인덱스·마이그레이션`
+- 브랜치: `feat/#22-postgres-schema` (`develop` `8dec412`에서 생성, PR 전 `16b55d5` 병합)
+- 상태: SQLAlchemy Core 스키마 25테이블, Alembic `0001`(트리거 포함), DB 테스트 10개, CI PostgreSQL 서비스·이미지 내 마이그레이션 smoke, Pi E2E 완료. PR https://github.com/apg0001/Agent-Office/pull/89 CI 진행
+- 직전 완료(Pi): #21, PR https://github.com/apg0001/Agent-Office/pull/85, merge commit `8dec412`
+- 직전 완료(Windows PC, 병렬): #18, PR https://github.com/apg0001/Agent-Office/pull/86, merge commit `16b55d5`. 소유자가 Codex Desktop `26.1007.2314.0` 합성 세션 1회를 직접 조작해 Hook 8종 관측, `SessionStart` 미관측. 상세 [Codex Desktop 실측](poc/codex-desktop.md). 후속 #87(반복 실측), #88(#19·#21 테스트 Windows 비호환)
+- 기준 브랜치: `develop` (`16b55d5`, PR #86 병합 결과)
+- 병렬 작업 주의: Pi(Claude Code)와 Windows PC(데스크톱 에이전트)가 동시에 진행한다. `docs/project-status.md`는 PR 직전에 최신 `develop`을 병합하고 충돌을 해결한다
 - 배포/릴리스: 수행하지 않음. GHCR 이미지 게시 없음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19, #20)만 실행
 - 호스트 전환: 이 Raspberry Pi가 이후 서비스 호스팅 서버가 될 예정(소유자 안내). 아래 환경 기준선 참고
@@ -163,8 +161,23 @@
 77. #18 `desktop_session.py`(prepare/mark/summarize/cleanup)와 Hook 프로브 하위 에이전트·승인 필드 확장. 소유자가 Desktop UI에서 6단계 합성 시나리오 수행.
 78. #18 Hook 미신뢰 상태 0건 → Desktop 설정에서 신뢰 후 21건 기록. 전역 `config.toml`의 소유 섹션 13개(`projects` 1, `hooks.state` 12)만 제거하고 앱 자체 변경 1건은 보존. 읽기 전용 `.git` 삭제 실패를 수정·회귀 테스트화.
 79. #18 PR #86 생성, run `39920836824` 전체 통과. 소유자 결정으로 후속 Issue #87(Desktop 반복 실측)·#88(#19·#21 테스트 Windows 비호환) 생성, #21로 대체된 app-server 프로브 stash 삭제.
+80. PR #85 CI 통과 후 병합(`8dec412`), #21 종료, Epic #2 체크 갱신(#18만 미완).
+81. #22 `feat/#22-postgres-schema` 생성. SQLAlchemy 2.1.6·Alembic 1.20.1·psycopg 3.3.6을 서버 의존성에 추가.
+82. `agent_office/db/schema.py`에 마스터 사양 §5 엔티티 25테이블 작성. 이벤트 장치·세션·에이전트 일치를 복합 FK로, 원문 비저장을 컬럼 설계로 보장.
+83. 빈 PostgreSQL 17.11에 autogenerate로 `0001_initial_schema` 생성·검토 후 마지막 SUPER_ADMIN 보호(advisory lock)·팀 OWNER 존재(지연 제약) 트리거 추가.
+84. `apps/server/tests/test_db_schema.py` 10개: 메타데이터 차이 0, downgrade·재-upgrade, 무결성 규칙 7종, 원문 컬럼 부재·이벤트 v1 컬럼 일치. 로컬 PostgreSQL 컨테이너 `ao-pg-test`(127.0.0.1:55432)로 실행.
+85. CI Python job에 PostgreSQL 서비스(trust 인증)와 `AGENT_OFFICE_REQUIRE_DB_TESTS=1`, Images job에 이미지 내 `alembic upgrade head` 추가. Compose에 `AGENT_OFFICE_DATABASE_URL` 조합, 서버 이미지에 `alembic.ini` 포함.
+86. Pi E2E 첫 시도에서 SD 카드 initdb가 healthcheck 재시도(약 50초)를 넘겨 PostgreSQL unhealthy로 실패. 두 Compose에 `start_period: 120s`를 추가해 재실행: `up --wait` 143초, upgrade 후 26테이블, downgrade 후 1, 재-upgrade·health 성공.
+87. pytest 70개(비root, DB 포함, 건너뜀 0), Ruff, mypy, Compose 2종, actionlint 통과.
+88. PR #89 생성 후 Windows PC 쪽 #18 병합(`16b55d5`)으로 `develop`이 앞서 나가 최신 `develop`을 병합. `docs/project-status.md` 충돌 3곳을 양쪽 기록 보존으로 해결하고 전체 테스트 재실행.
 
-## 이번 변경 요약(#18)
+## 이번 변경 요약(#22)
+
+- [데이터 모델과 마이그레이션](architecture/data-model.md): ERD, 무결성 규칙, 원문 비저장 설계, 보존·삭제 연쇄, 운영 롤백은 백업 복원 원칙.
+- 서버는 아직 DB를 읽고 쓰지 않는다. 수집 API(#35)·인증(#23~#26)이 이 스키마를 사용한다.
+- 미실행: 대량 데이터 보존 삭제 성능, 파티셔닝, 운영 DB 백업·복원 연동(#58).
+
+## 이전 완료 변경 요약(#18)
 
 - [Codex Desktop Hook 실측](poc/codex-desktop.md)과 [`tests/poc/codex`](../tests/poc/codex/README.md) Desktop 수동 세션 하네스.
 - 관측: `UserPromptSubmit`·`PreToolUse`·`PostToolUse`·`PermissionRequest`·`SubagentStart/Stop`·`Stop`·`SessionEnd`. `PostToolUse`는 Desktop에서 관측(CLI `exec`는 미관측), `PermissionRequest`에는 `tool_use_id` 없음.
@@ -227,6 +240,7 @@
 | Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: #19 포함 pytest 34개 통과(Starlette deprecation 경고 1개), Ruff lint·format, server mypy, Claude 프로브 mypy strict 통과. 호스트에는 pytest·`python3-venv` 없음 |
 | Pi 호스트 Node·Go 회귀 | 미실행 | Node·Go 호스트 미설치. CI 원격 결과로 대체 확인 |
 | Pi arm64 이미지·Compose | 통과 | #56: 빌드, 개발/운영 Compose `up --wait`, health·HTTP 200, 비루트·read-only·루프백·자동 재시작 실측 |
+| PostgreSQL 스키마·마이그레이션 | 통과 | #22: PostgreSQL 17.11(Pi arm64)에서 DB 테스트 10개, 서버 이미지 내 upgrade/downgrade/재-upgrade E2E |
 | Codex app-server 부착 범위 | 부분 통과 | #21: 같은 서버 합류·다른 서버 부착 불가 4/4, daemon 공유는 로그인 필요로 미판정 |
 | Hook·JSONL 중복 제거·tail 규칙 | 통과(참조 구현) | #20: 합성 fixture 순서 무관·재시작 재처리 0, tail 경계 10종, Claude 실측 7회 |
 | amd64·arm64 이미지 CI | 통과 | PR #83 run `39905138626`: `Images (amd64)` 41초, `Images (arm64)` 39초, 나머지 job과 `CI Gate` 모두 성공 |
@@ -237,15 +251,16 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. #21 PR의 CI를 확인한다: `gh pr checks <PR 번호> --watch`.
-2. CI 통과 후 `gh pr merge <PR 번호> --merge`(소유자가 자율 진행을 승인함), `gh issue close 21`, Epic #2 체크리스트(#21)를 UTF-8 파일로 갱신하고 재조회한다. #18이 남아 Epic #2는 닫지 않는다.
-3. ADR-0002는 "제안됨" 상태다. 소유자에게 검토를 요청하고, 승인되면 상태를 "승인됨"으로 바꾼다.
-4. 다음 Issue: EP-02가 #18을 제외하고 끝나므로 의존성상 EP-03 #22(PostgreSQL ERD·인덱스·마이그레이션) 또는 EP-04 #29(Codex·Claude 어댑터·샘플 파서, #20 fixture 재사용)로 진행한다. 서버 상태 엔진(EP-05)이 둘 다 필요하므로 #22를 먼저 권장한다.
-5. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
-6. #18: 병합 승인됨. 미완료 시 `gh pr merge 86 --merge`, `gh issue close 18`, Epic #2 체크리스트(#18)를 UTF-8 파일로 갱신하고 재조회한다. EP-02 세부 Issue가 모두 닫히면 Epic #2 종료 여부를 소유자에게 확인한다.
-7. #19·#20 후속 후보: 대화형 TUI의 승인 대기·`Notification`·중단·compact·fork 관측(소유자 조작 필요).
-8. #87: Desktop PC에서 `python tests/poc/codex/desktop_session.py prepare`부터 소유자 조작으로 반복 실측·`SessionStart`·승인 허용·Interrupt를 확인한다. 로그인한 CLI·Desktop의 app-server daemon 공유 확인은 #21 후속이다.
-9. #88: Windows에서 `pytest tests/test_claude_hook_probe.py tests/test_codex_app_server_probe.py`로 재현 후 수정 또는 사유 있는 skip을 결정한다.
+1. PR #89의 CI를 확인한다: `gh pr checks 89 --watch`. Python job의 PostgreSQL 서비스와 Images job의 `alembic upgrade head`가 처음 실행되므로 실패 시 job 로그를 확인한다.
+2. CI 통과 후 `gh pr merge 89 --merge`(소유자 자율 진행 승인), `gh issue close 22`, Epic #3 체크리스트(#22)를 UTF-8 파일로 갱신하고 재조회한다.
+3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
+4. 다음 Issue 후보(Pi): #26 기기 인증·장치 등록·토큰(수집 API #35의 선행), #23 이메일 가입·로그인, #29 Collector 어댑터(#20 fixture 재사용). 서버 수집 경로를 먼저 세우려면 #26 → #35 순서를 권장한다.
+5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
+6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
+7. EP-02 세부 Issue(#17~#21)가 모두 닫혔다. Epic #2 종료 여부를 소유자에게 확인한다(#87은 후속 PoC).
+8. #87(Windows PC): `python tests/poc/codex/desktop_session.py prepare`부터 소유자 조작으로 반복 실측·`SessionStart`·승인 허용·Interrupt 확인. 로그인한 CLI·Desktop의 app-server daemon 공유 확인도 함께 한다(#21 후속).
+9. #88(Windows PC): `pytest tests/test_claude_hook_probe.py tests/test_codex_app_server_probe.py`로 재현 후 수정 또는 사유 있는 skip. Pi 쪽 분석: Claude 테스트는 Windows `Path.home()`이 `HOME`이 아니라 `USERPROFILE`을 써서 생기는 문제로 보이며 `CLAUDE_CONFIG_DIR`을 테스트 환경에 지정하면 플랫폼 무관하게 고칠 수 있다(미검증). WebSocket 테스트는 Windows에 `socket.AF_UNIX`가 없으므로 사유 있는 skip이 맞다.
+10. #19·#20 후속 후보: 대화형 TUI의 승인 대기·`Notification`·중단·compact·fork 관측(소유자 조작 필요).
 
 ## 알려진 위험과 결정 대기
 
@@ -269,6 +284,9 @@
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
 - PR #76~#79 본문의 한글이 `?`로 손상돼 있고 GitHub 편집 이력에 원본이 없다. 커밋 메시지·문서가 원본 기록이며, 필요하면 소유자 승인 후 PR 본문을 다시 작성한다. Epic #3~#12와 세부 Issue는 손상 없음을 확인했다.
+- 운영 DB에서 `alembic downgrade`(특히 `0001`)는 모든 테이블을 삭제한다. 운영 롤백은 백업 복원(#58)으로만 한다.
+- 부모 에이전트 순환은 DB FK로 막을 수 없다. 수집 API(#35)가 부모 존재·불변을 검증해야 한다.
+- Pi(SD 카드)에서 PostgreSQL 첫 기동이 2분 이상 걸릴 수 있다. healthcheck `start_period`를 줄이지 않는다.
 - Codex app-server 제어 소켓은 `command/exec`·`fs/writeFile`·샌드박스 밖 `thread/shellCommand`를 허용한다. Collector가 연결하면 실행 권한을 갖게 되므로 ADR-0002 개정 없이 연결하지 않는다.
 - `/tmp/codex-daemon-<uid>/`에 #21 실험용 해시 항목이 남았을 수 있다. 사용자 실제 daemon 항목과 구분할 수 없어 삭제하지 않았다.
 - Claude Code `Stop`은 누락될 수 있다(#20, resume 1/4). 상태 엔진(#36)은 `Stop` 하나에 의존해 IDLE을 만들지 않는다.

@@ -4,6 +4,7 @@
 - [Agent Office 마스터 개발 프롬프트 v0.8 원문](specifications/agent-office-master-development-prompt-v0.8.md)
 - [프로젝트 상태와 인수인계](project-status.md)
 - [아키텍처 개요](architecture/overview.md)
+- [데이터 모델과 마이그레이션](architecture/data-model.md)
 - [API 문서 상태](api/README.md)
 - [호환성 행렬](compatibility/matrix.md)
 - [개발 환경 설치](installation/development.md)
