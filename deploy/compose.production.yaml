@@ -42,6 +42,8 @@ services:
     <<: *hardening
     environment:
       # 암호에 URL 예약 문자가 있으면 퍼센트 인코딩해야 한다.
+      # 관리 화면에서 저장하는 SMTP 암호·OAuth secret 암호화 키(32바이트 URL-safe base64, #67).
+      AGENT_OFFICE_SECRET_KEY: ${AGENT_OFFICE_SECRET_KEY:-}
       AGENT_OFFICE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_office}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-agent_office}
     # 기본은 루프백에만 바인딩한다. 외부 공개는 리버스 프록시·Tunnel(#57)을 통해서만 한다.
     ports:

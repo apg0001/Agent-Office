@@ -72,7 +72,7 @@ erDiagram
 - `activity_events` 컬럼은 이벤트 v1 허용 필드와 서버 전용 `received_at`·`payload_digest`뿐입니다.
 - `plan_steps`는 순서와 상태만 저장하고 계획 문장은 저장하지 않습니다.
 - `project_sources`는 Collector가 만든 장치별 HMAC 지문만 저장합니다. 경로·원격 URL은 저장하지 않습니다.
-- `notification_channels`의 Webhook URL·토큰·SMTP 암호는 `secret_ciphertext`에 암호화해 둡니다(암호화 키 관리는 #67·#70). `instance_settings`에는 비밀을 두지 않습니다.
+- `notification_channels`의 Webhook URL·토큰·SMTP 암호는 `secret_ciphertext`에 암호화해 둡니다(암호화 키 관리는 #67·#70). `instance_settings`에는 비밀을 두지 않습니다. 인스턴스 비밀(SMTP 암호, OAuth client secret)은 `instance_secrets`에 AES-256-GCM 암호문으로 둡니다(#67, 마이그레이션 `0005`).
 - `audit_logs.details`는 허용 목록 키만 담는 요약입니다(#28).
 
 ## 보존·삭제
