@@ -21,6 +21,15 @@ python -m venv .venv
 .\.venv\Scripts\python -m uvicorn agent_office.main:app --app-dir apps/server/src --reload
 ```
 
+DB 스키마 테스트는 PostgreSQL이 필요합니다. 관리 권한 URL을 주면 테스트마다 임시 DB를 만들고 지웁니다.
+
+```bash
+docker run -d --name ao-pg-test -e POSTGRES_PASSWORD=<로컬 전용 암호> -p 127.0.0.1:55432:5432 postgres:17.11-alpine
+AGENT_OFFICE_TEST_DATABASE_URL="postgresql+psycopg://postgres:<로컬 전용 암호>@127.0.0.1:55432/postgres" python -m pytest apps/server/tests/test_db_schema.py
+```
+
+URL이 없으면 DB 테스트는 사유를 표시하고 건너뜁니다. 건너뛴 결과를 통과로 기록하지 않습니다.
+
 ## 웹
 
 ```powershell

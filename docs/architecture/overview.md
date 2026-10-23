@@ -11,6 +11,8 @@
 
 현재는 버전형 이벤트 계약과 기반만 존재하며 수집·저장·실시간 경로는 구현 전입니다. 실제 지원 여부는 [호환성 행렬](../compatibility/matrix.md)에 기록합니다.
 
+PostgreSQL 스키마·무결성 규칙·보존 인덱스·마이그레이션 전략은 [데이터 모델](data-model.md)에 있습니다(#22). 수집 API·상태 엔진은 아직 이 스키마를 사용하지 않습니다.
+
 공통 계약 v1은 [`packages/event-schema`](../../packages/event-schema/README.md)에 있으며 필드가 닫힌 JSON Schema를 정본으로 사용합니다. 배치 수집 의미는 [이벤트 수집 API 계약](../api/event-ingestion-v1.md)에 정의합니다.
 
 ## 독립 상태축

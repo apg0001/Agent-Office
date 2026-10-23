@@ -8,8 +8,11 @@ version = "0.0.0"
 description = "Agent Office FastAPI server"
 requires-python = ">=3.13"
 dependencies = [
+  "alembic>=1.20,<2",
   "fastapi>=0.159,<0.160",
+  "psycopg[binary]>=3.3,<4",
   "pydantic>=2.14,<3",
+  "sqlalchemy>=2.1,<2.2",
   "uvicorn[standard]>=0.54,<0.55",
 ]
 
@@ -26,6 +29,8 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_office"]
+# 마이그레이션 템플릿(.mako)도 패키지에 포함한다.
+artifacts = ["src/agent_office/db/migrations/script.py.mako"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -36,6 +41,10 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# autogenerate한 마이그레이션의 긴 제약식은 줄을 나누지 않는다.
+"src/agent_office/db/migrations/versions/*" = ["E501"]
 
 [tool.mypy]
 python_version = "3.13"

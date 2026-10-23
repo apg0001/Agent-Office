@@ -33,6 +33,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN --mount=type=bind,from=build,source=/wheels,target=/tmp/wheels \
     python -m pip install --no-index --find-links /tmp/wheels agent-office-server
 
+WORKDIR /app
+# 마이그레이션 실행용: `alembic -c /app/alembic.ini upgrade head`
+COPY alembic.ini ./alembic.ini
+
 USER 65532:65532
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \

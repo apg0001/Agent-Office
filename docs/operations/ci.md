@@ -8,11 +8,11 @@
 
 | 상태 검사 | 범위 |
 |---|---|
-| Python | Python 3.13, Ruff lint/format, mypy strict, pytest, pip 일관성, JSON Schema와 OpenAPI 검증 |
+| Python | Python 3.13, Ruff lint/format, mypy strict, pytest, pip 일관성, JSON Schema와 OpenAPI 검증. PostgreSQL 17.11 서비스로 스키마·마이그레이션 테스트 필수 실행(#22) |
 | Node | Node 24, `npm ci`, TypeScript, Vitest, production build, production dependency audit |
 | Go | Go 1.24, gofmt, vet, race test |
 | Compose | actionlint workflow 문법, 개발 구성과 독립 운영 구성(`compose.production.yaml`) 렌더링 |
-| Images (amd64·arm64) | GitHub 네이티브 `ubuntu-24.04`·`ubuntu-24.04-arm` 러너에서 server·web 이미지 빌드, 개발 Compose `up --wait`, 아키텍처·비루트 사용자·health HTTP 확인 후 볼륨까지 정리 (#56) |
+| Images (amd64·arm64) | GitHub 네이티브 `ubuntu-24.04`·`ubuntu-24.04-arm` 러너에서 server·web 이미지 빌드, 개발 Compose `up --wait`, 서버 이미지 안 `alembic upgrade head`, 아키텍처·비루트 사용자·health HTTP 확인 후 볼륨까지 정리 (#56, #22) |
 | Secret Scan | 전체 Git 이력을 Gitleaks로 검사하며 탐지 내용은 출력·artifact·PR 댓글로 재노출하지 않음 |
 | CI Gate | 위 검사가 모두 `success`일 때만 성공하는 보호 규칙용 단일 상태 검사 |
 

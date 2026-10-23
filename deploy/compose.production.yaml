@@ -32,12 +32,17 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+      # SD 카드의 Raspberry Pi에서 첫 initdb가 1분 넘게 걸린다(#22 실측). 초기화 중 실패는 세지 않는다.
+      start_period: 120s
     logging: *default-logging
     restart: always
 
   server:
     image: ${AGENT_OFFICE_SERVER_IMAGE:?AGENT_OFFICE_SERVER_IMAGE is required (tag@digest)}
     <<: *hardening
+    environment:
+      # 암호에 URL 예약 문자가 있으면 퍼센트 인코딩해야 한다.
+      AGENT_OFFICE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-agent_office}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-agent_office}
     # 기본은 루프백에만 바인딩한다. 외부 공개는 리버스 프록시·Tunnel(#57)을 통해서만 한다.
     ports:
       - "${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:${AGENT_OFFICE_HTTP_PORT:-8000}:8000"
