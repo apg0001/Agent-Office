@@ -3,13 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "packages/event-schema"
   ],
   "scripts": {
     "dev:web": "npm --workspace @agent-office/web run dev",
-    "build": "npm --workspace @agent-office/web run build",
-    "test": "npm --workspace @agent-office/web run test",
-    "typecheck": "npm --workspace @agent-office/web run typecheck"
+    "build": "npm --workspace @agent-office/event-schema run build && npm --workspace @agent-office/web run build",
+    "test": "npm --workspace @agent-office/event-schema run test && npm --workspace @agent-office/web run test",
+    "typecheck": "npm --workspace @agent-office/event-schema run typecheck && npm --workspace @agent-office/web run typecheck"
   },
   "engines": {
     "node": ">=24",
