@@ -14,6 +14,8 @@ export function OfficeView() {
   const host = useRef<HTMLDivElement>(null);
   const [source, setSource] = useState<DataSource>("synthetic");
   const [online, setOnline] = useState(false);
+  const [autoFocus, setAutoFocus] = useState(true);
+  const resume = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     const element = host.current;
@@ -37,6 +39,8 @@ export function OfficeView() {
         createDefaultOffice(2),
         live ? { source: "server", devices: [], sessions: [], agents: [] } : initial,
       );
+      scene.onCameraChange = (camera) => setAutoFocus(camera.autoFocus);
+      resume.current = () => scene.resumeFocus();
       game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: element,
@@ -89,7 +93,13 @@ export function OfficeView() {
           {online ? "실시간 연결됨" : "서버 연결 끊김 — 재접속 중"}
         </p>
       )}
-      <div ref={host} className="office-canvas" />
+      <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>
+      {!autoFocus && (
+        <button type="button" className="focus-button" onClick={() => resume.current()}>
+          자동 초점 다시 켜기
+        </button>
+      )}
+      <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
     </section>
   );
 }
