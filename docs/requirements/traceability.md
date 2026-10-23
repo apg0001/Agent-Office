@@ -29,3 +29,11 @@
 | CT-EVT-002 | EVT-002 이벤트 멱등 키 | 필수 UUID `event_id`, 배치 중복 fixture, ACK 계약 문서 |
 | CT-EVT-004 | EVT-004 부모-자식 관계 | nullable UUID `parent_agent_id`, 루트·하위 에이전트 fixture, 서버 참조 검증 책임 명시 |
 | CT-EVT-007 | EVT-007 프라이버시 최소화 | `additionalProperties: false`, 정확한 허용 필드 집합 테스트, 자유 형식 오류 필드 거부 fixture |
+
+## CI 기준선 검증 매핑
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| CI-EVT-001 | EVT-001 계약 자동 검증 | Python JSON Schema·OpenAPI 검사와 TypeScript 계약 테스트를 `CI Gate`에 연결 |
+| CI-SEC-006 | SEC-006 서버 최소 데이터·비밀 보호 | 익명 fixture 화이트리스트 검사, 전체 Git 이력 Gitleaks, 최소 Actions 권한 |
+| CI-DOC-004 | DOC-004 재현 가능한 기록 | 고정된 액션 SHA, 로컬 재현 명령, 단일 필수 상태 검사와 인수인계 문서 |
