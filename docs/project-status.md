@@ -10,13 +10,19 @@
 
 ## 현재 위치
 
-- 활성 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
-- 재개 브랜치: `feat/#18-codex-desktop-poc` (`3f39495`; 최신 `develop` 반영 필요)
-- 기준 브랜치: `develop` (PR #81 병합 결과를 반영해 재개)
-- 상태: #80 원문 기준선 보존과 원격 `CI Gate` 검증 완료. #18은 수동 합성 Desktop 세션 또는 비-UI 관측 경로 결정 대기
-- 직전 완료: #80, PR https://github.com/apg0001/Agent-Office/pull/81, Actions run `39889981917`
+- 활성 작업: #19 `EP-02/ISS-03 Claude Code Hook/JSONL 및 병렬 에이전트 실측`
+- 브랜치: `feat/#19-claude-code-hook-poc` (`develop` `9145d8c`에서 생성, #18의 Pi 기준선 커밋을 cherry-pick)
+- 상태: Pi Claude Code 2.1.308 합성 실측 10회와 보고서·회귀 테스트 완료, PR·CI 진행
+- 다음 예정: #56 ARM64 Docker 이미지·Compose 실측(소유자 지시: #19 다음)
+- 보류 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
+- #18 브랜치: `feat/#18-codex-desktop-poc` (`develop` `9145d8c` 병합 완료, PR 없음)
+- 기준 브랜치: `develop` (`9145d8c`, PR #81 병합 결과)
+- 상태: **#18 보류(소유자 결정, 2026-10-23).** 작업 호스트가 Windows PC에서 Raspberry Pi 5(Linux arm64)로 바뀌었고, Pi에는 Codex Desktop이 없으며 Desktop UI 자동화도 금지돼 있어 실측할 수 없음. app-server 비-UI 관측은 #18이 아니라 #21 범위로 둠
+- 재개 조건: Codex Desktop이 설치된 PC에서 소유자 또는 수동 운영자가 합성 세션을 직접 조작할 수 있을 때
+- 직전 완료: #80, PR https://github.com/apg0001/Agent-Office/pull/81, merge commit `9145d8c`
 - 배포/릴리스: 수행하지 않음
-- 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
+- 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션(#17)과 합성 Claude Code `-p` 세션(#19)만 실행
+- 호스트 전환: 이 Raspberry Pi가 이후 서비스 호스팅 서버가 될 예정(소유자 안내). 아래 환경 기준선 참고
 
 ## GitHub 연결과 백로그
 
@@ -45,6 +51,24 @@
 | EP-12 Notification Providers | #12 | #70~#74 |
 
 ## 환경 기준선
+
+### 현재 호스트: Raspberry Pi 5 (2026-10-23 확인, 서버 호스팅 예정)
+
+| 도구 | 확인 결과 |
+|---|---|
+| 하드웨어/OS | Raspberry Pi 5, RAM 7.7GiB, Ubuntu 24.04.5 LTS, kernel 6.8.0-1065-raspi, aarch64 |
+| 저장소 | 루트가 SD 카드(`mmcblk0p2`, 29G 중 14G 여유). 사양의 PostgreSQL SSD 권장 미충족, #56·#58·#63에서 결정 필요 |
+| Git | 2.43.0 |
+| GitHub CLI | 2.103.0, `apg0001` 재인증 완료(scope `repo`·`workflow`·`read:org`·`gist`) |
+| Python | 3.12.3 (CI·이전 기준선 3.13과 다름) |
+| Node/npm | 호스트 미설치 |
+| Go | 호스트 미설치; 이전처럼 공식 Go 컨테이너로 검증 가능 |
+| Docker/Compose | 29.9.2 / v5.6.1, 사용자 `docker` 그룹 소속, 실행 중인 컨테이너 없음 |
+| Codex CLI | 0.163.0 (Linux arm64, 미실측) |
+| Codex Desktop | 미설치 |
+| Claude Code | 2.1.308 (Linux arm64, 이벤트 미실측. #19 대상) |
+
+### 이전 호스트: Windows 개발 PC (#13~#17, #80 수행 환경)
 
 | 도구 | 확인 결과 |
 |---|---|
@@ -100,14 +124,30 @@
 37. PR #79 생성 후 GitHub Actions run `39888754773`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
 38. PR #79 최신 run `39888846155`도 전체 통과 후 `develop` 병합, #17 종료와 Epic #2 체크리스트 동기화.
 39. #18 `feat/#18-codex-desktop-poc` 브랜치를 최신 `develop`에서 생성.
-40. `computer-use` 안전 지침상 Codex Desktop UI 자동화가 금지됨을 확인하고 앱 입력 없이 중단, 수동 운영 또는 비-UI 관측 경로 결정 대기 상태를 기록.
+40. `computer-use` 스킬과 안전 지침상 ChatGPT/Codex Desktop UI·확장 자동화가 금지됨을 확인하고 앱 입력 없이 중단, 수동 운영 또는 비-UI 관측 경로 결정 대기 상태를 기록.
 41. 저장소만으로 최초 사양을 복원할 수 없는 공백을 확인하고 문서 Issue #80 생성.
 42. #18 작업 브랜치를 원격 `3f39495`에 보존한 채 최신 `develop`에서 `docs/#80-master-prompt-baseline` 생성.
 43. 외부 마스터 프롬프트에 대표 비밀·개인 절대경로 패턴이 없음을 확인하고 44,535바이트 원문을 변경 없이 `docs/specifications`에 복사.
 44. 원본·저장소 사본 SHA-256 `76bf1febe43afa60072e11f232885709e24f4a4fb619067935426adfafd4c17b` 일치, 14개 요구사항 범위와 문서 링크를 검사하는 테스트 3개 추가.
-45. PR #81 생성 후 GitHub Actions run `39889981917`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 모두 통과.
+45. PR #81 최신 GitHub Actions run `39890099009`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 전체 통과 후 `develop` 병합, #80 종료.
+46. (Claude Code, Raspberry Pi 5) 작업 호스트 전환을 확인하고 OS·도구·Docker·GitHub 인증 상태를 읽기 전용으로 점검. `gh` 토큰 무효 확인 후 소유자가 재인증.
+47. 소유자 결정에 따라 #18을 보류로 전환. Pi에는 Codex Desktop이 없고 UI 자동화가 금지돼 있으므로 app-server 비-UI 관측은 #21로 분리. 테스트·실측은 수행하지 않음.
+48. #18 브랜치 push와 Issue 댓글로 보류 사유·재개 조건 기록. 데스크톱 운영자용 재개 지시문을 소유자에게 전달.
+49. #19 `feat/#19-claude-code-hook-poc` 생성, #18의 Pi 기준선 커밋 cherry-pick(`project-status` 충돌은 #18 쪽 내용으로 해결).
+50. `tests/poc/claude` 하네스 작성: 임시 작업공간, `--setting-sources project` + 임시 `--settings` Hook, `stream-json` 구조 축약, 부모 세션 `CLAUDE*` 환경 변수 제거, Hook 장애 주입 옵션.
+51. 합성 실행 10회(basic 3, 장애 주입 2, 병렬 하위 에이전트 3, 권한 거부 2). 전부 exit 0, 사용자 설정 SHA-256 무변경, 결과 원문 패턴 0건, 총 비용 약 $0.20.
+52. 공식 Hooks 문서와 대조해 `prompt_id`·`effort`·`background_tasks`·`duration_ms`가 문서화된 필드임을 확인하고 보고서·프로브 허용 필드 목록을 보정.
+53. 최종 프로브로 `basic` 1회 재실행해 같은 결과·미등록 필드 0 확인.
+54. 프로브 회귀 테스트 7개 추가, Python 3.13 컨테이너에서 pytest 34개·Ruff·mypy 통과.
 
-## 직전 완료 변경 요약(#17)
+## 이번 변경 요약(#19)
+
+- [Claude Code Hook·JSONL 실측 보고서](poc/claude-code-hooks.md)와 [`tests/poc/claude`](../tests/poc/claude/README.md) 하네스.
+- 관측: 시작·턴·도구 전/후·하위 에이전트 시작/종료·권한 요청·Stop·종료. 미관측: `Notification`, `PostToolUseFailure`, compact, `PermissionDenied`, `StopFailure`.
+- 핵심 결정: `tool_use_id`가 Hook·stream·transcript에서 일치. 하위 에이전트는 `agent_id`로만 생성. `Stop`·`Agent` `PostToolUse`는 유휴·하위 종료 근거가 아님. Hook timeout은 짧게 명시하고 exit 2를 쓰지 않음.
+- 호환성 범위: Linux arm64, `-p`, 2.1.308 한정. 대화형 TUI·승인 대기·Windows/macOS는 미실측.
+
+## 이전 완료 변경 요약(#17)
 
 - 원문 없이 Hook 입력·Codex JSONL·합성 transcript 구조만 축약하는 PoC 하네스.
 - 민감 값·경로 미보존, fail-open, transcript 범위 제한 회귀 테스트 3개.
@@ -129,21 +169,25 @@
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
 | GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자·대화 해결·strict `CI Gate` 활성, 승인 0, force-push·삭제 비활성 |
-| GitHub Actions 원격 CI | 통과 | PR #81 run `39889981917`: Python·Node·Go·Compose·Secret Scan과 `CI Gate` 모두 성공 |
+| GitHub Actions 원격 CI | 통과 | PR #81 최신 run `39890099009`: Python·Node·Go·Compose·Secret Scan과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
-| Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
+| 실제 Claude Code Hook 이벤트 | 부분 통과 | Pi Linux arm64, 2.1.308 `-p` 합성 10회: 9종 관측, 반복 재현, `tool_use_id`·`agent_id` 상관관계 일치; 대화형·승인 대기 미실측. 상세 #19 보고서 |
+| Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: #19 포함 pytest 34개 통과(Starlette deprecation 경고 1개), Ruff lint·format, server mypy, Claude 프로브 mypy strict 통과. 호스트에는 pytest·`python3-venv` 없음 |
+| Pi 호스트 Node·Go·Compose 회귀 | 미실행 | Node·Go 호스트 미설치, 컨테이너 재검증은 다음 Issue 착수 시 수행 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
 | diff 공백·비밀·개인 경로 검사 | 통과 | `git diff --check`, 대표 비밀/절대경로 패턴 일치 0 |
 | 마스터 사양 기준선 | 통과 | 외부 원본과 저장소 사본 44,535바이트·SHA-256 일치, 요구사항 범위·문서 링크 테스트 3개 통과 |
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. `feat/#18-codex-desktop-poc`에 PR #81이 반영된 최신 `develop` 기준선을 병합하고 #18을 재개한다.
-2. 사용자 또는 수동 운영자가 별도 합성 Desktop 세션을 직접 실행할 수 있는지 확인한다. Computer Use로 Codex UI를 자동화하지 않는다.
-3. 수동 실행이 가능하면 #17 프로브를 Desktop이 연 임시 작업공간에 연결하되 Hook 정의·신뢰 동작은 운영자가 직접 검토한다.
-4. 시작·턴·안전한 읽기 도구·승인·하위 에이전트·종료를 하나씩 수행하고 관측/미관측을 구조 통계로만 기록한다.
-5. 수동 실행이 불가능하면 #18에 미실행 사유를 남기고, #21 app-server의 허용된 비-UI 관측으로 확인 가능한 범위를 별도 검증한다.
+1. #19 PR의 `CI Gate` 결과를 확인한다: `gh pr checks <PR 번호> --watch`. 실패하면 로그를 보고 수정 커밋을 올린다.
+2. 소유자 승인 후 `gh pr merge <PR 번호> --merge`로 `develop`에 병합하고, `gh issue close 19`와 Epic #2 체크리스트(#19 체크)를 갱신한다.
+3. #56 시작: `git switch develop && git pull --ff-only && git switch -c feat/#56-multiarch-images`.
+4. #56 실측: Pi에서 `docker compose -f deploy/compose.yaml config --quiet`, `docker compose -f deploy/compose.yaml build`, 기동, `curl` health를 확인한다. 8000 포트 충돌은 이 Pi에서 다시 확인한다. 빌드 시간·메모리, SD 카드 볼륨 위치를 기록하고 테스트 컨테이너·볼륨은 정리한다.
+5. #56 범위의 GHCR 멀티아키텍처 빌드(`docker buildx`)와 Actions 연동은 push·공개 영향이 있으므로 소유자 승인 전에는 workflow 작성과 로컬 검증까지만 한다.
+6. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때 #17 프로브(`tests/poc/codex`)로 시작·턴·도구·승인·하위 에이전트·종료를 구조 통계로만 기록한다. 소유자에게 전달한 데스크톱용 지시문은 #18 Issue 댓글의 재개 조건을 따른다.
+7. #19 후속(별도 Issue 후보): 대화형 TUI 세션에서 승인 대기·`Notification`·중단·compact 관측. 자동화 금지 원칙상 소유자가 직접 조작해야 한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -151,7 +195,11 @@
 - 마스터 프롬프트 v0.8 저장소 사본은 불변 기준선이다. 수정이 필요하면 기존 파일을 고치지 않고 Issue·ADR과 새 버전 파일을 추가한다.
 - 호스트 Go는 없지만 공식 Go 컨테이너로 현재 모듈 검증을 완료했다.
 - 로컬 8000 포트가 이미 사용 중이어서 Compose smoke test는 18000/15173 포트로 수행했다.
-- Claude CLI가 없어 관련 검증은 수행할 수 없다.
+- Windows PC에는 Claude CLI가 없었다. #19 결과는 Pi(Linux arm64) `-p` 모드에 한정되며 Windows/macOS·대화형 지원으로 확장하지 않는다.
+- #19 실행으로 Claude Code가 관리하는 합성 프로젝트 transcript 디렉터리 11개가 `~/.claude/projects/`에 생성됐다. 원본 도구 기록 삭제 금지 원칙에 따라 그대로 두었으며 실제 사용자 내용은 없다.
+- Claude Code Hook 입력의 `background_tasks`·`session_crons`에는 작업 설명·명령·프롬프트 원문이 들어갈 수 있다. #31·#32 어댑터에서 상태·개수 외 값은 폐기해야 한다.
+- Claude Hook 기본 타임아웃은 600초이며 동기 Hook 지연이 그대로 세션 지연이 된다. #31 Hook 설치 시 짧은 `timeout` 명시가 필수다.
+- Pi 루트 파일시스템이 SD 카드다. 운영 PostgreSQL 데이터와 백업 위치는 SSD 또는 외부 저장소 결정 전까지 확정하지 않는다.
 - 기존 사용자 Codex DB/JSONL 원문은 읽지 않았다. #17에서는 Hook이 직접 제공한 합성 세션 transcript만 구조 키·개수로 축약했으며 원문은 저장소에 남기지 않았다.
 - #17 실행으로 Codex가 관리하는 합성 세션 transcript 8개가 사용자 Codex 상태에 생성됐다. 원본 도구 기록을 임의 삭제하지 않는 원칙에 따라 그대로 두었으며 실제 사용자 내용은 없다.
 - Codex CLI 0.162.0-alpha.17.2에서 inline `PostToolUse`가 네 번 모두 미관측이었다. 공식 문서와 차이가 있으므로 이 버전의 Hook만으로 `tool.completed`를 만들지 않는다.

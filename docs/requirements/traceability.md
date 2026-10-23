@@ -49,3 +49,15 @@
 | POC-CDX-003 | EVT-004~005 도구·상태 진실성 | `PreToolUse` 관측, `PostToolUse` 반복 미관측을 지원 제한으로 명시 |
 | POC-CDX-004 | EVT-007 프라이버시 | 원문 미저장, 허용 필드 타입·HMAC만 보존하는 프로브 회귀 테스트 |
 | POC-CDX-005 | EVT-002·006·008 중복·시간·유휴 | 단일 실행 중복 0 확인; 교차 소스 중복·유휴는 #20 후속 범위로 명시 |
+
+## Claude Code PoC 검증 매핑
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| POC-CLD-001 | COL-003~006 Hook·로컬 기록 관측 | Raspberry Pi 5 Linux arm64, Claude Code 2.1.308 합성 `-p` 실행 10회와 구조 축약 보고서 |
+| POC-CLD-002 | EVT-003 세션·턴 경계 | `SessionStart`/`UserPromptSubmit`/`Stop`/`SessionEnd`, `prompt_id` 상관관계, 하위 에이전트 알림 턴 기록 |
+| POC-CLD-003 | EVT-004 부모-자식 관계 | 병렬 하위 에이전트 2개 × 3회, Hook `agent_id`와 하위 transcript `agentId` 일치 |
+| POC-CLD-004 | EVT-005 도구·상태 진실성 | `PreToolUse`·`PostToolUse` `tool_use_id` 일치, `PermissionRequest` 자동 거부, 대화형 승인 대기 미검증 명시 |
+| POC-CLD-005 | EVT-007 프라이버시 | 원문 미저장·stdout 없음·`~/.claude` 밖 transcript 미열람 프로브 회귀 테스트 7개, 결과 원문 패턴 0건 |
+| POC-CLD-006 | COL-004 비침습 Hook | 비정상 종료·타임아웃 장애 주입에서 Claude 정상 완료, 사용자 설정 SHA-256 무변경 |
+| POC-CLD-007 | EVT-002·008 중복·유휴 | Hook·stream·transcript `tool_use_id` 일치, transcript 블록 중복 관측; `Stop` 단독 유휴 판정 금지. 교차 중복은 #20 |
