@@ -2,22 +2,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import secrets
 import uuid
 
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine
 
-from agent_office.api.deps import CSRF_HEADER, SESSION_COOKIE
+from agent_office.auth.sessions import CSRF_HEADER, SESSION_COOKIE, csrf_token_for, issue_session
 from agent_office.db import schema
-
-CSRF = {CSRF_HEADER: "1"}
 
 
 def sign_in(engine: Engine, status: str = "active") -> tuple[uuid.UUID, str]:
-    """#25 전까지 로그인 세션은 테스트가 직접 만든다(토큰 해시만 저장)."""
-    token = secrets.token_urlsafe(32)
+    """#23 로그인 전까지 사용자는 테스트가 만들고, 세션은 실제 발급 함수로 만든다."""
     with engine.begin() as connection:
         user_id: uuid.UUID = connection.execute(
             schema.users.insert()
@@ -28,14 +24,12 @@ def sign_in(engine: Engine, status: str = "active") -> tuple[uuid.UUID, str]:
             )
             .returning(schema.users.c.id)
         ).scalar_one()
-        connection.execute(
-            schema.login_sessions.insert().values(
-                user_id=user_id,
-                token_hash=hashlib.sha256(token.encode()).digest(),
-                expires_at=text("now() + interval '1 hour'"),
-            )
-        )
+        token = issue_session(connection, user_id)
     return user_id, token
+
+
+def csrf(session: str) -> dict[str, str]:
+    return {CSRF_HEADER: csrf_token_for(session)}
 
 
 def session_cookie(token: str) -> dict[str, str]:
@@ -48,7 +42,7 @@ def bearer(token: str) -> dict[str, str]:
 
 def new_code(client: TestClient, session: str) -> str:
     response = client.post(
-        "/api/v1/devices/registration-codes", headers={**CSRF, **session_cookie(session)}
+        "/api/v1/devices/registration-codes", headers={**csrf(session), **session_cookie(session)}
     )
     assert response.status_code == 201, response.text
     return str(response.json()["code"])
