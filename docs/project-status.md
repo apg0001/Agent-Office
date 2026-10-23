@@ -13,7 +13,7 @@
 - 활성 작업: #16 `EP-01/ISS-04 자동 테스트·CI 기초 및 익명 fixture 생성`
 - 브랜치: `chore/#16-ci-foundation`
 - 기준 브랜치: `develop` (`3da0665`, PR #77 병합 결과)
-- 상태: Python·Node·Go·Compose·Gitleaks와 단일 `CI Gate` workflow 구현, 로컬 재현 통과, GitHub-hosted 실행 전
+- 상태: CI workflow의 첫 GitHub-hosted 전체 실행 통과, `main`·`develop` 필수 `CI Gate` 적용 완료, PR #78 후속 문서 commit·최종 CI 대기
 - 직전 완료: #15, PR https://github.com/apg0001/Agent-Office/pull/77, merge commit `3da0665`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음
@@ -87,6 +87,8 @@
 24. Gitleaks 8.30.1로 전체 Git 이력 6개 commit을 스캔해 비밀 0건 확인.
 25. actionlint 1.7.12로 workflow 문법·표현식을 검사하고 CI에서는 동일 이미지를 digest로 고정.
 26. 병렬 로컬 검사 직후 Vite `dist/index.html` 잠금으로 `EPERM`이 1회 발생했으나 잔류 Vite 프로세스가 없음을 확인하고 단독 build 재실행에 성공. GitHub Linux runner에는 해당 Windows 파일 잠금이 적용되지 않음.
+27. PR #78 GitHub Actions run `39887244474`에서 Python·Node·Go·Compose·Secret Scan과 집계 `CI Gate` 모두 통과.
+28. `main`·`develop` 보호 규칙에 strict 필수 상태 검사 `CI Gate`를 추가하고 GitHub API로 두 브랜치 설정을 재조회해 확인.
 
 ## 직전 완료 변경 요약(#15)
 
@@ -109,8 +111,8 @@
 | Docker image build | 통과 | FastAPI server와 React/nginx web 이미지 빌드 성공 |
 | Compose 실제 기동/health | 통과 | PostgreSQL·server healthy, API health JSON 확인, web HTTP 200·title 확인 |
 | 저장소 메타데이터 검사 | 통과 | Issue 폼 4개·보안 문의 링크·PR 필수 섹션을 pytest로 검증 |
-| GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자 적용·대화 해결 활성, 승인 0, 필수 상태 검사 없음, force-push·삭제 비활성 |
-| GitHub Actions 원격 CI | 미실행 | workflow push/PR 전. PR에서 실제 job 결과를 확인해야 함 |
+| GitHub 브랜치 보호 | 통과 | `main`·`develop`: 관리자·대화 해결·strict `CI Gate` 활성, 승인 0, force-push·삭제 비활성 |
+| GitHub Actions 원격 CI | 통과 | PR #78 run `39887244474`: 하위 5개 job과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex Hook 이벤트 | 미실행 | #17, #18 |
 | Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
@@ -119,11 +121,11 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. CI 문서·workflow·검사 diff와 민감 패턴을 최종 리뷰한다.
-2. #16 초기 커밋을 push하고 `develop` 대상 PR을 생성해 GitHub-hosted 다섯 job과 `CI Gate` 결과를 확인한다.
-3. 실패하면 실제 로그 근거로 수정하고, 모두 통과하면 `main`·`develop` 보호 규칙의 필수 상태 검사에 정확한 `CI Gate` context를 추가한다.
-4. 보호 규칙 API 재조회 결과와 PR 번호를 문서에 반영해 후속 커밋을 push하고 최종 CI를 다시 통과시킨다.
-5. 병합 후 #16·Epic #1을 종료하고 #17 Codex Hook 안전 PoC를 시작한다.
+1. 보호 규칙과 원격 run 근거를 반영한 후속 문서 commit을 push한다.
+2. 최신 commit에서 GitHub-hosted 다섯 job과 필수 `CI Gate`가 다시 통과하는지 확인한다.
+3. PR #78 자체 리뷰 후 보호 규칙을 통과해 `develop`에 병합한다.
+4. #16과 상위 Epic #1 체크리스트를 완료 처리하고 Epic 완료 조건을 대조한다.
+5. `develop`을 갱신한 뒤 #17 Codex Hook 안전 PoC를 시작한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -134,5 +136,4 @@
 - Codex 로컬 DB/JSONL 원문은 민감정보 보호를 위해 아직 읽지 않았다. #17/#18에서 스키마 키와 안전한 합성 fixture만 추출한다.
 - 이벤트 v1은 payload 계약만 확정했으며 수집 엔드포인트·인증·DB 영속화는 아직 없다. 부모 참조 존재·순환, 자격증명과 `device_id` 일치, 같은 `event_id`의 내용 충돌은 서버 구현에서 검증해야 한다.
 - 현재 provider/event enum은 마스터 프롬프트 기반 기준선이다. #17~#21 실제 PoC에서 새 값이 필요하면 원문을 통과시키지 말고 `unknown`을 사용한 뒤 버전형 계약 변경으로 심사한다.
-- #16 workflow는 아직 GitHub-hosted runner에서 실행 전이다. 로컬 통과만으로 원격 CI 성공을 주장하지 않는다.
 - Wails, Pi 실장비, macOS/Linux, 코드 서명·공증, SMTP/OAuth, 외부 Heartbeat는 각각 등록된 후속 이슈에서 결정한다.

@@ -17,6 +17,8 @@
 
 GitHub Action은 릴리스 태그 이름이 아니라 40자리 commit SHA로 고정하고 주석에 확인한 버전을 남깁니다. 업데이트할 때는 공식 릴리스와 commit SHA를 확인하고 별도 Issue/PR에서 전체 CI를 다시 실행합니다.
 
+`main`과 `develop` 보호 규칙은 최신 기준 브랜치와 동기화된 `CI Gate` 성공을 필수로 요구합니다. 하위 job 이름은 진단용이며 보호 규칙 context는 `CI Gate` 하나로 고정합니다.
+
 ## 로컬 재현
 
 ```powershell
