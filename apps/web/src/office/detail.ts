@@ -47,12 +47,20 @@ export function detailFromState(state: OfficeState, agentId: string): AgentDetai
   };
 }
 
+export function detailPath(agentId: string, teamId: string | null = null): string {
+  const agent = encodeURIComponent(agentId);
+  return teamId
+    ? `/api/v1/teams/${encodeURIComponent(teamId)}/office/agents/${agent}`
+    : `/api/v1/office/agents/${agent}`;
+}
+
 export async function fetchAgentDetail(
   agentId: string,
   fetcher: typeof fetch = fetch,
+  teamId: string | null = null,
 ): Promise<AgentDetail | null> {
   try {
-    const response = await fetcher(`/api/v1/office/agents/${encodeURIComponent(agentId)}`, {
+    const response = await fetcher(detailPath(agentId, teamId), {
       credentials: "same-origin",
     });
     return response.ok ? ((await response.json()) as AgentDetail) : null;

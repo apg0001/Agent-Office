@@ -5,7 +5,7 @@ import { AgentPanel } from "./AgentPanel";
 import { deskRowsFor } from "./behavior";
 import { detailFromState, fetchAgentDetail, type AgentDetail } from "./detail";
 import { createDefaultOffice } from "./grid";
-import { connectLive, hasSession } from "./liveSource";
+import { connectLive, hasSession, scopeFromSearch } from "./liveSource";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
 import type { DataSource, OfficeState } from "./types";
 
@@ -13,8 +13,49 @@ import type { DataSource, OfficeState } from "./types";
  * 사무실 화면. 로그인 세션이 있으면 서버 실시간 상태를, 없으면 합성 데이터를 그린다.
  * Phaser는 브라우저에서만 지연 로드한다(테스트 환경에서 캔버스를 쓰지 않도록).
  */
+interface TeamOption {
+  id: string;
+  name: string;
+}
+
+/** 내 사무실과 내가 속한 팀 사무실 중 하나를 고른다. 바꾸면 그 범위로 다시 연결한다. */
+function ScopePicker({ team }: { team: string | null }) {
+  const [teams, setTeams] = useState<TeamOption[]>([]);
+
+  useEffect(() => {
+    void fetch("/api/v1/teams", { credentials: "same-origin" })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((list: TeamOption[]) => setTeams(list))
+      .catch(() => setTeams([]));
+  }, []);
+
+  if (teams.length === 0) {
+    return null;
+  }
+  return (
+    <label className="scope-picker">
+      사무실{" "}
+      <select
+        value={team ?? ""}
+        onChange={(event) => {
+          const value = event.target.value;
+          window.location.assign(value ? `/?team=${encodeURIComponent(value)}` : "/");
+        }}
+      >
+        <option value="">내 사무실</option>
+        {teams.map((option) => (
+          <option key={option.id} value={option.id}>
+            팀: {option.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function OfficeView() {
   const host = useRef<HTMLDivElement>(null);
+  const [team] = useState(() => (typeof window === "undefined" ? null : scopeFromSearch(window.location.search)));
   const [source, setSource] = useState<DataSource>("synthetic");
   const [online, setOnline] = useState(false);
   const [autoFocus, setAutoFocus] = useState(true);
@@ -71,7 +112,7 @@ export function OfficeView() {
       };
       if (live) {
         setSource("server");
-        const handle = connectLive(show, setOnline);
+        const handle = connectLive(show, setOnline, team);
         stop = handle.close;
         return;
       }
@@ -100,7 +141,7 @@ export function OfficeView() {
       return undefined;
     }
     let current = true;
-    void fetchAgentDetail(selected).then((detail) => {
+    void fetchAgentDetail(selected, fetch, team).then((detail) => {
       if (current) {
         setRemote(detail);
       }
@@ -108,7 +149,7 @@ export function OfficeView() {
     return () => {
       current = false;
     };
-  }, [source, selected, changeSeq]);
+  }, [source, selected, changeSeq, team]);
   // 실시간 상태가 최신이므로 기본 정보는 로컬, 타임라인·계획만 서버 응답을 쓴다.
   const detail =
     local && remote?.agent.id === local.agent.id
@@ -122,9 +163,13 @@ export function OfficeView() {
           합성 데이터(데모) — 실제 관측이 아닙니다
         </p>
       ) : (
-        <p className="live-badge" role="status">
-          {online ? "실시간 연결됨" : "서버 연결 끊김 — 재접속 중"}
-        </p>
+        <>
+          <p className="live-badge" role="status">
+            {online ? "실시간 연결됨" : "서버 연결 끊김 — 재접속 중"}
+            {team ? " · 팀 사무실(공유된 프로젝트만)" : ""}
+          </p>
+          <ScopePicker team={team} />
+        </>
       )}
       <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>
       {!autoFocus && (

@@ -35,6 +35,8 @@ export interface SessionState {
   last_event_at: string | null;
   /** 개인 사무실 책상 번호(서버가 배정·재사용, #48). 퇴근 후 반납되면 null. */
   desk_slot: number | null;
+  /** 사용자가 지정한 프로젝트. 팀에 공유된 프로젝트의 세션만 팀 사무실에 나온다(#54). */
+  project_id?: string | null;
   change_seq: number;
 }
 
