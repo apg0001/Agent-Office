@@ -10,13 +10,15 @@
 
 ## 현재 위치
 
-- 활성 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
-- 브랜치: `feat/#18-codex-desktop-poc`
+- 보류 작업: #18 `EP-02/ISS-02 Codex Desktop 세션·도구·하위 에이전트 이벤트 실측`
+- 브랜치: `feat/#18-codex-desktop-poc` (`develop` `9145d8c` 병합 완료, PR 없음)
 - 기준 브랜치: `develop` (`9145d8c`, PR #81 병합 결과)
-- 상태: 최신 기준선 병합 중. 공식 OpenAI app-server 프로토콜을 이용한 비-UI 관측 범위 검증 착수
+- 상태: **#18 보류(소유자 결정, 2026-10-23).** 작업 호스트가 Windows PC에서 Raspberry Pi 5(Linux arm64)로 바뀌었고, Pi에는 Codex Desktop이 없으며 Desktop UI 자동화도 금지돼 있어 실측할 수 없음. app-server 비-UI 관측은 #18이 아니라 #21 범위로 둠
+- 재개 조건: Codex Desktop이 설치된 PC에서 소유자 또는 수동 운영자가 합성 세션을 직접 조작할 수 있을 때
 - 직전 완료: #80, PR https://github.com/apg0001/Agent-Office/pull/81, merge commit `9145d8c`
 - 배포/릴리스: 수행하지 않음
 - 실제 사용자 수집: 수행하지 않음. 합성 Codex CLI 세션만 실행
+- 호스트 전환: 이 Raspberry Pi가 이후 서비스 호스팅 서버가 될 예정(소유자 안내). 아래 환경 기준선 참고
 
 ## GitHub 연결과 백로그
 
@@ -45,6 +47,24 @@
 | EP-12 Notification Providers | #12 | #70~#74 |
 
 ## 환경 기준선
+
+### 현재 호스트: Raspberry Pi 5 (2026-10-23 확인, 서버 호스팅 예정)
+
+| 도구 | 확인 결과 |
+|---|---|
+| 하드웨어/OS | Raspberry Pi 5, RAM 7.7GiB, Ubuntu 24.04.5 LTS, kernel 6.8.0-1065-raspi, aarch64 |
+| 저장소 | 루트가 SD 카드(`mmcblk0p2`, 29G 중 14G 여유). 사양의 PostgreSQL SSD 권장 미충족, #56·#58·#63에서 결정 필요 |
+| Git | 2.43.0 |
+| GitHub CLI | 2.103.0, `apg0001` 재인증 완료(scope `repo`·`workflow`·`read:org`·`gist`) |
+| Python | 3.12.3 (CI·이전 기준선 3.13과 다름) |
+| Node/npm | 호스트 미설치 |
+| Go | 호스트 미설치; 이전처럼 공식 Go 컨테이너로 검증 가능 |
+| Docker/Compose | 29.9.2 / v5.6.1, 사용자 `docker` 그룹 소속, 실행 중인 컨테이너 없음 |
+| Codex CLI | 0.163.0 (Linux arm64, 미실측) |
+| Codex Desktop | 미설치 |
+| Claude Code | 2.1.308 (Linux arm64, 이벤트 미실측. #19 대상) |
+
+### 이전 호스트: Windows 개발 PC (#13~#17, #80 수행 환경)
 
 | 도구 | 확인 결과 |
 |---|---|
@@ -106,6 +126,8 @@
 43. 외부 마스터 프롬프트에 대표 비밀·개인 절대경로 패턴이 없음을 확인하고 44,535바이트 원문을 변경 없이 `docs/specifications`에 복사.
 44. 원본·저장소 사본 SHA-256 `76bf1febe43afa60072e11f232885709e24f4a4fb619067935426adfafd4c17b` 일치, 14개 요구사항 범위와 문서 링크를 검사하는 테스트 3개 추가.
 45. PR #81 최신 GitHub Actions run `39890099009`의 Python·Node·Go·Compose·Secret Scan과 필수 `CI Gate` 전체 통과 후 `develop` 병합, #80 종료.
+46. (Claude Code, Raspberry Pi 5) 작업 호스트 전환을 확인하고 OS·도구·Docker·GitHub 인증 상태를 읽기 전용으로 점검. `gh` 토큰 무효 확인 후 소유자가 재인증.
+47. 소유자 결정에 따라 #18을 보류로 전환. Pi에는 Codex Desktop이 없고 UI 자동화가 금지돼 있으므로 app-server 비-UI 관측은 #21로 분리. 테스트·실측은 수행하지 않음.
 
 ## 직전 완료 변경 요약(#17)
 
@@ -132,18 +154,23 @@
 | GitHub Actions 원격 CI | 통과 | PR #81 최신 run `39890099009`: Python·Node·Go·Compose·Secret Scan과 `CI Gate` 모두 성공 |
 | Gitleaks 전체 이력 | 통과 | 8.30.1 컨테이너로 6 commit·약 136KB 검사, leak 0 |
 | 실제 Codex CLI Hook 이벤트 | 부분 통과 | inline 합성 실행 4회: 5종 관측, 중복 0, `PostToolUse` 미관측; 상세 #17 보고서 |
-| Claude 이벤트 | 미실행 | Claude CLI 미설치, #19 |
+| Claude 이벤트 | 미실행 | Pi에 Claude Code 2.1.308 설치 확인, 실측 미실행. #19 |
+| Pi 호스트 Python 회귀 | 통과 | `python:3.13-slim`(arm64) 컨테이너: pytest 27개 통과(Starlette deprecation 경고 1개), Ruff lint 통과. 호스트에는 pytest·`python3-venv` 없음 |
+| Pi 호스트 Node·Go·Compose 회귀 | 미실행 | Node·Go 호스트 미설치, 컨테이너 재검증은 다음 Issue 착수 시 수행 |
 | npm audit / pip check | 통과 | 취약점 0, 깨진 Python 의존성 0 |
 | diff 공백·비밀·개인 경로 검사 | 통과 | `git diff --check`, 대표 비밀/절대경로 패턴 일치 0 |
 | 마스터 사양 기준선 | 통과 | 외부 원본과 저장소 사본 44,535바이트·SHA-256 일치, 요구사항 범위·문서 링크 테스트 3개 통과 |
 
 ## 다음 에이전트가 바로 수행할 작업
 
-1. 공식 app-server의 stable 프로토콜과 로컬 CLI 구현에서 시작·턴·도구·승인·하위 에이전트·종료 알림의 비-UI 관측 가능 범위를 확인한다.
-2. 실제 Codex Desktop 설치·프로세스 버전과 공개된 통합 표면을 원문 로그 접근 없이 읽기 전용으로 확인한다.
-3. Desktop 전용임을 입증할 수 없는 app-server 결과는 일반 Codex harness 관측으로 분리하고 Desktop 지원을 주장하지 않는다.
-4. 사용자/수동 운영자가 별도 합성 Desktop 세션을 실행할 수 있으면 #17 프로브와 연결하고, 불가능하면 정확한 미실행 사유와 수동 절차를 남긴다.
-5. CLI #17과 Desktop 결과의 공유 여부를 값이 아닌 경로 템플릿·HMAC으로만 비교하고 개인정보 회귀 테스트·호환성 보고서를 갱신한다.
+1. `gh auth status`로 인증을 확인한다(2026-10-23 소유자 재인증 완료, scope `repo`·`workflow`).
+2. #18 보류 기록은 브랜치 push와 Issue 댓글로 반영했다. #18은 닫지 않는다.
+3. `develop`에 인수인계를 반영해야 하면 #18 브랜치를 그대로 병합하지 말고, 상태 문서만 담은 `docs/#<새 번호>-...` Issue·브랜치·PR을 따로 만든다.
+4. 소유자 지시를 받은 뒤 다음 Issue를 시작한다. Pi에서 할 수 있는 후보는 아래 두 가지다.
+   - #19 Claude Code PoC: `git switch develop && git pull --ff-only && git switch -c feat/#19-claude-code-hook-poc`. 임시 작업공간과 `claude -p --settings <임시 파일>` inline Hook만 사용하고 `~/.claude/settings.json`은 수정하지 않는다. 합성 세션의 Claude 사용량은 소유자 승인을 받는다.
+   - #56 ARM64 Docker: `git switch -c feat/#56-multiarch-images` 후 `docker compose -f deploy/compose.yaml build`, 기동, health를 Pi에서 실측한다.
+5. 다른 Issue에 착수하기 전 Pi에서 `python3 -m pytest`와 Go·Node 검사를 컨테이너로 다시 실행하고 결과를 이 문서에 기록한다.
+6. #18 재개: Codex Desktop이 설치된 PC에서 소유자가 합성 세션을 직접 조작할 수 있을 때 #17 프로브(`tests/poc/codex`)로 시작·턴·도구·승인·하위 에이전트·종료를 구조 통계로만 기록한다.
 
 ## 알려진 위험과 결정 대기
 
@@ -151,7 +178,8 @@
 - 마스터 프롬프트 v0.8 저장소 사본은 불변 기준선이다. 수정이 필요하면 기존 파일을 고치지 않고 Issue·ADR과 새 버전 파일을 추가한다.
 - 호스트 Go는 없지만 공식 Go 컨테이너로 현재 모듈 검증을 완료했다.
 - 로컬 8000 포트가 이미 사용 중이어서 Compose smoke test는 18000/15173 포트로 수행했다.
-- Claude CLI가 없어 관련 검증은 수행할 수 없다.
+- Windows PC에는 Claude CLI가 없었다. Pi에는 Claude Code 2.1.308이 있으므로 #19는 Pi(Linux arm64)에서만 실측 가능하며, 그 결과를 Windows/macOS 지원으로 확장하지 않는다.
+- Pi 루트 파일시스템이 SD 카드다. 운영 PostgreSQL 데이터와 백업 위치는 SSD 또는 외부 저장소 결정 전까지 확정하지 않는다.
 - 기존 사용자 Codex DB/JSONL 원문은 읽지 않았다. #17에서는 Hook이 직접 제공한 합성 세션 transcript만 구조 키·개수로 축약했으며 원문은 저장소에 남기지 않았다.
 - #17 실행으로 Codex가 관리하는 합성 세션 transcript 8개가 사용자 Codex 상태에 생성됐다. 원본 도구 기록을 임의 삭제하지 않는 원칙에 따라 그대로 두었으며 실제 사용자 내용은 없다.
 - Codex CLI 0.162.0-alpha.17.2에서 inline `PostToolUse`가 네 번 모두 미관측이었다. 공식 문서와 차이가 있으므로 이 버전의 Hook만으로 `tool.completed`를 만들지 않는다.
