@@ -9,7 +9,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from helpers import CSRF, bearer, new_code, register, session_cookie, sign_in
+from helpers import bearer, csrf, new_code, register, session_cookie, sign_in
 from sqlalchemy import Engine, select, text, update
 
 from agent_office.db import schema
@@ -101,7 +101,7 @@ def test_registration_code_is_single_use_and_expires(client: TestClient, engine:
 def test_user_endpoints_require_session_and_csrf_header(client: TestClient, engine: Engine) -> None:
     _, session = sign_in(engine)
 
-    no_session = client.post("/api/v1/devices/registration-codes", headers=CSRF)
+    no_session = client.post("/api/v1/devices/registration-codes", headers=csrf(session))
     no_csrf = client.post("/api/v1/devices/registration-codes", headers=session_cookie(session))
     forged = client.get("/api/v1/devices", headers=session_cookie("forged"))
 
@@ -141,7 +141,7 @@ def test_open_registration_codes_are_limited(client: TestClient, engine: Engine)
         new_code(client, session)
 
     response = client.post(
-        "/api/v1/devices/registration-codes", headers={**CSRF, **session_cookie(session)}
+        "/api/v1/devices/registration-codes", headers={**csrf(session), **session_cookie(session)}
     )
 
     assert response.status_code == 429
@@ -193,9 +193,16 @@ def test_self_revoke_and_owner_revoke(client: TestClient, engine: Engine) -> Non
     # 다른 사용자는 내 장치를 보거나 폐기할 수 없고 존재 여부도 알 수 없다.
     path = f"/api/v1/devices/{second['device_id']}/revoke"
     assert client.get("/api/v1/devices", headers=session_cookie(other_session)).json() == []
-    assert client.post(path, headers={**CSRF, **session_cookie(other_session)}).status_code == 404
+    assert (
+        client.post(
+            path, headers={**csrf(other_session), **session_cookie(other_session)}
+        ).status_code
+        == 404
+    )
     assert client.post(path, headers=session_cookie(session)).status_code == 403
-    assert client.post(path, headers={**CSRF, **session_cookie(session)}).status_code == 204
+    assert (
+        client.post(path, headers={**csrf(session), **session_cookie(session)}).status_code == 204
+    )
     assert (
         client.post(
             "/api/v1/devices/heartbeat", json={}, headers=bearer(second["device_token"])

@@ -9,14 +9,13 @@ from typing import Annotated
 from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy import Connection, func, or_, select
 
+from agent_office.auth import sessions as session_service
+from agent_office.auth.sessions import CSRF_HEADER, SESSION_COOKIE
 from agent_office.db import schema
 from agent_office.db.engine import get_connection
-from agent_office.security import DEVICE_TOKEN_PREFIX, token_hash
+from agent_office.security import DEVICE_TOKEN_PREFIX, constant_time_equal, token_hash
 
-SESSION_COOKIE = "ao_session"
-# #25에서 CSRF 토큰을 도입하기 전까지 쿠키 인증 쓰기 요청에 요구하는 헤더.
-# 교차 사이트 폼·단순 요청은 사용자 정의 헤더를 보낼 수 없고, 서버는 CORS를 열지 않는다.
-CSRF_HEADER = "X-Agent-Office-Request"
+__all__ = ["CSRF_HEADER", "SESSION_COOKIE"]
 
 # 커밋이 끝난 뒤에 응답을 보낸다. 기본 scope("request")는 응답 후 커밋해서,
 # 커밋이 실패해도 클라이언트가 이미 토큰을 받는 일이 생길 수 있다.
@@ -27,6 +26,8 @@ DbConnection = Annotated[Connection, Depends(get_connection, scope="function")]
 class CurrentUser:
     id: uuid.UUID
     instance_role: str
+    session_id: uuid.UUID
+    csrf_token: str
 
 
 @dataclass(frozen=True)
@@ -49,29 +50,36 @@ def current_user(
     connection: DbConnection,
     session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> CurrentUser:
-    """브라우저 세션 검증만 한다. 세션 발급·로그아웃은 #25 범위다."""
+    """브라우저 세션을 검증한다. 폐기·절대 만료·유휴 만료·비활성 사용자를 모두 거부한다."""
     if not session_token or len(session_token) > 256:
         raise _unauthorized()
     sessions, users = schema.login_sessions, schema.users
     row = connection.execute(
-        select(users.c.id, users.c.instance_role)
+        select(sessions.c.id.label("session_id"), users.c.id, users.c.instance_role)
         .select_from(sessions.join(users, users.c.id == sessions.c.user_id))
         .where(
             sessions.c.token_hash == token_hash(session_token),
-            sessions.c.revoked_at.is_(None),
-            sessions.c.expires_at > func.now(),
+            *session_service.active_session_filter(),
             users.c.status == "active",
         )
     ).one_or_none()
     if row is None:
         raise _unauthorized()
-    return CurrentUser(id=row.id, instance_role=row.instance_role)
+    session_service.touch(connection, row.session_id)
+    return CurrentUser(
+        id=row.id,
+        instance_role=row.instance_role,
+        session_id=row.session_id,
+        csrf_token=session_service.csrf_token_for(session_token),
+    )
 
 
-def require_csrf_header(
-    marker: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
+def require_csrf(
+    user: Annotated[CurrentUser, Depends(current_user)],
+    token: Annotated[str | None, Header(alias=CSRF_HEADER)] = None,
 ) -> None:
-    if marker != "1":
+    """쿠키 인증 쓰기 요청은 세션에서 유도한 CSRF 토큰을 헤더로 보내야 한다."""
+    if not token or not constant_time_equal(token.encode(), user.csrf_token.encode()):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="csrf_required")
 
 
@@ -115,4 +123,4 @@ def current_device(
 
 UserDep = Annotated[CurrentUser, Depends(current_user)]
 DeviceDep = Annotated[CurrentDevice, Depends(current_device)]
-CsrfDep = Annotated[None, Depends(require_csrf_header)]
+CsrfDep = Annotated[None, Depends(require_csrf)]
