@@ -193,3 +193,41 @@ def next_non_ping(ws: Any) -> dict[str, Any]:
         if message["type"] != "ping":
             return message
     raise AssertionError("no message")
+
+
+def test_combined_office_merges_own_and_shared_once(client: TestClient, engine: Engine) -> None:
+    alice, bob, eve = (Person(client, engine, n) for n in ("Alice", "Bob", "Eve"))
+    first, second = team_with(alice, bob), team_with(alice, bob)
+    own = working_session(alice, "alice-pc")
+    bob_session = working_session(bob, "bob-laptop")
+    project = share(bob, bob_session, first)
+    # 같은 프로젝트를 두 팀에 공유해도 통합 화면에는 한 번만 나온다.
+    assert bob.call("PUT", f"/projects/{project}/shares/{second}").status_code == 200
+    working_session(eve, "eve-pc")
+
+    combined = alice.call("GET", "/office/combined").json()
+    assert combined["scope"] == {"kind": "combined"}
+    assert sorted(s["id"] for s in combined["sessions"]) == sorted([own, bob_session])
+    assert sorted(s["desk_slot"] for s in combined["sessions"]) == [0, 1]
+    # 내 장치는 PC 이름, 남의 장치는 표시 이름.
+    assert sorted(d["name"] for d in combined["devices"]) == ["Bob", "alice-pc"]
+    dumped = json.dumps(combined)
+    assert "bob-laptop" not in dumped and "eve-pc" not in dumped
+
+    bob_agent = next(a["id"] for a in combined["agents"] if a["session_id"] == bob_session)
+    detail = alice.call("GET", f"/office/combined/agents/{bob_agent}").json()
+    assert detail["device"]["name"] == "Bob"
+    assert eve.call("GET", f"/office/combined/agents/{bob_agent}").status_code == 404
+
+
+def test_combined_live_drops_unshared_sessions(client: TestClient, engine: Engine) -> None:
+    alice, bob = Person(client, engine, "Alice"), Person(client, engine, "Bob")
+    team = team_with(alice, bob)
+    project = share(bob, working_session(bob), team)
+
+    url = f"{office.LIVE_PATH}?view=combined"
+    with client.websocket_connect(url, headers=live_headers(alice.session)) as ws:
+        assert len(ws.receive_json()["sessions"]) == 1
+        bob.call("DELETE", f"/projects/{project}/shares/{team}")
+        message = next_non_ping(ws)
+        assert message["type"] == "snapshot" and message["sessions"] == []

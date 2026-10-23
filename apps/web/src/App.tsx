@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 
 import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./account/AccountPages";
 import { InvitePage } from "./account/InvitePage";
+import { TeamsPage } from "./account/TeamsPage";
 import { SetupWizard } from "./account/SetupWizard";
 import { type SessionInfo, call, routeFor } from "./account/api";
 import { OfficeView } from "./office/OfficeView";
+import { SideBySide } from "./office/SideBySide";
+import { scopeFromSearch } from "./office/liveSource";
 
 const principles = [
   ["관측 우선", "실제 이벤트와 추정·연출을 분리합니다."],
@@ -35,6 +38,7 @@ function SessionBar() {
   };
   return (
     <nav className="session-bar" aria-label="계정">
+      <a href="/teams">팀</a>
       <span>{session.user.display_name}</span>
       <button type="button" onClick={() => void logout()}>
         로그아웃
@@ -54,10 +58,11 @@ export function App({ pathname }: { pathname?: string }) {
       reset: ResetPage,
       setup: SetupWizard,
       invite: InvitePage,
+      teams: TeamsPage,
     };
     const Page = pages[route];
     return (
-      <main className="shell account-shell">
+      <main className={`shell account-shell${route === "teams" ? " wide" : ""}`}>
         <p className="eyebrow">
           <a href="/">AGENT OFFICE</a>
         </p>
@@ -78,7 +83,7 @@ export function App({ pathname }: { pathname?: string }) {
         </p>
         <span className="status">기반 구축 중 · 실제 수집 비활성</span>
       </section>
-      <OfficeView />
+      {typeof window !== "undefined" && scopeFromSearch(window.location.search).kind === "side" ? <SideBySide /> : <OfficeView />}
       <section className="principles" aria-label="프로젝트 원칙">
         {principles.map(([title, description]) => (
           <article key={title}>
