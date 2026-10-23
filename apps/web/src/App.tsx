@@ -6,6 +6,8 @@ import { TeamsPage } from "./account/TeamsPage";
 import { SetupWizard } from "./account/SetupWizard";
 import { type SessionInfo, call, routeFor } from "./account/api";
 import { OfficeView } from "./office/OfficeView";
+import { SideBySide } from "./office/SideBySide";
+import { scopeFromSearch } from "./office/liveSource";
 
 const principles = [
   ["관측 우선", "실제 이벤트와 추정·연출을 분리합니다."],
@@ -81,7 +83,7 @@ export function App({ pathname }: { pathname?: string }) {
         </p>
         <span className="status">기반 구축 중 · 실제 수집 비활성</span>
       </section>
-      <OfficeView />
+      {typeof window !== "undefined" && scopeFromSearch(window.location.search).kind === "side" ? <SideBySide /> : <OfficeView />}
       <section className="principles" aria-label="프로젝트 원칙">
         {principles.map(([title, description]) => (
           <article key={title}>

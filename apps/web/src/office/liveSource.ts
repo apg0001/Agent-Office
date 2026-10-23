@@ -21,23 +21,52 @@ export async function hasSession(fetcher: typeof fetch = fetch): Promise<boolean
   }
 }
 
-/** 실시간 주소. 팀 범위면 `?team=`을 붙인다(#54). */
-export function liveUrl(protocol: string, host: string, teamId: string | null): string {
+/**
+ * 사무실 범위(#53). 이벤트는 한 번만 저장되고 범위마다 화면 배치만 다르다.
+ * personal: 내 사무실, team: 팀 사무실, combined: 내 것 + 내 팀들에 공유된 것을 한 사무실에,
+ * side: 개인·팀 사무실을 나란히(각각 따로 연결).
+ */
+export type OfficeScope =
+  | { kind: "personal" }
+  | { kind: "team"; teamId: string }
+  | { kind: "combined" }
+  | { kind: "side" };
+
+export const PERSONAL: OfficeScope = { kind: "personal" };
+
+/** 실시간 주소. */
+export function liveUrl(protocol: string, host: string, scope: OfficeScope = PERSONAL): string {
   const scheme = protocol === "https:" ? "wss:" : "ws:";
-  const query = teamId ? `?team=${encodeURIComponent(teamId)}` : "";
+  const query =
+    scope.kind === "team" ? `?team=${encodeURIComponent(scope.teamId)}` : scope.kind === "combined" ? "?view=combined" : "";
   return `${scheme}//${host}/api/v1/live${query}`;
 }
 
-/** 현재 주소의 사무실 범위. 팀 ID가 아니면 개인 사무실. */
-export function scopeFromSearch(search: string): string | null {
-  const team = new URLSearchParams(search).get("team");
-  return team && /^[0-9a-f-]{36}$/i.test(team) ? team : null;
+/** 현재 주소의 사무실 범위. 알 수 없는 값은 개인 사무실. */
+export function scopeFromSearch(search: string): OfficeScope {
+  const params = new URLSearchParams(search);
+  const team = params.get("team");
+  if (team && /^[0-9a-f-]{36}$/i.test(team)) {
+    return { kind: "team", teamId: team };
+  }
+  const view = params.get("view");
+  if (view === "combined" || view === "side") {
+    return { kind: view };
+  }
+  return PERSONAL;
+}
+
+export function searchFor(scope: OfficeScope): string {
+  if (scope.kind === "team") {
+    return `?team=${encodeURIComponent(scope.teamId)}`;
+  }
+  return scope.kind === "personal" ? "" : `?view=${scope.kind}`;
 }
 
 export function connectLive(
   onState: (state: OfficeState) => void,
   onStatus: (online: boolean) => void,
-  teamId: string | null = null,
+  scope: OfficeScope = PERSONAL,
 ): LiveHandle {
   let socket: WebSocket | undefined;
   let state: OfficeState | undefined;
@@ -46,7 +75,7 @@ export function connectLive(
   let timer: number | undefined;
 
   const open = () => {
-    socket = new WebSocket(liveUrl(window.location.protocol, window.location.host, teamId));
+    socket = new WebSocket(liveUrl(window.location.protocol, window.location.host, scope));
     socket.onopen = () => {
       backoff = 1000;
       onStatus(true);
