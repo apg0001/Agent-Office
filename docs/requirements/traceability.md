@@ -235,3 +235,13 @@
 | NORM-004 | EVT-002 이중 수집 멱등 | `pipeline_test.go`: #20 dual-source fixture를 Hook + tail → 어댑터 → 정규화로 양쪽 순서 처리, 키 이벤트 10개·억제 8건, 영속 키 재시작 재방출 0 |
 | NORM-005 | EVT-005 진실성 | 미검증·부분 지원은 `inferred`, enum 밖 값은 `unknown`+`inferred`, 세션 없는 `unknown`은 개수만 세고 버림, Codex CLI `tool.completed` 미생성 |
 | NORM-006 | EVT-007·COL-007 프라이버시 | `privacy_test.go`: 모든 어댑터 입력 필드·런타임·후보 문자열 필드의 sentinel이 출력 JSON·카운터·오류에 없음, 어댑터 오류 fail-open 개수 |
+
+## Go Collector 큐·전송 검증 매핑(#33)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| QUEUE-001 | COL-007 로컬 영속 큐 | `queue_test.go`: SQLite WAL·`synchronous=FULL`·`busy_timeout`·스키마 버전(새 버전 거부), 파일 0600, 레코드·sequence·결정적 ID·체크포인트 한 트랜잭션, 잘못된 레코드 시 무커밋, 상한 초과 drop-oldest 개수 |
+| QUEUE-002 | COL-009 재시작 복구 | 재시작 후 같은 `event_id`(무작위 포함)·순서, sequence 이어짐, 영속 결정적 ID로 키 이벤트 재방출 0, 미기록 sequence 비영속 |
+| QUEUE-003 | EVT-002 멱등 재전송 | `transport_test.go`: 서버 저장 후 응답 전 연결 끊김 → 재시작 → 같은 본문·ID 재전송 → `duplicate` ACK 삭제, accepted·duplicate만 삭제, 잘못된 응답 7종 ACK 없음, 계약 fixture 응답 처리 |
+| QUEUE-004 | COL-008 배치·재시도 | 500건·1MiB(설정 한도) 분할, 5xx·429 full jitter 지수 백오프와 `Retry-After` 하한, 타임아웃, 401·403 정지(큐 유지), 422 이분 탐색, retryable·알 수 없는 거부 코드, `max_attempts` dead-letter |
+| QUEUE-005 | COL-007·SEC-006 프라이버시 | Hook 원문·ID 필드, 체크포인트 경로, 거부 코드 sentinel이 DB 본 파일·WAL·오류 문자열에 없음, 전송 오류에 본문·토큰·URL 없음 |

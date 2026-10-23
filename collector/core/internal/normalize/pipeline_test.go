@@ -179,6 +179,33 @@ func TestDualSourceRestartWithPersistedStateEmitsNoReplays(t *testing.T) {
 	}
 }
 
+// 큐(#33)는 원본 키 대신 결정적 event_id만 저장한다. 그 집합으로 재시작해도 재방출이 없다.
+func TestDualSourceRestartWithSeenEventIDsEmitsNoReplays(t *testing.T) {
+	store := NewMemorySequenceStore()
+	first := NewPipeline(newNormalizer(t, Options{Sequences: store}))
+	recs := runDualSource(t, first, true)
+	var ids []string
+	for _, r := range recs {
+		if r.DeterministicID {
+			ids = append(ids, r.Event.EventID)
+		}
+	}
+	if len(ids) == 0 {
+		t.Fatal("expected deterministic ids")
+	}
+	restarted := NewPipeline(newNormalizer(t, Options{Sequences: store, SeenEventIDs: ids}))
+	var replay []Record
+	for _, name := range []string{"transcript.jsonl", "subagent-transcript.jsonl"} {
+		replay = append(replay, restarted.Transcript(tailFixture(t, name), claudeRuntime, observed)...)
+	}
+	if len(replay) != 0 {
+		t.Fatalf("replayed %d", len(replay))
+	}
+	if restarted.Counters().DuplicateSuppressed == 0 {
+		t.Fatal("expected suppression from seen event ids")
+	}
+}
+
 func cutFirst(key string) (string, string, bool) {
 	for i := 0; i < len(key); i++ {
 		if key[i] == '|' {

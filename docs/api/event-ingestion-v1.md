@@ -47,7 +47,7 @@
 - `duplicate_event_ids`: 같은 `event_id`로 이미 영속화된 이벤트
 - `rejected_events`: 코드와 재시도 가능 여부가 명시된 이벤트
 
-Collector는 `accepted_event_ids`와 `duplicate_event_ids`만 로컬 큐에서 ACK 처리합니다. HTTP 오류, 연결 끊김, 형식이 맞지 않는 응답에서는 ACK하지 않습니다. 서버는 DB 커밋이 끝난 뒤에만 응답하므로 두 목록에 있는 이벤트는 영속화가 끝난 것입니다.
+Collector는 `accepted_event_ids`와 `duplicate_event_ids`만 로컬 큐에서 ACK 처리합니다(구현: [Collector 로컬 큐·배치 전송](../architecture/collector-queue.md), #33). HTTP 오류, 연결 끊김, 형식이 맞지 않는 응답에서는 ACK하지 않습니다. 서버는 DB 커밋이 끝난 뒤에만 응답하므로 두 목록에 있는 이벤트는 영속화가 끝난 것입니다.
 
 ### 거부 코드
 
