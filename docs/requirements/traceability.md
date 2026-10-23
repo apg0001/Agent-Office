@@ -332,3 +332,14 @@
 | NET-002 | OPS-002 실제 클라이언트 IP | 서버 로그가 클라이언트 IP 기록, 위조 `X-Forwarded-For` 무시 |
 | NET-003 | OPS-003 보안 헤더 | `X-Frame-Options`·`Referrer-Policy`·`nosniff`, `Server` 제거 |
 | NET-004 | DOC-001~003 가이드 | Tailscale·Cloudflare Tunnel·도메인 HTTPS·Nginx 절차와 위협 모델(외부 연동은 미검증 표시) |
+
+## Go Collector 실행·진단 검증 매핑(#34)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| RUN-001 | COL-001 GUI와 분리된 Core 실행 | `e2e_test.go`: `httptest` 서버로 `register` → `run`(tail·정규화·큐·전송·heartbeat 고루틴) → 새 transcript·Hook 이벤트 수신 → 컨텍스트 취소(SIGINT/SIGTERM 경로)로 정상 종료(`stopped`, 큐 0). `cli_test.go`: 두 번째 `run` 거부(단일 실행 잠금) |
+| RUN-002 | COL-002 OS별 자동 시작 | `service_test.go`: systemd 사용자 unit·launchd LaunchAgent·Windows 로그온 작업 XML 골든, 인용·이스케이프·UTF-16LE, 소유 표시 없는 파일·작업은 교체·삭제 거부. 실제 systemd·macOS·Windows 등록은 미실행 |
+| RUN-003 | COL-003 탐지·최초 위치 | 최초 실행에서 기존 transcript 끝으로 건너뜀(`baseline_skipped_files`), 이후 새 파일은 처음부터 수집, 감시 루트 없음·접근 불가 상태 코드 |
+| RUN-004 | COL-004·COL-005 Hook fail-open | `cli_test.go`: 잘못된 입력 9종·끝나지 않는 stdin·쓸 수 없는 spool·실제 하위 프로세스에서 종료 코드 0, 출력 없음, 제한 시간 안 종료. spool에는 어댑터 후보만 있고 prompt·경로 sentinel 없음 |
+| RUN-005 | COL-010 일시중지·재개 | 일시중지 중 tail·Hook spool·전송·heartbeat 정지, 재개 후 일시중지 동안 쓰인 줄 미수집(`skip_backlog`), 손상된 pause 파일은 일시중지로 처리 |
+| RUN-006 | COL-010·SEC-006 안전한 진단 | `status`·`diagnose` 출력(텍스트·JSON)에 토큰·서버 호스트·장치 ID·로컬 경로 sentinel 없음, 고정 오류 코드·개수만 표시, 설정 파일 0600·원자적 쓰기·토큰 `fmt` 가림 |

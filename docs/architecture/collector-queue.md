@@ -99,6 +99,8 @@ Linux arm64(Docker `golang:1.24-bookworm`)에서 `gofmt`, `go vet`, `go test -ra
 
 ## 후속 범위(#34)
 
+#34에서 아래 항목을 `internal/runner`로 구현했습니다. 실행·진단 방법은 [Collector CLI·백그라운드 실행·진단](../installation/collector-cli.md)을 봅니다. Linux는 XDG 기본값을 따라 `~/.local/state/agent-office/collector`를 씁니다.
+
 - 실행 루프에서 `queue.Open` → `SeenEventIDs` → `normalize.New(Sequences: q, SeenEventIDs: …)` → tail 결과마다 `Enqueue(recs, &CheckpointUpdate{…})` → `Sender.Notify()`; 별도 고루틴에서 `Sender.Run`과 주기적 `Heartbeat`, 하루 1회 `PruneSeen`.
 - `ErrDeviceRevoked`를 받으면 전송·heartbeat를 멈추고 사용자에게 재등록을 안내(큐 유지).
 - DB 경로는 OS별 사용자 데이터 디렉터리(Windows `%LOCALAPPDATA%`, macOS `~/Library/Application Support`, Linux `$XDG_STATE_HOME`).

@@ -14,6 +14,7 @@
 - [호환성 행렬](compatibility/matrix.md)
 - [개발 환경 설치](installation/development.md)
 - [Docker 이미지와 Compose](installation/docker-images.md)
+- [Collector CLI·백그라운드 실행·진단](installation/collector-cli.md)
 - [구성 경계](configuration/README.md)
 - [요구사항 추적](requirements/traceability.md)
 - [Codex CLI Hook·JSONL 실측](poc/codex-cli-hooks.md)
