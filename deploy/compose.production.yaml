@@ -54,6 +54,8 @@ services:
       AGENT_OFFICE_ALLOWED_ORIGINS: ${AGENT_OFFICE_ALLOWED_ORIGINS:-}
       # HTTPS가 아닌 LAN 직접 접속에서만 false. 기본은 Secure 쿠키.
       AGENT_OFFICE_COOKIE_SECURE: ${AGENT_OFFICE_COOKIE_SECURE:-true}
+      # 외부 Heartbeat push URL(비밀, #59). 비우면 보내지 않는다.
+      AGENT_OFFICE_HEARTBEAT_URL: ${AGENT_OFFICE_HEARTBEAT_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

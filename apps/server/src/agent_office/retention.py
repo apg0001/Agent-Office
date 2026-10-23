@@ -179,6 +179,8 @@ def purge(connection: Connection) -> dict[str, int] | None:
 
 
 FIRST_RUN_DELAY_SECONDS = 300
+# 이 프로세스의 마지막 주기 실행 결과(관리자 지표에 표시).
+last_run: dict[str, Any] = {"at": None, "ok": None}
 
 
 def _run_once() -> dict[str, int] | None:
@@ -194,9 +196,11 @@ async def run_periodically() -> None:
     while True:
         try:
             counts = await run_in_threadpool(_run_once)
+            last_run.update(at=dt.datetime.now(dt.UTC).isoformat(), ok=True)
             if counts:
                 logger.info("retention purge: %s", {k: v for k, v in counts.items() if v})
         except Exception as error:  # noqa: BLE001 - 정리 실패가 서버를 멈추면 안 된다.
+            last_run.update(at=dt.datetime.now(dt.UTC).isoformat(), ok=False)
             logger.warning("retention purge failed: %s", type(error).__name__)
         await asyncio.sleep(RUN_INTERVAL_SECONDS)
 
