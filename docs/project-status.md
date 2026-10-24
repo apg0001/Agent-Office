@@ -12,8 +12,7 @@
 
 - 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
 - 활성 작업 A(Pi, 직접): #60 `EP-09/ISS-05 배포·롤백` (`feat/#60-deploy-rollback`)
-- 활성 작업 B(Pi, 서브에이전트): 없음
-- 활성 작업 B(Pi, 서브에이전트): 없음
+- 활성 작업 B(Pi, 서브에이전트·별도 worktree): #24 `EP-03/ISS-03 OAuth` (`feat/#24-oauth`)
 - 직전 완료(Pi): #38(PR #126 서버 `4eeb9a0`, PR #128 Collector `2d14891`, Epic #5 종료), #61(PR #129, `3fb1982`), #70~#74(PR #127, `41446c7`, Epic #12 종료), #28(PR #125, `e7e2ce2`), #68(PR #124, `8153abb`), #58(PR #123, `9af0f4c`), #31(PR #120, `7346425`, 서브에이전트, Epic #4 종료), #59(PR #121, `5881ba5`), #39(PR #119, `53682b7`), #53(PR #118, `ac09293`, Epic #8 종료), #52(PR #117, `9db2315`), #54·#55(PR #116, `8c74cb1`), #34(PR #113, `5b85ade`, 서브에이전트), #57(PR #114, `985c59f`), #27(PR #112, `b111d67`), #67(PR #110 서버 `b101c9a`, PR #111 웹 `217531e`), #66(PR #109, `c7722b1`), #33(PR #108, `113905c`, 서브에이전트), #23(PR #107, `e008e28`), #46(PR #106, `119ae9d`, Epic #7 종료), #51(PR #105, `fe6592d`), #32(PR #103, `4ed866c`, 서브에이전트), #50(PR #104, `bd5b25a`), #49(PR #102, `74d70c3`), #48(PR #101, `8a1d885`), #30(PR #98, `a589e62`, 서브에이전트), #47(PR #100, `09ea7b7`), #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
 - EP-02: 완료. 세부 #17~#21 종료, Epic #2는 소유자 승인으로 종료. 후속 독립 Issue #87(Desktop PC 필요). #88 종료
@@ -254,6 +253,8 @@
 167. #61: 지표에 배포 상태(이미지 버전·리비전·기대 마이그레이션)와 보안 점검 목록(값 없이 코드·수준·안내), 관리 화면 표시(긴급·높음은 맨 위), 로그 보존 정책 문서화. 서버 277개·웹 69개 테스트 통과.
 168. PR #129 병합(`3fb1982`), #61 종료. #38 서브에이전트 PR #128(Claude `TodoWrite` Hook·transcript와 Codex `update_plan` Hook에서 상태값만 읽어 `plan.updated` 추가 기록, 중복 제거 키 `plan.updated|tool_use_id`, 입력 형식 미실측이라 항상 `inferred`, 할 일·계획 문장 sentinel 비누출, fuzz)를 최신 `develop` 병합·추적표 충돌 해결·CI 통과 후 병합(`2d14891`), #38 종료, Epic #5 종료. 서브에이전트 사용량 약 12만 토큰. 미검증: 실제 Claude·Codex 계획 갱신 관측(#62), Codex Hook이 `update_plan`을 넘기는지.
 169. 체크포인트: 종료 Epic #2·#4·#5·#7·#8·#12. 남은 Issue: #24 OAuth, #40~#44 Collector GUI, #60 배포·롤백, #62~#65 E2E·성능·보안·릴리스, #69 설치 방식 동일성, #87(Windows 전용).
+170. 소유자가 사용량 27%라며 계속 진행을 지시(메모리에 반영: 내 추정으로 멈추지 않음). #24 OAuth를 서브에이전트에 위임.
+171. #60: `deploy/upgrade.sh`(계획·`deploy` 입력 승인·새 이미지로 백업·`migrate-check` 사전 실행·교체·마이그레이션·점검·실패 시 DB 다운그레이드 후 이전 이미지 롤백·이력), `agent-office-backup migrate-check`·`expected-revision`, 문서 `docs/operations/deploy.md`. Pi에서 0005 이미지→0006 업그레이드(24초)와 점검 실패 롤백(0006→0005) 실측. 이전 이미지의 root 소유 백업 볼륨과, 준비 상태 엔드포인트가 없는 예전 이미지 롤백 점검 문제를 실측으로 발견해 처리.
 
 ## 이번 변경 요약(#22)
 
@@ -339,7 +340,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율, 소유자 재개 지시 후): #60 배포·롤백(배포 전 `agent-office-backup create`, 새 이미지로 백업 복원 DB에 `alembic upgrade` 사전 실행, health·smoke, 실패 시 이전 이미지 태그로 되돌림, 비역호환 마이그레이션은 백업 복원 절차) → #69 Docker·소스 빌드 동일성(클린 환경 두 방식 설치 후 같은 마법사·보안 기본값 비교) → #24 OAuth(Google·GitHub, `/api/v1/admin/settings/oauth` 설정 사용) → #63 부하·장시간(SSD로 실측 가능) → #64 보안 시나리오 → #40~#44 GUI(Wails, 실제 OS 검증은 소유자 장비) → #62·#65. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
+4. 진행 순서(자율): #60 PR 병합, #24 OAuth PR 병합(서브에이전트) → #69 Docker·소스 빌드 동일성(클린 환경 두 방식 설치 후 같은 마법사·보안 기본값 비교) → #24 OAuth(Google·GitHub, `/api/v1/admin/settings/oauth` 설정 사용) → #63 부하·장시간(SSD로 실측 가능) → #64 보안 시나리오 → #40~#44 GUI(Wails, 실제 OS 검증은 소유자 장비) → #62·#65. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
