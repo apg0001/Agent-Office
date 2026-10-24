@@ -41,6 +41,31 @@ def normalize_email(value: str) -> str | None:
     return email
 
 
+BLOCKED_DOMAINS_KEY = "auth.blocked_email_domains"
+MAX_BLOCKED_DOMAINS = 500
+_DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$")
+
+
+def normalize_domain(value: str) -> str | None:
+    domain = value.strip().lower().lstrip("@")
+    return domain if _DOMAIN.fullmatch(domain) else None
+
+
+def blocked_domains(connection: Connection) -> list[str]:
+    value = connection.execute(
+        select(schema.instance_settings.c.value).where(
+            schema.instance_settings.c.key == BLOCKED_DOMAINS_KEY
+        )
+    ).scalar_one_or_none()
+    return [str(d) for d in value] if isinstance(value, list) else []
+
+
+def domain_blocked(connection: Connection, email: str) -> bool:
+    """가입 차단 도메인(#28). 하위 도메인도 막는다(example.com이면 mail.example.com도)."""
+    domain = email.rsplit("@", 1)[-1]
+    return any(domain == d or domain.endswith("." + d) for d in blocked_domains(connection))
+
+
 def signup_policy(connection: Connection) -> SignupPolicy:
     value = connection.execute(
         select(schema.instance_settings.c.value).where(

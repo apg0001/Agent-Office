@@ -34,6 +34,8 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 # 키는 "종류:IP" 또는 "종류:이메일". 리버스 프록시 뒤 실제 IP 반영은 #57에서 한다.
 signup_limiter = KeyedRateLimiter(limit=5, window_seconds=3600)
+# 여러 IP로 나눠 들어오는 대량 가입을 막는 인스턴스 전체 한도(#28).
+signup_global_limiter = KeyedRateLimiter(limit=30, window_seconds=3600)
 verify_limiter = KeyedRateLimiter(limit=20, window_seconds=3600)
 login_ip_limiter = KeyedRateLimiter(limit=30, window_seconds=600)
 login_email_limiter = KeyedRateLimiter(limit=10, window_seconds=900)
@@ -41,6 +43,7 @@ reset_ip_limiter = KeyedRateLimiter(limit=10, window_seconds=3600)
 reset_email_limiter = KeyedRateLimiter(limit=3, window_seconds=3600)
 LIMITERS = (
     signup_limiter,
+    signup_global_limiter,
     verify_limiter,
     login_ip_limiter,
     login_email_limiter,
@@ -59,6 +62,8 @@ class SignupRequest(StrictModel):
     display_name: str = Field(min_length=1, max_length=80)
     # 초대 전용 정책에서 팀 초대 링크로 가입할 때(#27).
     invite_token: str | None = Field(default=None, max_length=256)
+    # 사람에게는 보이지 않는 입력란(#28). 값이 있으면 자동 가입 봇으로 보고 조용히 무시한다.
+    website: str | None = Field(default=None, max_length=200)
 
 
 class TokenRequest(StrictModel):
@@ -133,6 +138,9 @@ def signup(
     body: SignupRequest, request: Request, _origin: SameOrigin, connection: DbConnection
 ) -> AcceptedResponse:
     enforce_limit(signup_limiter, f"signup:{client_host(request)}")
+    if body.website:
+        return AcceptedResponse(status="verification_sent")
+    enforce_limit(signup_global_limiter, "signup:all")
     policy = accounts.signup_policy(connection)
     if policy == "CLOSED":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="signup_closed")
@@ -144,6 +152,8 @@ def signup(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invite_required")
     if email is None:
         raise _bad_request("invalid_email")
+    if accounts.domain_blocked(connection, email):
+        raise _bad_request("email_domain_blocked")
     problem = passwords.password_problem(body.password)
     if problem:
         raise _bad_request(problem)

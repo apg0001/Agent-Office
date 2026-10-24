@@ -110,6 +110,8 @@ export function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  // 사람에게는 보이지 않는 입력란. 자동 가입 봇이 채우면 서버가 조용히 무시한다(#28).
+  const [website, setWebsite] = useState("");
   const [done, setDone] = useState(false);
   const { busy, error, run } = useSubmit();
 
@@ -122,6 +124,7 @@ export function SignupPage() {
         password,
         display_name: name,
         ...(invite ? { invite_token: invite } : {}),
+        ...(website ? { website } : {}),
       });
       setDone(result.ok);
       return result.error;
@@ -139,6 +142,16 @@ export function SignupPage() {
     <Card title="가입">
       <form onSubmit={submit}>
         <Field label="이름" name="name" value={name} onChange={setName} autoComplete="name" />
+        <label className="trap" aria-hidden="true">
+          웹사이트(비워 두세요)
+          <input
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            value={website}
+            onChange={(event) => setWebsite(event.target.value)}
+          />
+        </label>
         <Field label="이메일" name="email" type="email" value={email} onChange={setEmail} autoComplete="email" />
         <Field
           label="비밀번호(10자 이상)"

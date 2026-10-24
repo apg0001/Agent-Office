@@ -49,6 +49,20 @@
 - 서버 오류 코드는 한국어 문구로 바꿔 보여 주고, SMTP 시험 실패는 원인 코드만 표시합니다. 암호 입력란은 저장 후 비웁니다.
 - 운영 웹 이미지 nginx는 화면 경로를 `index.html`로 돌려줍니다(`apps/web/nginx.conf`). `/api`는 리버스 프록시(#57)가 서버로 보냅니다.
 
+## 사용자 관리·감사 로그(#28)
+
+| 요청 | 설명 |
+|---|---|
+| `GET /api/v1/admin/users?status=&limit=&offset=` | 사용자 목록(이메일 포함, 관리자만), `total`, 이메일 확인 후 승인 대기 수 `pending_approval` |
+| `POST /api/v1/admin/users/{id}/approve` | 이메일 확인을 마친 대기 사용자만 승인(`409 not_awaiting_approval`) |
+| `POST /api/v1/admin/users/{id}/disable` | 비활성화 + 모든 브라우저 세션 폐기. 자기 계정은 `409 cannot_modify_self` |
+| `POST /api/v1/admin/users/{id}/enable` | 이메일 확인됐으면 `active`, 아니면 `pending` |
+| `PUT /api/v1/admin/users/{id}/role {instance_role}` | SUPER_ADMIN만. 마지막 활성 SUPER_ADMIN 강등은 DB 트리거가 막아 `409 last_super_admin` |
+| `PUT /api/v1/admin/settings/blocked-domains {domains}` | 가입 차단 도메인(최대 500개, 형식 검사) |
+| `GET /api/v1/admin/audit?limit=&before=&action=` | 최신순 감사 로그, `before` 커서, `action` 접두어 필터. 행위자는 표시 이름만 |
+
+웹 `/admin`에 사용자(승인 대기 맨 위)·감사 로그·차단 도메인 영역이 있습니다.
+
 ## 백업 실행(#68)
 
 | 요청 | 설명 |

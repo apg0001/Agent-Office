@@ -9,7 +9,17 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from agent_office import backup, monitoring, retention
-from agent_office.api import accounts, admin_settings, auth, devices, events, office, setup, teams
+from agent_office.api import (
+    accounts,
+    admin_settings,
+    admin_users,
+    auth,
+    devices,
+    events,
+    office,
+    setup,
+    teams,
+)
 from agent_office.db.engine import get_engine
 from agent_office.http_limits import BodySizeLimitMiddleware
 from agent_office.validation import validation_error_handler
@@ -72,6 +82,7 @@ app.include_router(accounts.router)
 app.include_router(setup.router)
 app.include_router(admin_settings.router)
 app.include_router(admin_settings.metrics_router)
+app.include_router(admin_users.router)
 app.include_router(teams.router)
 app.include_router(devices.router)
 app.include_router(events.router)

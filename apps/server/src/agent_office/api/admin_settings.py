@@ -86,6 +86,11 @@ class SettingsView(StrictModel):
     smtp_source: Literal["settings", "environment", "none"]
     oauth: dict[str, OAuthView]
     secret_storage_available: bool
+    blocked_email_domains: list[str]
+
+
+class BlockedDomainsBody(StrictModel):
+    domains: list[str] = Field(max_length=accounts.MAX_BLOCKED_DOMAINS)
 
 
 class SmtpTestResult(StrictModel):
@@ -136,6 +141,7 @@ def _view(connection: Connection) -> SettingsView:
         smtp_source=source,
         oauth=oauth,
         secret_storage_available=secret_store.available(),
+        blocked_email_domains=accounts.blocked_domains(connection),
     )
 
 
@@ -205,6 +211,22 @@ def update_signup_policy(
         actor_user_id=admin.id,
         details={"reason": body.policy},
     )
+    return _view(connection)
+
+
+@router.put("/blocked-domains", response_model=SettingsView)
+def update_blocked_domains(
+    body: BlockedDomainsBody, admin: AdminDep, _csrf: CsrfDep, connection: DbConnection
+) -> SettingsView:
+    """가입을 막을 이메일 도메인(일회용 메일 등, #28)."""
+    domains = []
+    for raw in body.domains:
+        domain = accounts.normalize_domain(raw)
+        if domain is None:
+            raise _bad("invalid_domain")
+        domains.append(domain)
+    instance.put_value(connection, accounts.BLOCKED_DOMAINS_KEY, sorted(set(domains)), admin.id)
+    audit.record(connection, "settings.blocked_domains", "success", actor_user_id=admin.id)
     return _view(connection)
 
 
