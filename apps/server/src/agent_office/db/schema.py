@@ -620,6 +620,30 @@ deleted_users = Table(
     Column("deleted_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
+oauth_states = Table(
+    "oauth_states",
+    metadata,
+    # OAuth 로그인 시작~콜백 사이의 일회용 상태(#24). state 원문과 PKCE verifier는 저장하지 않는다.
+    # verifier는 HttpOnly 쿠키로만 브라우저에 두고, 여기에는 그 해시(쿠키 결속 확인용)만 둔다.
+    _uuid_pk(),
+    Column("state_hash", LargeBinary(32), nullable=False),
+    Column("binding_hash", LargeBinary(32), nullable=False),
+    Column("provider", String(16), nullable=False),
+    Column("intent", String(8), nullable=False),
+    # 계정 연결(intent=link)을 시작한 사용자. 로그인 시작이면 비어 있다.
+    _fk("user_id", "users.id", ondelete="CASCADE", nullable=True),
+    # 초대 전용 정책 가입에 쓸 초대. 토큰 원문은 저장하지 않는다.
+    _fk("invitation_id", "team_invitations.id", ondelete="CASCADE", nullable=True),
+    _created_at(),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("state_hash"),
+    CheckConstraint(_in("provider", OAUTH_PROVIDERS), name="provider"),
+    CheckConstraint(_in("intent", ("login", "link")), name="intent"),
+    CheckConstraint("intent <> 'link' OR user_id IS NOT NULL", name="link_has_user"),
+    CheckConstraint("expires_at > created_at", name="expiry_after_creation"),
+)
+Index("ix_oauth_states_expires_at", oauth_states.c.expires_at)
+
 instance_secrets = Table(
     "instance_secrets",
     metadata,

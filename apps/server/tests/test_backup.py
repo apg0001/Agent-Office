@@ -133,7 +133,7 @@ def test_backup_verify_and_restore_test(
     backup.verify(path)
 
     result = backup.restore_test(path)
-    assert result["migration"] == "0006" and result["tables"] > 20 and result["users"] == 1
+    assert result["migration"] == "0007" and result["tables"] > 20 and result["users"] == 1
 
     path.write_bytes(path.read_bytes()[:-1] + b"\0")
     with pytest.raises(backup.BackupError) as error:

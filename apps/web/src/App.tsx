@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./account/AccountPages";
+import { AccountPage, LoginPage, ResetPage, SignupPage, VerifyPage } from "./account/AccountPages";
 import { InvitePage } from "./account/InvitePage";
 import { AdminPage } from "./account/AdminPage";
 import { TeamsPage } from "./account/TeamsPage";
@@ -40,6 +40,7 @@ function SessionBar() {
   return (
     <nav className="session-bar" aria-label="계정">
       <a href="/teams">팀</a>
+      <a href="/account">계정</a>
       {["SUPER_ADMIN", "ADMIN"].includes(session.user.instance_role) && <a href="/admin">관리</a>}
       <span>{session.user.display_name}</span>
       <button type="button" onClick={() => void logout()}>
@@ -62,6 +63,7 @@ export function App({ pathname }: { pathname?: string }) {
       invite: InvitePage,
       teams: TeamsPage,
       admin: AdminPage,
+      account: AccountPage,
     };
     const Page = pages[route];
     return (

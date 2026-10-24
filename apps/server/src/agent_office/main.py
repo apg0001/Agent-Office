@@ -18,6 +18,7 @@ from agent_office.api import (
     auth,
     devices,
     events,
+    oauth,
     office,
     setup,
     teams,
@@ -81,6 +82,7 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.include_router(auth.router)
 app.include_router(accounts.router)
+app.include_router(oauth.router)
 app.include_router(setup.router)
 app.include_router(admin_settings.router)
 app.include_router(admin_settings.metrics_router)
