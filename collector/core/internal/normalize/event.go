@@ -1,6 +1,6 @@
 // Package normalize는 어댑터 후보(adapter.Candidate)를 이벤트 v1 객체로 바꾼다(#32).
 //
-// 출력은 packages/event-schema/schema/event-v1.schema.json의 13개 필드뿐이다. 제공자 원본
+// 출력은 packages/event-schema/schema/event-v1.schema.json의 13개 필수 필드와 선택 필드 plan_steps(#38)뿐이다. 제공자 원본
 // 세션·에이전트 ID는 장치 범위 UUIDv5로 바꿔 PC 밖으로 내보내지 않고, enum 필드는 v1 집합에
 // 속한 값만 통과시킨다(2차 방어선). 큐·전송(#33)과 polling 실행 루프(#34)는 범위 밖이다.
 package normalize

@@ -70,9 +70,18 @@ func (p *Pipeline) Transcript(res tail.Result, rt adapter.Runtime, observedAt ti
 	return out
 }
 
+// emit은 후보 하나를 정규화하고, 계획 도구 후보면 같은 입력 시각으로 plan.updated를 하나 더 만든다(#38).
+// 두 번째 기록은 자체 중복 제거 키(plan.updated|tool_use_id)를 가지므로 도구 후보가 중복이어도
+// 독립적으로 판정된다.
 func (p *Pipeline) emit(out []Record, in Input) []Record {
 	if rec, outcome := p.n.Normalize(in); outcome == OutcomeAccepted {
 		out = append(out, rec)
+	}
+	if plan, ok := adapter.PlanUpdate(in.Candidate); ok {
+		in.Candidate = plan
+		if rec, outcome := p.n.Normalize(in); outcome == OutcomeAccepted {
+			out = append(out, rec)
+		}
 	}
 	return out
 }

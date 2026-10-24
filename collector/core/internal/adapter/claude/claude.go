@@ -27,6 +27,12 @@ const (
 
 	// transcriptEvent는 transcript 줄 검증 수준을 조회할 때 쓰는 가상 이벤트 이름이다.
 	transcriptEvent = "transcript"
+
+	// planInputEvent는 TodoWrite 입력(tool_input.todos / tool_use.input.todos) 형식의 검증 수준을
+	// 조회하는 가상 이벤트 이름이다. 실측(#19, #20)에서 TodoWrite 호출을 보존하지 않았으므로
+	// 어떤 대상에도 없고 계획 후보는 항상 unverified → inferred다.
+	planInputEvent = "plan:TodoWrite"
+	planTool       = "TodoWrite"
 )
 
 // VerifiedTargets는 실측(#19, #20)으로 검증된 런타임이다.
@@ -114,6 +120,11 @@ func ParseHook(data []byte, rt adapter.Runtime) (c adapter.Candidate, err error)
 			return adapter.Candidate{}, adapter.ErrMissingRef
 		}
 		c.ToolCategory, c.Activity = toolCategory(obj.String("tool_name"))
+		if eventType != adapter.EventToolFailed && obj.String("tool_name") == planTool {
+			if input, ok := obj.Object("tool_input"); ok {
+				c.Plan = todoPlan(input, rt)
+			}
+		}
 	case adapter.EventApprovalRequested:
 		c.ToolCategory, _ = toolCategory(obj.String("tool_name"))
 	case adapter.EventAgentStarted, adapter.EventAgentCompleted:
@@ -170,6 +181,11 @@ func ParseTranscriptLine(line []byte, rt adapter.Runtime) (out []adapter.Candida
 				c.EventType = adapter.EventToolStarted
 				c.ToolUseRef = ref
 				c.ToolCategory, c.Activity = toolCategory(block.String("name"))
+				if block.String("name") == planTool {
+					if input, ok := block.Object("input"); ok {
+						c.Plan = todoPlan(input, rt)
+					}
+				}
 				out = append(out, c)
 			}
 		case lineType == "user" && blockType == "tool_result":
@@ -193,6 +209,15 @@ func ParseTranscriptLine(line []byte, rt adapter.Runtime) (out []adapter.Candida
 		out = append(out, c)
 	}
 	return out, nil
+}
+
+// todoPlan은 TodoWrite 입력의 todos[].status만 읽는다. 할 일 문장(content·activeForm)은 읽지 않는다.
+func todoPlan(input adapter.Object, rt adapter.Runtime) *adapter.Plan {
+	steps := adapter.PlanSteps(input, "todos")
+	if steps == nil {
+		return nil
+	}
+	return &adapter.Plan{Steps: steps, Support: adapter.Assess(VerifiedTargets, rt, planInputEvent)}
 }
 
 // toolCategory는 도구 이름을 보수적으로 분류한다. 이름 원문은 반환하지 않는다.

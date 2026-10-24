@@ -87,6 +87,8 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | Claude Code | `$CLAUDE_CONFIG_DIR/settings.json`, 없으면 `~/.claude/settings.json`의 `hooks` | #19에서 반복 관측한 9종: `SessionStart`, `UserPromptSubmit`, `PreToolUse`·`PostToolUse`·`PermissionRequest`(matcher `*`), `SubagentStart`, `SubagentStop`, `Stop`, `SessionEnd` | `install`·`uninstall`·`status`·`print` |
 | Codex CLI·Desktop | 미확정 | #17·#18에서 관측한 9종(위와 같은 이름, matcher 없음) | `print`만. 출력은 #18이 쓴 `hooks.json` 형식입니다. Codex는 Hook 정의를 사용자가 검토·신뢰해야 하므로 직접 등록하세요 |
 
+계획 단계(#38)는 별도 Hook 없이 위 `PreToolUse`·`PostToolUse`(Claude `TodoWrite`, Codex `update_plan`)와 Claude transcript에서 상태만 읽어 `plan.updated`로 보냅니다. 입력 형식이 미실측이라 `confidence`는 `inferred`입니다([어댑터 문서](../architecture/collector-adapters.md#계획-단계planupdated-38)).
+
 미관측 이벤트(`PostToolUseFailure`, `Notification`, `PreCompact` 등)는 등록하지 않습니다. `--scope`는 `user`만 받습니다(프로젝트 설정은 건드리지 않음).
 
 ### 핸들러

@@ -25,6 +25,12 @@ const (
 	// ProductCLI와 ProductDesktop은 Runtime.Product 값이다.
 	ProductCLI     = "codex-cli"
 	ProductDesktop = "codex-desktop"
+
+	// planInputEvent는 update_plan 입력(tool_input.plan) 형식의 검증 수준을 조회하는 가상
+	// 이벤트 이름이다. #17·#18 실측에서 update_plan Hook payload를 관측하지 않았으므로 어떤 대상에도
+	// 없고 계획 후보는 항상 unverified → inferred다.
+	planInputEvent = "plan:update_plan"
+	planTool       = "update_plan"
 )
 
 // VerifiedTargets는 실측 런타임이다.
@@ -118,6 +124,9 @@ func ParseHook(data []byte, rt adapter.Runtime) (c adapter.Candidate, err error)
 			return adapter.Candidate{}, adapter.ErrMissingRef
 		}
 		c.ToolCategory, c.Activity = toolCategory(obj.String("tool_name"))
+		if obj.String("tool_name") == planTool {
+			c.Plan = updatePlan(obj, rt)
+		}
 	case adapter.EventApprovalRequested:
 		c.ToolCategory, _ = toolCategory(obj.String("tool_name"))
 	case adapter.EventAgentStarted, adapter.EventAgentCompleted:
@@ -126,6 +135,20 @@ func ParseHook(data []byte, rt adapter.Runtime) (c adapter.Candidate, err error)
 		}
 	}
 	return c, nil
+}
+
+// updatePlan은 update_plan 입력의 plan[].status만 읽는다. 단계 문장(step)과 explanation은 읽지 않는다.
+// tool_input이 객체가 아니면(예: 인코딩된 문자열) 계획을 만들지 않는다.
+func updatePlan(obj adapter.Object, rt adapter.Runtime) *adapter.Plan {
+	input, ok := obj.Object("tool_input")
+	if !ok {
+		return nil
+	}
+	steps := adapter.PlanSteps(input, "plan")
+	if steps == nil {
+		return nil
+	}
+	return &adapter.Plan{Steps: steps, Support: adapter.Assess(VerifiedTargets, rt, planInputEvent)}
 }
 
 // toolCategory는 Codex 도구 이름을 보수적으로 분류한다. 실측 이름은 Bash뿐이다.

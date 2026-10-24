@@ -469,3 +469,13 @@
 | DASH-002 | 보안 점검 | 쿠키·HTTPS·Origin·비밀 키·백업·외부 복제·공개 가입·bootstrap 경고, 안전 설정에서 사라짐 |
 | DASH-003 | 민감정보 | 경고에 주소·키 값 없음 |
 | DASH-004 | 로그 보존 | 컨테이너 로그 회전·감사 로그·이벤트 보존 문서화 |
+
+## Collector 계획 단계 검증 매핑(#38)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| CPLAN-001 | VIEW-003 원문 없는 계획 | `TodoWrite`·`update_plan` 문장 sentinel이 후보·이벤트·카운터·오류·큐 DB(WAL 포함)에 없음, 상태만 저장 |
+| CPLAN-002 | EVT-007 계획 반영 | Claude Hook·transcript, Codex `update_plan`에서 `tool.started`와 `plan.updated`(`planning`) 두 기록, 스키마 유효 |
+| CPLAN-003 | 상태 매핑 | 정확한 `pending`·`in_progress`·`completed`만 유지, 그 밖 `unknown`, 50개 상한, 빈 목록·실패 호출은 계획 없음, 퍼즈 |
+| CPLAN-004 | 중복 제거 | 종류 `plan.updated`·`tool_use_id` 키로 Hook Pre/Post·transcript 순서 무관 1회, 다른 호출은 새 계획 |
+| CPLAN-005 | 검증 수준 | 계획 입력 형식 미실측이라 항상 `inferred`, Codex CLI `PostToolUse`는 계획 없음 |
