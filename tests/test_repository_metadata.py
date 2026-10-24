@@ -65,6 +65,7 @@ def test_ci_workflow_has_a_pinned_complete_gate() -> None:
         "python",
         "node",
         "go",
+        "go-gui",
         "compose",
         "images",
         "secret-scan",
