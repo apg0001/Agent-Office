@@ -568,3 +568,11 @@
 | PERF-004 | OFF-010 브라우저 FPS | Chromium(SwiftShader) 평균 39.8·하위 5% 29.9FPS |
 | PERF-005 | 화면 흐름 | 실제 브라우저 E2E 7단계 통과(CI `E2E (browser)`) |
 | PERF-006 | 자원 | 서버 메모리 1시간 91→97MB(누수 징후 없음) |
+
+## 릴리스 준비 검증 매핑(#65 준비)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| REL-001 | DIST-008 릴리스 노트 | 실제 검증·미검증·위험·호환성 초안 `docs/releases/0.1.0-beta.1.md` |
+| REL-002 | DIST-009~012 승인 게이트 | 게시·main·태그는 관리자 승인 후(`docs/operations/release.md`), 게시 워크플로 `image-publish` Environment |
+| REL-003 | DOC-001~004 | 설치·업그레이드·롤백·복원 문서 연결 |
