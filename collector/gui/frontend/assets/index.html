@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'" />
+    <title>Agent Office Collector</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <p class="eyebrow">AGENT OFFICE</p>
+      <h1>Collector</h1>
+      <p class="lede">이 창은 Collector Core를 설정하고 상태를 보여 줍니다. 창을 닫아도 자동 시작된 수집은 계속됩니다.</p>
+      <p id="core-missing" class="notice error" hidden></p>
+    </header>
+    <nav aria-label="페이지">
+      <button type="button" data-page="account" class="active">1. 계정·서버</button>
+      <button type="button" data-page="device">2. 기기 등록</button>
+      <button type="button" data-page="tools">3. 도구 탐지·Hook</button>
+      <button type="button" data-page="service">4. 자동 시작</button>
+      <button type="button" data-page="status">수집 상태</button>
+      <button type="button" data-page="diagnose">진단</button>
+    </nav>
+    <main>
+      <section id="page-account" class="page">
+        <h2>계정·서버</h2>
+        <p>Agent Office 서버 주소를 입력하세요. 로그인은 브라우저에서만 하며 이 앱은 계정 비밀번호를 받지 않습니다.</p>
+        <form id="server-form">
+          <label>서버 주소 <input id="server-url" type="url" placeholder="https://office.example" autocomplete="url" required /></label>
+          <button type="submit">저장</button>
+        </form>
+        <p id="server-result" class="notice" hidden></p>
+      </section>
+
+      <section id="page-device" class="page" hidden>
+        <h2>기기 등록</h2>
+        <ol class="steps">
+          <li>
+            <button type="button" id="open-browser">브라우저에서 로그인하고 등록 코드 받기</button>
+            <span class="hint">웹의 <code>/devices</code> 화면에서 'PC 등록 코드 발급'을 누르면 10분 동안 쓸 수 있는 일회용 코드가 나옵니다.</span>
+          </li>
+          <li>받은 코드와 이 PC의 이름을 입력하세요.</li>
+        </ol>
+        <form id="register-form">
+          <label>등록 코드 <input id="reg-code" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX" maxlength="16" required /></label>
+          <label>PC 이름 <input id="reg-name" maxlength="80" required /></label>
+          <label class="check"><input id="reg-force" type="checkbox" /> 이미 등록돼 있으면 새 장치로 다시 등록</label>
+          <button type="submit">등록</button>
+        </form>
+        <p id="register-result" class="notice" hidden></p>
+        <pre id="register-output" hidden></pre>
+      </section>
+
+      <section id="page-tools" class="page" hidden>
+        <h2>도구 탐지·Hook 연동</h2>
+        <button type="button" id="tools-refresh">다시 탐지</button>
+        <table>
+          <thead><tr><th>도구</th><th>버전</th><th>검증 수준</th><th>Hook</th></tr></thead>
+          <tbody id="tools-body"></tbody>
+        </table>
+        <p id="tools-result" class="notice" hidden></p>
+        <h3>Claude Code Hook</h3>
+        <p>설치하면 사용자 설정 <code>~/.claude/settings.json</code>을 먼저 백업하고 Agent Office 항목만 추가합니다. 다른 Hook과 설정은 그대로 둡니다.</p>
+        <div class="row">
+          <button type="button" id="hook-preview">1) 설치 미리보기</button>
+          <button type="button" id="hook-install" disabled>2) 내용을 확인했고 설치에 동의</button>
+          <button type="button" id="hook-uninstall" class="secondary">Agent Office Hook 제거</button>
+        </div>
+        <h3>Codex</h3>
+        <div class="row"><button type="button" id="codex-print" class="secondary">hooks.json 항목 보기(직접 등록)</button></div>
+        <p id="hook-result" class="notice" hidden></p>
+        <pre id="hook-output" hidden></pre>
+      </section>
+
+      <section id="page-service" class="page" hidden>
+        <h2>자동 시작</h2>
+        <p>로그인 시 Collector Core가 GUI 없이 실행되도록 사용자 수준 자동 시작 정의를 설치합니다(관리자 권한 없음).</p>
+        <div class="row">
+          <button type="button" id="service-preview" class="secondary">정의 미리보기</button>
+        </div>
+        <label class="check"><input id="service-activate" type="checkbox" checked /> 설치 후 바로 활성화(systemctl --user · launchctl · schtasks 실행)</label>
+        <div class="row"><button type="button" id="service-install">자동 시작 설치</button></div>
+        <p id="service-result" class="notice" hidden></p>
+        <pre id="service-output" hidden></pre>
+      </section>
+
+      <section id="page-status" class="page" hidden>
+        <h2>수집 상태</h2>
+        <div class="row">
+          <button type="button" id="status-refresh" class="secondary">새로고침</button>
+          <button type="button" id="pause">일시중지</button>
+          <button type="button" id="resume">재개</button>
+        </div>
+        <p id="pause-result" class="notice" hidden></p>
+        <dl id="status-list" class="grid"></dl>
+        <h3>오류(코드별)</h3>
+        <ul id="status-errors"></ul>
+        <h3>개수</h3>
+        <ul id="status-counters" class="counters"></ul>
+      </section>
+
+      <section id="page-diagnose" class="page" hidden>
+        <h2>진단</h2>
+        <p>버전·상태·개수·서버 도달 여부만 표시합니다. 장치 토큰, 서버 주소, 로컬 경로, 대화 내용은 포함하지 않습니다.</p>
+        <div class="row">
+          <button type="button" id="diagnose-run">진단 실행</button>
+          <label class="check"><input id="diagnose-offline" type="checkbox" /> 서버 도달 확인 생략</label>
+        </div>
+        <pre id="diagnose-output" hidden></pre>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

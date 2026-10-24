@@ -526,3 +526,29 @@ textarea.domains {
   color: inherit;
   font: inherit;
 }
+
+.registration-code {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin: 0.75rem 0;
+}
+
+.registration-code output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.6rem;
+  letter-spacing: 0.15em;
+}
+
+.device-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.device-table th,
+.device-table td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}

@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -72,7 +73,12 @@ func cmdHooks(args []string, env Env) int {
 	scope := fs.String("scope", "user", "설치 범위(user만 지원)")
 	goos := fs.String("os", env.GOOS, "print 대상 OS")
 	exeFlag := fs.String("exe", "", "print에 넣을 실행 파일 경로")
+	asJSON := fs.Bool("json", false, "status를 JSON으로 출력(GUI용)")
 	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 {
+		return ExitUsage
+	}
+	if *asJSON && sub != "status" {
+		fmt.Fprintln(env.Stderr, "--json은 hooks status에서만 쓸 수 있습니다")
 		return ExitUsage
 	}
 	if *scope != "user" {
@@ -121,6 +127,9 @@ func cmdHooks(args []string, env Env) int {
 		}
 		_, _ = env.Stdout.Write(spec.JSON())
 		return ExitOK
+	}
+	if *asJSON {
+		return hooksStatusJSON(env, dirs, exe, tools)
 	}
 	code := ExitOK
 	for _, t := range tools {
@@ -190,6 +199,81 @@ func hooksStatus(env Env, dirs paths.Dirs, spec hooks.Spec) int {
 	fmt.Fprintf(env.Stdout, "Claude Code Hook: %s (이벤트 %d/%d 최신, 누락 %d, 변경됨 %d, 다른 Hook %d개 보존)\n",
 		st.State, st.Current, len(spec.Events), st.Missing, st.Modified, st.Foreign)
 	return ExitOK
+}
+
+// ToolReport는 `hooks status --json`의 도구 하나다. 버전 문자열·enum·개수만 담고
+// 설정 파일 경로, Hook 명령 원문, 다른 Hook 내용은 넣지 않는다.
+type ToolReport struct {
+	Tool string `json:"tool"`
+	// Detected는 PATH에서 `<도구> --version`으로 버전을 얻었는지다.
+	Detected bool   `json:"detected"`
+	Version  string `json:"version,omitempty"`
+	// Support는 어댑터 실측 표와의 일치 수준(verified / partial / unverified)이다.
+	Support string `json:"support"`
+	// VerifiedMode는 실측 모드(print / exec / desktop)다. 일치하지 않으면 비어 있다.
+	VerifiedMode string `json:"verified_mode,omitempty"`
+	// HookInstall은 auto(install 지원) 또는 print_only다.
+	HookInstall string `json:"hook_install"`
+	// HookState는 installed / partial / modified / not_installed / unreadable / unknown이다.
+	HookState     string `json:"hook_state"`
+	EventsCurrent int    `json:"events_current"`
+	EventsTotal   int    `json:"events_total"`
+	Missing       int    `json:"missing"`
+	Modified      int    `json:"modified"`
+	Foreign       int    `json:"foreign"`
+	// Error는 unreadable일 때의 고정 코드다.
+	Error string `json:"error,omitempty"`
+}
+
+func hooksStatusJSON(env Env, dirs paths.Dirs, exe string, tools []string) int {
+	out := struct {
+		OS    string       `json:"os"`
+		Tools []ToolReport `json:"tools"`
+	}{OS: env.GOOS}
+	code := ExitOK
+	for _, t := range tools {
+		spec, err := hooks.Generate(hooks.Params{Tool: t, GOOS: env.GOOS, Exe: exe})
+		if err != nil {
+			fmt.Fprintln(env.Stderr, "Hook 항목을 만들 수 없습니다:", err)
+			return ExitError
+		}
+		r := ToolReport{Tool: t, Support: "unverified", HookInstall: "auto", HookState: "unknown", EventsTotal: len(spec.Events)}
+		if v, err := env.ToolVersion(t); err == nil && v != "" {
+			sup := hooks.AssessVersion(t, v, env.GOOS)
+			r.Detected, r.Version, r.Support, r.VerifiedMode = true, v, string(sup.Level), sup.Mode
+		}
+		if t == hooks.ToolCodex {
+			r.HookInstall = "print_only"
+		} else if st, err := hooks.Inspect(hooks.ClaudeSettingsPath(dirs.ClaudeProjects), spec); err != nil {
+			r.HookState, r.Error = string(hooks.StateUnreadable), hooksErrCode(err)
+			code = ExitError
+		} else {
+			r.HookState, r.EventsCurrent, r.Missing, r.Modified, r.Foreign = string(st.State), st.Current, st.Missing, st.Modified, st.Foreign
+		}
+		out.Tools = append(out.Tools, r)
+	}
+	data, _ := json.MarshalIndent(out, "", "  ")
+	fmt.Fprintln(env.Stdout, string(data))
+	return code
+}
+
+func hooksErrCode(err error) string {
+	switch {
+	case errors.Is(err, hooks.ErrParse):
+		return "parse_error"
+	case errors.Is(err, hooks.ErrShape):
+		return "shape_error"
+	case errors.Is(err, hooks.ErrNotRegular):
+		return "not_regular"
+	case errors.Is(err, hooks.ErrReadOnly):
+		return "read_only"
+	case errors.Is(err, hooks.ErrTooLarge):
+		return "too_large"
+	case errors.Is(err, hooks.ErrChanged):
+		return "changed"
+	default:
+		return "io_error"
+	}
 }
 
 func hooksApply(env Env, dirs paths.Dirs, spec hooks.Spec, install, yes bool) int {
