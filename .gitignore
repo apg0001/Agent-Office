@@ -22,6 +22,8 @@ bin/
 .env.*
 !deploy/.env.example
 !deploy/.env.production.example
+# 배포 이력(deploy/upgrade.sh)
+deploy/.deploy-history
 *.pem
 *.key
 
