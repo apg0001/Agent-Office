@@ -597,3 +597,12 @@
 | UPD-004 | 알림 후 업데이트 | `check`는 알림만, `apply`는 `--yes`일 때만 |
 | UPD-005 | 재기동 검증·롤백 | 원자적 교체·`.bak`, 비정상 재기동 시 되돌림 |
 | UPD-006 | 패키지 설치 | `/usr/bin` 설치는 패키지 관리자로 안내 |
+
+## Linux 실제 사용 흐름 검증 매핑(#62 Linux 부분)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| FLOW-001 | 실제 Hook 수집 | Claude Code 2.1.308 `claude -p` → Hook → Collector → 서버, 세션·턴·도구 이벤트 |
+| FLOW-002 | 원문 비전송 | 프롬프트 표식 문자열이 DB 전체 덤프에 0건 |
+| FLOW-003 | 사용자 설정 보존 | `~/.claude/settings.json` 실행 전후 동일 |
+| FLOW-004 | 등록 | 웹 API 등록 코드 → `register --code-stdin` |
