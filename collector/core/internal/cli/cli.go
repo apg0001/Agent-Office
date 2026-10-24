@@ -1,6 +1,7 @@
 // Package cli는 headless Collector 명령줄이다(#34). GUI(#40~#44)는 이 명령들을 감싼다.
 //
 //	agent-office-collector register --server URL --code XXXX-XXXX|--code-stdin --name PC [--force]
+//	agent-office-collector logout [--local-only]
 //	agent-office-collector run
 //	agent-office-collector hook claude|codex [--product P] [--tool-version V] [--mode M]
 //	agent-office-collector pause | resume
@@ -34,6 +35,7 @@ import (
 	"github.com/apg0001/Agent-Office/collector/core/internal/config"
 	"github.com/apg0001/Agent-Office/collector/core/internal/paths"
 	"github.com/apg0001/Agent-Office/collector/core/internal/runner"
+	"github.com/apg0001/Agent-Office/collector/core/internal/secret"
 	"github.com/apg0001/Agent-Office/collector/core/internal/service"
 )
 
@@ -69,6 +71,9 @@ type Env struct {
 	HookTimeout time.Duration
 	// ToolVersion은 `<도구> --version`에서 버전 문자열만 돌려준다(hooks 명령).
 	ToolVersion func(tool string) (string, error)
+	// Secrets는 장치 토큰 보관용 OS 보안 저장소다(#41). nil이면 secret.System(환경 변수·OS로 결정,
+	// 사용할 수 없으면 파일 보관). 테스트는 secret.Memory를 넣어 실제 저장소를 건드리지 않는다.
+	Secrets secret.Store
 }
 
 func (e *Env) defaults() {
@@ -126,6 +131,12 @@ func (e *Env) defaults() {
 	if e.HookTimeout <= 0 {
 		e.HookTimeout = 2 * time.Second
 	}
+	if e.Secrets == nil {
+		// 인터페이스에 nil 포인터가 들어가지 않게 명시적으로 확인한다.
+		if s := secret.System(e.Getenv, e.GOOS); s != nil {
+			e.Secrets = s
+		}
+	}
 }
 
 func execCommand(args ...string) ([]byte, error) {
@@ -151,6 +162,8 @@ func Main(args []string, env Env) int {
 		return ExitOK
 	case "register":
 		return cmdRegister(rest, env)
+	case "logout":
+		return cmdLogout(rest, env)
 	case "run":
 		return cmdRun(rest, env)
 	case "pause", "resume":
@@ -175,7 +188,8 @@ func Main(args []string, env Env) int {
 func usage(w io.Writer) {
 	fmt.Fprint(w, `사용법: agent-office-collector <명령>
 
-  register --server URL --code XXXX-XXXX|--code-stdin --name PC [--force]  장치 등록(토큰은 0600 설정 파일에 저장, 출력하지 않음)
+  register --server URL --code XXXX-XXXX|--code-stdin --name PC [--force]  장치 등록(토큰은 OS 보안 저장소, 없으면 0600 설정 파일에 저장, 출력하지 않음)
+  logout [--local-only]                                        서버에서 이 장치를 폐기하고 로컬 장치 토큰·등록 정보를 지움
   run                                                          수집·전송 실행(포그라운드, SIGINT/SIGTERM으로 종료)
   hook claude|codex                                            Hook stdin을 실행 중인 Collector에 전달(항상 종료 코드 0)
   pause | resume                                               수집·전송 일시중지/재개
@@ -208,7 +222,7 @@ func cmdRun(args []string, env Env) int {
 		return ExitError
 	}
 	logger := log.New(env.Stderr, "agent-office-collector: ", log.LstdFlags)
-	o := runner.Options{Dirs: dirs, Version: env.Version, GOOS: env.GOOS, Now: env.Now, Logf: logger.Printf}
+	o := runner.Options{Dirs: dirs, Version: env.Version, GOOS: env.GOOS, Now: env.Now, Logf: logger.Printf, Secrets: env.Secrets}
 	if env.RunOptions != nil {
 		env.RunOptions(&o)
 	}

@@ -157,20 +157,32 @@ func cmdRegister(args []string, env Env) int {
 	}
 	cfg := config.Config{
 		SchemaVersion: config.SchemaVersion, ServerURL: base, DeviceID: out.DeviceID,
-		DeviceToken: config.Secret(out.DeviceToken), DeviceName: trimmedName, RegisteredAt: env.Now().UTC(),
+		DeviceName: trimmedName, RegisteredAt: env.Now().UTC(),
 	}
 	if prevErr == nil {
 		cfg.ClaudeProjectsDir, cfg.ClaudeVersion, cfg.ClaudeMode = prev.ClaudeProjectsDir, prev.ClaudeVersion, prev.ClaudeMode
 	}
-	if err := cfg.Validate(); err != nil {
+	token := config.Secret(out.DeviceToken)
+	check := cfg
+	check.DeviceToken = token
+	if err := check.Validate(); err != nil {
 		fmt.Fprintln(env.Stderr, "서버 응답 형식이 올바르지 않습니다")
 		return ExitError
 	}
-	if err := config.Save(dirs.ConfigFile(), cfg); err != nil {
+	saved, err := config.SaveWithToken(dirs.ConfigFile(), cfg, token, env.Secrets)
+	if err != nil {
 		fmt.Fprintln(env.Stderr, "설정 파일을 저장하지 못했습니다")
 		return ExitError
 	}
-	fmt.Fprintf(env.Stdout, "등록했습니다. 장치 ID %s. 장치 토큰은 설정 파일(권한 0600)에만 저장했습니다.\n", cfg.DeviceID)
+	if prevErr == nil && prev.DeviceID != saved.DeviceID {
+		// 이전 장치의 보안 저장소 항목은 더 쓰지 않는다(서버 폐기는 하지 않음: 웹 /devices 또는 logout).
+		_ = config.DeleteToken(prev, env.Secrets)
+	}
+	if saved.InKeyring() {
+		fmt.Fprintf(env.Stdout, "등록했습니다. 장치 ID %s. 장치 토큰은 OS 보안 저장소에만 저장했습니다.\n", saved.DeviceID)
+	} else {
+		fmt.Fprintf(env.Stdout, "등록했습니다. 장치 ID %s. OS 보안 저장소를 쓸 수 없어 장치 토큰을 설정 파일(권한 0600)에 저장했습니다(대체 경로).\n", saved.DeviceID)
+	}
 	if prevErr == nil {
 		fmt.Fprintln(env.Stdout, "이전 장치의 미전송 큐 이벤트는 새 장치로 보낼 수 없어 서버가 거부할 수 있습니다(dead-letter로 집계).")
 	}

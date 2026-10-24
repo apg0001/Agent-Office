@@ -24,6 +24,8 @@ const (
 	StateNotRegistered = "not_registered"
 	StateConfigInvalid = "config_invalid"
 	StateStopped       = "stopped"
+	// StateTokenUnavailable은 OS 보안 저장소에서 장치 토큰을 읽지 못해 기다리는 상태다(#41, 잠김·D-Bus 없음).
+	StateTokenUnavailable = "token_unavailable"
 )
 
 // 오류 코드. 고정 enum만 쓰고 경로·URL·서버 응답 본문·OS 오류 문자열은 남기지 않는다.
