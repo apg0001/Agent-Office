@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/apg0001/Agent-Office/collector/core/internal/adapter"
+	"github.com/apg0001/Agent-Office/collector/core/internal/adapter/claude"
 	"github.com/apg0001/Agent-Office/collector/core/internal/adapter/codex"
+	"github.com/apg0001/Agent-Office/collector/core/internal/spool"
 	"github.com/apg0001/Agent-Office/collector/core/internal/tail"
 )
 
@@ -157,4 +159,22 @@ func TestPlanStepsOnlyOnPlanUpdated(t *testing.T) {
 		t.Fatalf("schema: %v", err)
 	}
 	assertClean(t, "sanitized", rec)
+}
+
+// `hook` 명령은 spool 레코드를 남기고 `run`이 Candidate로 정규화한다. 이 경로도 plan.updated를 만든다.
+func TestPipelineCandidateFromSpoolEmitsPlan(t *testing.T) {
+	c, err := claude.ParseHook(todoHook("PreToolUse", "tu-9", "in_progress", "pending"), claudeRuntime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := spool.FromCandidate(c, observed).Candidate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := NewPipeline(newNormalizer(t, Options{}))
+	got := byType(p.Candidate(Input{Candidate: back, ObservedAt: observed}))
+	plans := got["plan.updated"]
+	if len(got["tool.started"]) != 1 || len(plans) != 1 || !reflect.DeepEqual(plans[0].PlanSteps, []string{"in_progress", "pending"}) {
+		t.Fatalf("records %+v", got)
+	}
 }

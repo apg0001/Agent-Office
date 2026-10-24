@@ -188,6 +188,28 @@ func TestHookSpoolsWhitelistedCandidateOnly(t *testing.T) {
 	}
 }
 
+// TodoWrite Hook은 단계 상태만 spool에 남기고 단계 문장은 버린다(#38).
+func TestHookSpoolsPlanStatusesOnly(t *testing.T) {
+	te := newTestEnv(t, "u")
+	te.register("https://office.example")
+	hook := `{"hook_event_name":"PreToolUse","session_id":"00000000-0000-4000-8000-000000000001","prompt_id":"00000000-0000-4000-8000-000000000101","tool_name":"TodoWrite","tool_use_id":"toolu_p1","tool_input":{"todos":[{"content":"` + sentinelPrompt + `","activeForm":"` + sentinelPrompt + `","status":"in_progress"},{"content":"` + sentinelPrompt + `","activeForm":"x","status":"pending"}]}}`
+	if code := te.run(hook, "hook", "claude", "--tool-version", "2.1.308", "--mode", "print"); code != ExitOK {
+		t.Fatal(code)
+	}
+	files := spoolFiles(t, te.dirs)
+	if len(files) != 1 {
+		t.Fatalf("spool files %d", len(files))
+	}
+	for _, bad := range []string{sentinelPrompt, "content", "activeForm", "todos"} {
+		if bytes.Contains(files[0], []byte(bad)) {
+			t.Fatalf("spool contains %q", bad)
+		}
+	}
+	if !bytes.Contains(files[0], []byte(`"plan":{"steps":["in_progress","pending"]`)) {
+		t.Fatalf("plan statuses missing: %s", files[0])
+	}
+}
+
 // 실제 프로세스로 실행해 종료 코드와 시간을 확인한다(Claude Code가 보는 것과 같은 조건).
 func TestHookProcessExitsZeroQuickly(t *testing.T) {
 	home := t.TempDir()

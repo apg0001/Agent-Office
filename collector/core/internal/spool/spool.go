@@ -55,6 +55,14 @@ type Record struct {
 	AgentType    string    `json:"agent_type,omitempty"`
 	Confidence   string    `json:"confidence"`
 	Support      string    `json:"support"`
+	// Plan은 계획 도구 호출의 단계 상태 enum 목록이다(#38). 단계 문장은 담지 않는다.
+	Plan *PlanRecord `json:"plan,omitempty"`
+}
+
+// PlanRecord는 adapter.Plan의 spool 표현이다.
+type PlanRecord struct {
+	Steps   []string `json:"steps"`
+	Support string   `json:"support"`
 }
 
 // FromCandidate는 후보를 spool 레코드로 바꾼다.
@@ -65,7 +73,27 @@ func FromCandidate(c adapter.Candidate, observedAt time.Time) Record {
 		SessionRef: c.SessionRef, TurnRef: c.TurnRef, ToolUseRef: c.ToolUseRef, AgentRef: c.AgentRef,
 		ToolCategory: string(c.ToolCategory), Activity: string(c.Activity), AgentType: string(c.AgentType),
 		Confidence: string(c.Confidence), Support: string(c.Support),
+		Plan: planRecord(c.Plan),
 	}
+}
+
+func planRecord(p *adapter.Plan) *PlanRecord {
+	if p == nil || len(p.Steps) == 0 {
+		return nil
+	}
+	return &PlanRecord{Steps: planSteps(p.Steps), Support: string(p.Support)}
+}
+
+// planSteps는 상태를 enum으로 다시 거르고 길이를 adapter.MaxPlanSteps로 자른다.
+func planSteps(in []string) []string {
+	if len(in) > adapter.MaxPlanSteps {
+		in = in[:adapter.MaxPlanSteps]
+	}
+	out := make([]string, len(in))
+	for i, s := range in {
+		out[i] = adapter.PlanStatusOf(s)
+	}
+	return out
 }
 
 // Candidate는 레코드를 후보로 되돌린다. 참조 식별자는 adapter.ValidRef로 다시 검증한다
@@ -79,12 +107,16 @@ func (r Record) Candidate() (adapter.Candidate, error) {
 			return adapter.Candidate{}, ErrInvalid
 		}
 	}
+	var plan *adapter.Plan
+	if r.Plan != nil && len(r.Plan.Steps) > 0 {
+		plan = &adapter.Plan{Steps: planSteps(r.Plan.Steps), Support: adapter.SupportLevel(r.Plan.Support)}
+	}
 	return adapter.Candidate{
 		Provider: adapter.Provider(r.Provider), Source: adapter.Source(r.Source), EventType: adapter.EventType(r.EventType),
 		SessionRef: r.SessionRef, TurnRef: r.TurnRef, ToolUseRef: r.ToolUseRef, AgentRef: r.AgentRef,
 		ToolCategory: adapter.ToolCategory(r.ToolCategory), Activity: adapter.Activity(r.Activity),
 		AgentType: adapter.AgentTypeCategory(r.AgentType), Confidence: adapter.Confidence(r.Confidence),
-		Support: adapter.SupportLevel(r.Support),
+		Support: adapter.SupportLevel(r.Support), Plan: plan,
 	}, nil
 }
 
