@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import DataError
 
 from agent_office import backup, monitoring, retention
 from agent_office.api import (
@@ -25,7 +26,7 @@ from agent_office.api import (
 )
 from agent_office.db.engine import get_engine
 from agent_office.http_limits import BodySizeLimitMiddleware
-from agent_office.validation import validation_error_handler
+from agent_office.validation import data_error_handler, validation_error_handler
 
 
 class HealthResponse(BaseModel):
@@ -80,6 +81,7 @@ def ready() -> JSONResponse:
 
 app.add_middleware(BodySizeLimitMiddleware)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
+app.add_exception_handler(DataError, data_error_handler)
 app.include_router(auth.router)
 app.include_router(accounts.router)
 app.include_router(oauth.router)
