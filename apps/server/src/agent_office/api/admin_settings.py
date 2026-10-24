@@ -18,6 +18,7 @@ from agent_office import audit, backup, instance, monitoring, retention, secret_
 from agent_office.api.deps import CsrfDep, CurrentUser, DbConnection, UserDep
 from agent_office.auth import accounts, mailer
 from agent_office.db import schema
+from agent_office.notifications import manager as notifications
 
 router = APIRouter(prefix="/api/v1/admin/settings", tags=["admin"])
 
@@ -398,6 +399,12 @@ def run_backup(
     instance.put_value(
         connection, backup.STATUS_KEY, {**backup.read_status(connection), **fields}, admin.id
     )
+    # 관리자가 직접 다시 성공시키면 열린 장애 알림을 닫는다.
+    # 실패는 화면에 바로 보이므로 보내지 않는다.
+    if result.ok:
+        notifications.notify(
+            connection, "backup.recovered" if action == "run" else "restore_test.recovered"
+        )
     audit.record(
         connection,
         "backup.run" if action == "run" else "backup.restore_test",

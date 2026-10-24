@@ -202,6 +202,9 @@ async def run_periodically() -> None:
         except Exception as error:  # noqa: BLE001 - 정리 실패가 서버를 멈추면 안 된다.
             last_run.update(at=dt.datetime.now(dt.UTC).isoformat(), ok=False)
             logger.warning("retention purge failed: %s", type(error).__name__)
+            from agent_office.notifications.manager import notify_safely
+
+            await run_in_threadpool(notify_safely, "retention.failed")
         await asyncio.sleep(RUN_INTERVAL_SECONDS)
 
 

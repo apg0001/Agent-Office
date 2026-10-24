@@ -4,6 +4,7 @@ import { Card, Field, Notice } from "./AccountPages";
 import { type SessionInfo, call, messageFor, smtpMessage } from "./api";
 import { type AdminSettings, type Metrics, SETTING_BOUNDARIES, formatBytes, warningsFor } from "./admin";
 import { AdminUsers, AuditLog } from "./AdminUsers";
+import { NotificationChannels } from "./NotificationChannels";
 import { POLICY_LABELS } from "./wizard";
 
 const BACKUP_ERRORS: Record<string, string> = {
@@ -377,6 +378,7 @@ export function AdminPage() {
       {metrics && settings && <Diagnostics metrics={metrics} settings={settings} csrf={session.csrf_token} reload={() => void load()} />}
       <AdminUsers me={session.user.id} myRole={session.user.instance_role} csrf={session.csrf_token} />
       {settings && <SettingsForms key={JSON.stringify(settings)} settings={settings} csrf={session.csrf_token} reload={() => void load()} />}
+      <NotificationChannels csrf={session.csrf_token} />
       <AuditLog />
       <Card title="설정은 어디서 바꾸나요">
         <table className="members">

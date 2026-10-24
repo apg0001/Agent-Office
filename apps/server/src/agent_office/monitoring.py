@@ -209,5 +209,12 @@ async def send_heartbeats() -> None:
             ok = await run_in_threadpool(_ping, url)
             if not ok:
                 logger.warning("external heartbeat failed")
+            # 전송 실패·복구를 다른 채널로 알린다(호스트가 꺼진 경우는 외부 서비스가 알린다).
+            from agent_office.notifications.manager import notify_safely
+
+            if not ok:
+                await run_in_threadpool(notify_safely, "heartbeat.failed")
+            elif last_heartbeat["ok"] is False:
+                await run_in_threadpool(notify_safely, "heartbeat.recovered")
         last_heartbeat.update(at=dt.datetime.now(dt.UTC).isoformat(), ok=ok)
         await asyncio.sleep(heartbeat_interval())
