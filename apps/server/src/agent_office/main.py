@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from agent_office import backup, monitoring, retention
 from agent_office.api import (
     accounts,
+    admin_notifications,
     admin_settings,
     admin_users,
     auth,
@@ -83,6 +84,7 @@ app.include_router(setup.router)
 app.include_router(admin_settings.router)
 app.include_router(admin_settings.metrics_router)
 app.include_router(admin_users.router)
+app.include_router(admin_notifications.router)
 app.include_router(teams.router)
 app.include_router(devices.router)
 app.include_router(events.router)

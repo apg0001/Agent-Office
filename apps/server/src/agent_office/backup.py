@@ -449,6 +449,12 @@ def _due(value: Any, interval: dt.timedelta, now: dt.datetime) -> bool:
         return True
 
 
+def notify_safely(kind: str, code: str | None = None) -> None:
+    from agent_office.notifications.manager import notify_safely as send
+
+    send(kind, code)
+
+
 def run_scheduled_once(now: dt.datetime | None = None) -> None:
     """하루 한 번 백업, 30일마다 복원 시험. 여러 서버 프로세스여도 advisory lock으로 하나만."""
     from sqlalchemy import func, select
@@ -473,22 +479,26 @@ def run_scheduled_once(now: dt.datetime | None = None) -> None:
                         last_backup_size_bytes=info.size_bytes,
                         last_error=None,
                     )
+                    notify_safely("backup.recovered")
                 except BackupError as error:
                     _record(
                         last_backup_at=now.isoformat(), last_backup_ok=False, last_error=error.code
                     )
+                    notify_safely("backup.failed", error.code)
                     return
             if _due(status.get("last_restore_test_at"), RESTORE_TEST_INTERVAL, now):
                 directory = Path(os.environ.get(BACKUP_DIR_ENV, DEFAULT_BACKUP_DIR))
                 try:
                     restore_test(_latest(directory))
                     _record(last_restore_test_at=now.isoformat(), last_restore_test_ok=True)
+                    notify_safely("restore_test.recovered")
                 except BackupError as error:
                     _record(
                         last_restore_test_at=now.isoformat(),
                         last_restore_test_ok=False,
                         last_error=error.code,
                     )
+                    notify_safely("restore_test.failed", error.code)
         finally:
             lock_connection.execute(select(func.pg_advisory_unlock(func.hashtext(_LOCK_KEY))))
 
