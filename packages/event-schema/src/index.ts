@@ -43,6 +43,9 @@ export type EventActivity = (typeof EVENT_ACTIVITIES)[number];
 export const EVENT_CONFIDENCE_LEVELS = ["observed", "inferred"] as const;
 export type EventConfidence = (typeof EVENT_CONFIDENCE_LEVELS)[number];
 
+export const PLAN_STEP_STATUSES = ["pending", "in_progress", "completed", "unknown"] as const;
+export type PlanStepStatus = (typeof PLAN_STEP_STATUSES)[number];
+
 export interface AgentOfficeEventV1 {
   schema_version: typeof EVENT_SCHEMA_VERSION;
   event_id: string;
@@ -57,6 +60,8 @@ export interface AgentOfficeEventV1 {
   confidence: EventConfidence;
   occurred_at: string;
   sequence: number;
+  /** plan.updated에서만: 계획 단계 상태만 순서대로(#38). 단계 문장은 담지 않는다. */
+  plan_steps?: PlanStepStatus[];
 }
 
 export interface CollectorEventBatchRequestV1 {

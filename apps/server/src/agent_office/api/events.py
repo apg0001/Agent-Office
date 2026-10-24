@@ -24,7 +24,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from agent_office.api.deps import CurrentDevice, DbConnection, DeviceDep
 from agent_office.db import schema
-from agent_office.state.store import apply_event
+from agent_office.state.store import apply_event, apply_plan
 
 MAX_BATCH_EVENTS = 500
 RETENTION_WINDOW = dt.timedelta(days=30)
@@ -79,6 +79,7 @@ RejectionCode = Literal[
     "occurred_at_out_of_range",
     "internal_error",
 ]
+PlanStatus = Literal["pending", "in_progress", "completed", "unknown"]
 # RFC 3339 시간대(Z 또는 ±HH:MM)가 반드시 붙은 문자열만 받는다.
 OccurredAt = Annotated[
     str, StringConstraints(max_length=40, pattern=r"^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$")
@@ -103,9 +104,13 @@ class EventV1(BaseModel):
     confidence: Confidence
     occurred_at: OccurredAt
     sequence: Annotated[int, Field(strict=True, ge=0, le=MAX_SAFE_INTEGER)]
+    # plan.updated에서만: 계획 단계 상태만 순서대로(#38). 단계 문장은 받지 않는다.
+    plan_steps: Annotated[tuple[PlanStatus, ...], Field(min_length=1, max_length=50)] | None = None
 
     @model_validator(mode="after")
     def _inferred_source_is_inferred(self) -> EventV1:
+        if self.plan_steps is not None and self.event_type != "plan.updated":
+            raise ValueError("plan_steps only on plan.updated")
         if self.source == "inferred" and self.confidence != "inferred":
             raise ValueError("inferred source requires inferred confidence")
         if self.parent_agent_id == self.agent_id:
@@ -118,6 +123,9 @@ class EventV1(BaseModel):
     def digest(self) -> bytes:
         """정규 직렬화의 SHA-256. 같은 시각의 다른 표기는 같은 값이 된다."""
         canonical = self.model_dump(mode="json")
+        if canonical.get("plan_steps") is None:
+            # 계획 필드가 없는 이벤트의 digest는 필드 추가 전과 같아야 재전송이 중복으로 처리된다.
+            canonical.pop("plan_steps", None)
         canonical["occurred_at"] = self.occurred_datetime().astimezone(dt.UTC).isoformat()
         return hashlib.sha256(
             json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -329,6 +337,8 @@ def _store(
         occurred_at=occurred,
         sequence=event.sequence,
     )
+    if event.plan_steps is not None:
+        apply_plan(connection, session_id, agent_id, list(event.plan_steps), occurred)
     sessions = schema.agent_sessions
     connection.execute(
         update(sessions)

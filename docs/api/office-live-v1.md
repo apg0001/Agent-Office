@@ -59,7 +59,16 @@
 
 - 연결마다 1초 주기로 DB를 조회합니다. 30세션·소수 사용자 규모(Pi 목표) 기준이며, 부하 실측은 #63에서 합니다. 필요하면 PostgreSQL `LISTEN/NOTIFY`로 바꿉니다.
 - 클라이언트 메시지(구독 범위 변경 등)는 아직 받지 않습니다.
-- 계획 단계(`plan_steps`)를 채우는 수집 경로는 아직 없습니다. 이벤트 스키마 v1에 단계 필드가 없어 상세의 `plan_steps`는 현재 항상 빈 목록입니다(#38).
+- 계획 단계는 `plan.updated` 이벤트의 `plan_steps`(상태만)로 채워집니다(#38). Collector가 이 필드를 보내기 전까지는 빈 목록입니다.
+
+## 타임라인 페이지(#38)
+
+| 요청 | 설명 |
+|---|---|
+| `GET /api/v1/office/agents/{agent_id}/timeline?limit=&before=` | 내 에이전트. 최신순, `limit` 1~200(기본 50) |
+| `GET /api/v1/teams/{team_id}/office/agents/{agent_id}/timeline?limit=&before=` | 팀에 공유된 에이전트. 공유가 거둬지면 바로 404 |
+
+응답 `{entries: [{event_type, activity, confidence, source, occurred_at}], next}`. `next`는 다음 페이지 커서(불투명 문자열, 마지막이면 `null`)이며 `before`로 넘깁니다. 잘못된 커서는 `400 invalid_cursor`. 이벤트는 30일 보존(#39) 안의 것만 있습니다.
 
 ## 팀 사무실(#54, #55)
 

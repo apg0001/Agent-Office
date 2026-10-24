@@ -36,6 +36,44 @@ def apply_event(
     _apply_agent(connection, agent_id, event_type, activity, confidence, occurred_at, sequence)
 
 
+def apply_plan(
+    connection: Connection,
+    session_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    statuses: list[str],
+    occurred_at: dt.datetime,
+) -> bool:
+    """세션 계획을 이 상태 목록으로 바꾼다(#38). 이미 더 늦은 계획이 있으면 무시한다."""
+    steps = schema.plan_steps
+    latest = connection.execute(
+        select(func.max(steps.c.updated_at)).where(steps.c.session_id == session_id)
+    ).scalar_one()
+    if latest is not None and occurred_at <= latest:
+        return False
+    connection.execute(steps.delete().where(steps.c.session_id == session_id))
+    connection.execute(
+        steps.insert(),
+        [
+            {
+                "session_id": session_id,
+                "agent_id": agent_id,
+                "step_index": index,
+                "status": status,
+                "updated_at": occurred_at,
+            }
+            for index, status in enumerate(statuses)
+        ],
+    )
+    # 상세 패널이 다시 가져오도록 이 에이전트의 변경 번호를 올린다.
+    states = schema.agent_current_states
+    connection.execute(
+        update(states)
+        .where(states.c.agent_id == agent_id)
+        .values(change_seq=_next_change(), updated_at=func.clock_timestamp())
+    )
+    return True
+
+
 def _apply_lifecycle(
     connection: Connection, session_id: uuid.UUID, event_type: str, occurred_at: dt.datetime
 ) -> str:

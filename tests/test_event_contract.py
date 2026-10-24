@@ -83,5 +83,10 @@ def test_event_contract_has_only_reviewed_fields() -> None:
         "confidence",
         "occurred_at",
         "sequence",
+        # plan.updated에서만 쓰는 선택 필드. 상태 enum 배열이라 원문이 들어갈 수 없다(#38).
+        "plan_steps",
     }
     assert EVENT_SCHEMA["additionalProperties"] is False
+    plan = EVENT_SCHEMA["properties"]["plan_steps"]
+    assert plan["items"] == {"enum": ["pending", "in_progress", "completed", "unknown"]}
+    assert "plan_steps" not in EVENT_SCHEMA["required"]
