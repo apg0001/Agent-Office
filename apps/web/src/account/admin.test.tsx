@@ -76,6 +76,15 @@ describe("admin warnings", () => {
     expect(texts.some((t) => t.includes("접속 주소가 없어"))).toBe(true);
   });
 
+  it("raises high security findings to the top", () => {
+    const texts = warningsFor(
+      metrics({ security: [{ code: "cookie_not_secure", level: "high", text: "쿠키" }, { code: "setup_incomplete", level: "info", text: "설치" }] }),
+      settings,
+      NOW,
+    ).map((w) => w.text);
+    expect(texts).toEqual(["보안: 쿠키"]);
+  });
+
   it("warns about stale backups and restore tests", () => {
     const texts = warningsFor(
       metrics({
