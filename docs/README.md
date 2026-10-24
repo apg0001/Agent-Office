@@ -15,6 +15,7 @@
 - [개발 환경 설치](installation/development.md)
 - [Docker 이미지와 Compose](installation/docker-images.md)
 - [Collector CLI·백그라운드 실행·진단](installation/collector-cli.md)
+- [Collector GUI(Wails)·브라우저 로그인 기기 등록](installation/collector-gui.md)
 - [구성 경계](configuration/README.md)
 - [요구사항 추적](requirements/traceability.md)
 - [Codex CLI Hook·JSONL 실측](poc/codex-cli-hooks.md)
@@ -28,3 +29,4 @@
 - [지속적 통합 기준](operations/ci.md)
 - [ADR-0001 모노레포 구조](decisions/0001-monorepo-layout.md)
 - [ADR-0002 Collector 수집 소스 우선순위](decisions/0002-collector-source-priority.md)
+- [ADR-0003 Collector GUI는 Wails v2.12.0으로 Core를 감싼다](decisions/0003-collector-gui-wails-v2.md)

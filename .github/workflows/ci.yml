@@ -100,6 +100,36 @@ jobs:
       - name: Test with race detector
         run: go test -race ./...
 
+  go-gui:
+    name: Go GUI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: collector/gui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.24.x"
+          cache: false
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      # 빌드 태그 없이 검사하면 Wails 데스크톱(webkit2gtk·cgo) 없이 백엔드만 컴파일된다.
+      - name: Vet
+        run: |
+          go vet ./...
+          GOOS=windows go vet ./internal/...
+          GOOS=darwin go vet ./internal/...
+      - name: Build Collector Core for contract tests
+        working-directory: collector/core
+        run: go build -o "$RUNNER_TEMP/agent-office-collector" ./cmd/agent-office-collector
+      - name: Test with race detector (backend only, no display)
+        env:
+          AGENT_OFFICE_TEST_CORE_BIN: ${{ runner.temp }}/agent-office-collector
+        run: go test -race ./...
+
   compose:
     name: Compose
     runs-on: ubuntu-latest
@@ -172,17 +202,18 @@ jobs:
     name: CI Gate
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    needs: [python, node, go, compose, images, secret-scan]
+    needs: [python, node, go, go-gui, compose, images, secret-scan]
     steps:
       - name: Require every CI job
         env:
           PYTHON_RESULT: ${{ needs.python.result }}
           NODE_RESULT: ${{ needs.node.result }}
           GO_RESULT: ${{ needs.go.result }}
+          GO_GUI_RESULT: ${{ needs.go-gui.result }}
           COMPOSE_RESULT: ${{ needs.compose.result }}
           IMAGES_RESULT: ${{ needs.images.result }}
           SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
         run: |
-          for result in "$PYTHON_RESULT" "$NODE_RESULT" "$GO_RESULT" "$COMPOSE_RESULT" "$IMAGES_RESULT" "$SECRET_SCAN_RESULT"; do
+          for result in "$PYTHON_RESULT" "$NODE_RESULT" "$GO_RESULT" "$GO_GUI_RESULT" "$COMPOSE_RESULT" "$IMAGES_RESULT" "$SECRET_SCAN_RESULT"; do
             test "$result" = "success"
           done

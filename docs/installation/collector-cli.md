@@ -24,7 +24,7 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 
 | 명령 | 동작 |
 |---|---|
-| `register --server URL --code XXXX-XXXX --name PC [--force]` | `POST /api/v1/devices/register`로 장치를 등록하고 `device_id`·장치 토큰을 설정 파일(0600, 원자적 쓰기)에 저장합니다. 토큰은 출력하지 않습니다. 서버 주소는 https만 받고, http는 `localhost`·`127.x`·`::1`만 허용합니다. 이미 등록돼 있으면 `--force`가 필요합니다 |
+| `register --server URL --code XXXX-XXXX\|--code-stdin --name PC [--force]` | `--code-stdin`은 코드를 표준 입력 첫 줄(최대 64바이트)에서 읽습니다(GUI가 사용, 프로세스 목록에 코드가 보이지 않음). `POST /api/v1/devices/register`로 장치를 등록하고 `device_id`·장치 토큰을 설정 파일(0600, 원자적 쓰기)에 저장합니다. 토큰은 출력하지 않습니다. 서버 주소는 https만 받고, http는 `localhost`·`127.x`·`::1`만 허용합니다. 이미 등록돼 있으면 `--force`가 필요합니다 |
 | `run` | 포그라운드 장기 실행. SIGINT/SIGTERM(Windows는 Ctrl+C)으로 정상 종료(큐 보존, 종료 코드 0). 사용자당 1개만 실행(잠금 파일) |
 | `hook claude\|codex [--product codex-desktop] [--tool-version V] [--mode M]` | Hook stdin JSON 한 건을 받아 실행 중인 `run`에 spool로 넘깁니다. **항상 종료 코드 0**, stdout·stderr 출력 없음 |
 | `pause` / `resume` | 일시중지 상태를 설정 디렉터리 `pause.json`에 저장합니다. 실행 중인 `run`이 다음 주기(기본 2초)에 반영합니다 |
@@ -33,7 +33,7 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | `service install\|uninstall [--activate]` | 자동 시작 정의 설치·제거. `--activate`가 없으면 파일만 쓰고 실행할 명령을 안내합니다 |
 | `service print [--os linux\|darwin\|windows] [--exe PATH]` | 정의 미리보기(파일을 쓰지 않음) |
 | `hooks install\|uninstall [--tool claude] [--yes] [--scope user]` | Claude Code 사용자 설정에 Hook 추가·제거. `--yes`가 없으면 미리보기만 출력합니다 |
-| `hooks status [--tool claude\|codex]` | Hook 설치 상태와 도구 버전 검증 수준 |
+| `hooks status [--tool claude\|codex] [--json]` | Hook 설치 상태와 도구 버전 검증 수준. `--json`은 GUI용으로 도구별 감지 여부·버전·검증 수준·Hook 상태 enum·개수와 읽기 실패 코드만 출력합니다(설정 경로·다른 Hook 명령 원문 없음) |
 | `hooks print [--tool claude\|codex] [--os linux\|darwin\|windows] [--exe PATH]` | Hook 항목 미리보기(파일을 쓰지 않음). Codex는 이 명령만 지원 |
 | `version` | 버전·OS·아키텍처 |
 
