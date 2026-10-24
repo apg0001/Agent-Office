@@ -24,6 +24,10 @@ LABEL org.opencontainers.image.title="agent-office-server" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
 
+# 관리 화면이 현재 배포 버전을 보여 준다(#61).
+ENV AGENT_OFFICE_VERSION=${VERSION} \
+    AGENT_OFFICE_REVISION=${REVISION}
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

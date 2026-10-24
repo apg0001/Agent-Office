@@ -344,6 +344,8 @@ def read_metrics(_admin: AdminDep, connection: DbConnection) -> dict[str, Any]:
         },
         "retention": {"last_at": retention.last_run["at"], "last_ok": retention.last_run["ok"]},
         "backup": {"configured": backup.configured(), **backup.read_status(connection)},
+        "deployment": monitoring.deployment(),
+        "security": monitoring.security_checks(connection),
     }
 
 

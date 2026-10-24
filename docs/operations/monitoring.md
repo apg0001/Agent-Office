@@ -37,3 +37,31 @@ URL은 비밀로 다루며 로그·지표에 남기지 않습니다. 실패는 "
 
 - PostgreSQL 통합 테스트: 준비 상태 정상·마이그레이션 불일치 503, 지표 권한·식별자 미포함, 로컬 HTTP 서버로 Heartbeat 성공·실패.
 - 실제 외부 서비스(healthchecks.io 등) 연동과 전원 차단 알림은 실측하지 않았습니다.
+
+## 배포 상태·보안 점검(#61)
+
+`GET /api/v1/admin/metrics`에 다음이 함께 나오고 관리 화면 "상태·진단"에 표시됩니다.
+
+- `deployment`: 서버 이미지 버전·리비전(빌드 인자 `VERSION`·`REVISION`), 서버가 기대하는 마이그레이션 버전
+- `security`: 설정만 보고 판단한 경고 목록(`code`·`level`·`text`, 값은 담지 않음)
+
+| 코드 | 수준 | 의미 |
+|---|---|---|
+| `allowed_origins_wildcard` | 긴급 | 허용 Origin에 `*` |
+| `cookie_not_secure` | 높음 | 세션 쿠키 Secure 꺼짐 |
+| `public_url_http` | 높음 | 접속 주소가 HTTPS가 아님(localhost 제외) |
+| `secret_key_missing` · `backup_disabled` · `backup_no_offsite` · `bootstrap_token_pending` | 주의 | 비밀 키 없음, 백업 꺼짐, 외부 복제 없음, 쓰지 않은 bootstrap 토큰 |
+| `public_signup_open` · `setup_incomplete` | 정보 | 공개 가입 중(차단 도메인 없음), 설치 완료 전 |
+
+긴급·높음은 관리 화면 맨 위 "확인할 문제"에도 올라갑니다.
+
+## 로그 보존
+
+| 로그 | 보존 |
+|---|---|
+| 컨테이너 표준 출력(서버·웹·proxy·DB) | Docker `json-file` 서비스마다 10MB × 3개 회전(운영 Compose) |
+| 감사 로그(DB) | 기본 365일, 최소 30일(`AGENT_OFFICE_AUDIT_RETENTION_DAYS`, #39) |
+| 활동 이벤트·종료 세션 | 30일(#39) |
+| 백업 | 로컬 7개, 외부 일 7·주 4(#58) |
+
+서버 로그에는 오류 종류·코드만 남기고 이메일·토큰·주소·경로·원문은 남기지 않습니다. 접근 로그에 메일 토큰이 남지 않도록 토큰은 URL 조각(#)으로 전달합니다.
