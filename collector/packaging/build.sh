@@ -15,6 +15,8 @@ mkdir -p "$OUT"
 GO_IMAGE=golang:1.24-bookworm
 NFPM_IMAGE=goreleaser/nfpm:v2.41.1
 
+# 업데이트 manifest 서명 공개 키(#44). 비우면 이 빌드는 자체 업데이트를 하지 않는다.
+KEYS=${AGENT_OFFICE_UPDATE_KEYS:-}
 docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod \
   -v "$ROOT/collector:/src/collector:ro" -v "$OUT:/out" "$GO_IMAGE" sh -euc "
     cp -r /src/collector/core /tmp/core && cd /tmp/core
@@ -23,7 +25,7 @@ docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e GOCACHE=/tmp/go-cache -e 
       dir=/tmp/stage/agent-office-collector-$VERSION-\$os-\$arch
       mkdir -p \"\$dir\"
       CGO_ENABLED=0 GOOS=\$os GOARCH=\$arch go build -trimpath \
-        -ldflags \"-s -w -X main.version=$VERSION\" -o \"\$dir/agent-office-collector\$ext\" ./cmd/agent-office-collector
+        -ldflags \"-s -w -X main.version=$VERSION -X github.com/apg0001/Agent-Office/collector/core/internal/update.TrustedKeys=$KEYS\" -o \"\$dir/agent-office-collector\$ext\" ./cmd/agent-office-collector
       if [ \"\$os\" = windows ]; then
         cp /src/collector/packaging/uninstall.ps1 \"\$dir/\"
       else
