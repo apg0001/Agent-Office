@@ -37,6 +37,7 @@ def _load(path: Path) -> Any:
 def test_valid_contract_fixtures_parse() -> None:
     events_api.EventV1.model_validate(_load(FIXTURES / "valid" / "event-observed.json"))
     events_api.EventV1.model_validate(_load(FIXTURES / "valid" / "event-child-inferred.json"))
+    events_api.EventV1.model_validate(_load(FIXTURES / "valid" / "event-plan-steps.json"))
     events_api.BatchRequestV1.model_validate(_load(FIXTURES / "valid" / "batch-request.json"))
     events_api.BatchResponseV1.model_validate(_load(FIXTURES / "valid" / "batch-response.json"))
 
@@ -50,6 +51,8 @@ def test_valid_contract_fixtures_parse() -> None:
         "event-naive-time.json",
         "event-sequence-overflow.json",
         "event-unsupported-enum.json",
+        "event-plan-steps-wrong-type.json",
+        "event-plan-steps-text.json",
     ],
 )
 def test_invalid_event_fixtures_are_rejected(name: str) -> None:

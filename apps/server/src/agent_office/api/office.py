@@ -7,11 +7,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import datetime as dt
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Connection, Row, func, or_, select, true, union, update
 from sqlalchemy import null as sql_null
@@ -689,3 +690,127 @@ def combined_agent_detail(
         except HTTPException:
             continue
     raise HTTPException(status_code=404, detail="not_found")
+
+
+# --- 타임라인 페이지(#38) ---------------------------------------------------------------
+
+MAX_TIMELINE_PAGE = 200
+
+
+def _encode_cursor(occurred_at: dt.datetime, sequence: int) -> str:
+    raw = f"{occurred_at.isoformat()}|{sequence}".encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _decode_cursor(cursor: str) -> tuple[dt.datetime, int]:
+    try:
+        raw = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
+        moment, sequence = raw.rsplit("|", 1)
+        return dt.datetime.fromisoformat(moment), int(sequence)
+    except (ValueError, UnicodeDecodeError) as error:
+        raise HTTPException(status_code=400, detail="invalid_cursor") from error
+
+
+def timeline_page(
+    connection: Connection,
+    session_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    before: str | None,
+    limit: int,
+) -> dict[str, Any]:
+    """최신순 이벤트 페이지. 종류·활동·신뢰도·출처·시각만 담는다. `next`로 이어 읽는다."""
+    events = schema.activity_events
+    query = select(
+        events.c.event_type,
+        events.c.activity,
+        events.c.confidence,
+        events.c.source,
+        events.c.occurred_at,
+        events.c.sequence,
+    ).where(events.c.session_id == session_id, events.c.agent_id == agent_id)
+    if before:
+        moment, sequence = _decode_cursor(before)
+        query = query.where(
+            or_(
+                events.c.occurred_at < moment,
+                (events.c.occurred_at == moment) & (events.c.sequence < sequence),
+            )
+        )
+    rows = connection.execute(
+        query.order_by(events.c.occurred_at.desc(), events.c.sequence.desc()).limit(limit + 1)
+    ).all()
+    page = rows[:limit]
+    return {
+        "entries": [
+            {
+                "event_type": r.event_type,
+                "activity": r.activity,
+                "confidence": r.confidence,
+                "source": r.source,
+                "occurred_at": _iso(r.occurred_at),
+            }
+            for r in page
+        ],
+        "next": _encode_cursor(page[-1].occurred_at, page[-1].sequence)
+        if len(rows) > limit
+        else None,
+    }
+
+
+def _own_agent_session(
+    connection: Connection, user_id: uuid.UUID, agent_id: uuid.UUID
+) -> uuid.UUID:
+    agents, sessions, devices = schema.agents, schema.agent_sessions, schema.devices
+    session_id = connection.execute(
+        select(agents.c.session_id)
+        .select_from(
+            agents.join(sessions, sessions.c.id == agents.c.session_id).join(
+                devices, devices.c.id == sessions.c.device_id
+            )
+        )
+        .where(agents.c.id == agent_id, devices.c.owner_user_id == user_id)
+    ).scalar_one_or_none()
+    if session_id is None:
+        raise HTTPException(status_code=404, detail="not_found")
+    return uuid.UUID(str(session_id))
+
+
+TimelineLimit = Annotated[int, Query(ge=1, le=MAX_TIMELINE_PAGE)]
+TimelineCursor = Annotated[str | None, Query(max_length=200)]
+
+
+@router.get("/api/v1/office/agents/{agent_id}/timeline")
+def agent_timeline(
+    agent_id: uuid.UUID,
+    user: UserDep,
+    connection: DbConnection,
+    before: TimelineCursor = None,
+    limit: TimelineLimit = 50,
+) -> dict[str, Any]:
+    """내 에이전트 타임라인(#38). 30일 보존(#39) 안의 이벤트만 있다."""
+    session_id = _own_agent_session(connection, user.id, agent_id)
+    return timeline_page(connection, session_id, agent_id, before, limit)
+
+
+@router.get("/api/v1/teams/{team_id}/office/agents/{agent_id}/timeline")
+def team_agent_timeline(
+    team_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    user: UserDep,
+    connection: DbConnection,
+    before: TimelineCursor = None,
+    limit: TimelineLimit = 50,
+) -> dict[str, Any]:
+    """팀에 공유된 에이전트의 타임라인. 공유가 거둬지면 바로 404."""
+    _require_team(connection, team_id, user.id)
+    now: dt.datetime = connection.execute(select(func.now())).scalar_one()
+    agents = schema.agents
+    session_id = connection.execute(
+        select(agents.c.session_id).where(
+            agents.c.id == agent_id,
+            agents.c.session_id.in_(_team_session_ids(connection, team_id, now)),
+        )
+    ).scalar_one_or_none()
+    if session_id is None:
+        raise HTTPException(status_code=404, detail="not_found")
+    return timeline_page(connection, uuid.UUID(str(session_id)), agent_id, before, limit)

@@ -63,11 +63,20 @@
     },
     "provider": {
       "type": "string",
-      "enum": ["codex", "claude", "unknown"]
+      "enum": [
+        "codex",
+        "claude",
+        "unknown"
+      ]
     },
     "source": {
       "type": "string",
-      "enum": ["hook", "jsonl", "app_server", "inferred"]
+      "enum": [
+        "hook",
+        "jsonl",
+        "app_server",
+        "inferred"
+      ]
     },
     "event_type": {
       "type": "string",
@@ -107,7 +116,10 @@
     },
     "confidence": {
       "type": "string",
-      "enum": ["observed", "inferred"]
+      "enum": [
+        "observed",
+        "inferred"
+      ]
     },
     "occurred_at": {
       "type": "string",
@@ -119,6 +131,20 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 9007199254740991
+    },
+    "plan_steps": {
+      "description": "plan.updated에서만: 계획 단계의 상태만 순서대로(#38). 단계 문장 등 원문은 담지 않는다.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": {
+        "enum": [
+          "pending",
+          "in_progress",
+          "completed",
+          "unknown"
+        ]
+      }
     }
   },
   "allOf": [
@@ -129,12 +155,28 @@
             "const": "inferred"
           }
         },
-        "required": ["source"]
+        "required": [
+          "source"
+        ]
       },
       "then": {
         "properties": {
           "confidence": {
             "const": "inferred"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "plan_steps"
+        ]
+      },
+      "then": {
+        "properties": {
+          "event_type": {
+            "const": "plan.updated"
           }
         }
       }
