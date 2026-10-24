@@ -291,8 +291,32 @@ def verify(path: Path) -> None:
     _restore_list(path, backup_key())
 
 
-def restore_test(path: Path) -> dict[str, Any]:
-    """임시 DB에 복원해 마이그레이션 버전과 표 수를 확인하고 지운다. 운영 DB는 건드리지 않는다."""
+def _run_migrations(scratch_url: str) -> None:
+    """이 이미지의 마이그레이션을 임시 DB에 적용한다(배포 사전 점검, #60)."""
+    from alembic import command
+    from alembic.config import Config
+
+    config = Config()
+    config.set_main_option("script_location", "agent_office.db:migrations")
+    previous = os.environ.get("AGENT_OFFICE_DATABASE_URL")
+    os.environ["AGENT_OFFICE_DATABASE_URL"] = scratch_url
+    try:
+        command.upgrade(config, "head")
+    except Exception as error:  # noqa: BLE001 - 어떤 실패든 배포를 막는 코드로 바꾼다.
+        raise BackupError("migration_dry_run_failed") from error
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_OFFICE_DATABASE_URL", None)
+        else:
+            os.environ["AGENT_OFFICE_DATABASE_URL"] = previous
+
+
+def restore_test(path: Path, *, migrate: bool = False) -> dict[str, Any]:
+    """임시 DB에 복원해 마이그레이션 버전과 표 수를 확인하고 지운다. 운영 DB는 건드리지 않는다.
+
+    `migrate=True`면 복원한 DB에 이 이미지의 마이그레이션을 적용해 본다(배포 전 사전 실행).
+    결과에 복원 직후 버전(`migration_before`)과 적용 후 버전(`migration`)이 담긴다.
+    """
     key = backup_key()
     verify(path)
     url = _database_url()
@@ -332,6 +356,9 @@ def restore_test(path: Path) -> dict[str, Any]:
             process.stdin.close()
         if process.wait() != 0:
             raise BackupError("restore_test_restore_failed")
+        before = psql("SELECT version_num FROM alembic_version", "check", scratch_args)
+        if migrate:
+            _run_migrations(str(make_url(url).set(database=scratch).render_as_string(False)))
         revision = psql("SELECT version_num FROM alembic_version", "check", scratch_args)
         tables = int(
             psql(
@@ -343,7 +370,7 @@ def restore_test(path: Path) -> dict[str, Any]:
         users = int(psql("SELECT count(*) FROM users", "check", scratch_args))
     finally:
         psql(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)', "drop")
-    return {"migration": revision, "tables": tables, "users": users}
+    return {"migration_before": before, "migration": revision, "tables": tables, "users": users}
 
 
 def decrypt_to(path: Path, out: Path) -> None:
@@ -366,6 +393,8 @@ USAGE = """사용법: agent-office-backup <명령>
   list                    백업 목록
   verify [파일]           체크섬과 덤프 목차 확인(기본: 최신)
   restore-test [파일]     임시 DB에 복원해 확인 후 삭제(기본: 최신)
+  migrate-check [파일]    임시 DB에 복원하고 이 이미지의 마이그레이션을 적용해 본 뒤 삭제(배포 전)
+  expected-revision       이 이미지가 기대하는 DB 마이그레이션 버전
   decrypt <파일> <출력>   수동 복원용 복호화"""
 
 
@@ -392,6 +421,12 @@ def main(argv: list[str] | None = None) -> int:
             print("ok")
         elif command == "restore-test":
             print(json.dumps(restore_test(pick())))
+        elif command == "migrate-check":
+            print(json.dumps(restore_test(pick(), migrate=True)))
+        elif command == "expected-revision":
+            from agent_office.monitoring import expected_revision
+
+            print(expected_revision() or "")
         elif command == "decrypt" and len(rest) == 2:
             decrypt_to(directory / Path(rest[0]).name, Path(rest[1]))
             print("ok")

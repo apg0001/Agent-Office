@@ -104,6 +104,9 @@ def test_libpq_args_keep_password_out_of_argv() -> None:
     assert env["PGPASSWORD"] == "p@ss" and "p@ss" not in " ".join(args)
 
 
+NO_PG17 = "PostgreSQL 17 클라이언트(pg_dump) 없음: 운영 이미지·로컬 테스트 이미지에서 검증"
+
+
 def _pg_tools_17() -> bool:
     if not shutil.which("pg_dump"):
         return False
@@ -112,9 +115,7 @@ def _pg_tools_17() -> bool:
     return bool(found and int(found.group(1)) >= 17)
 
 
-@pytest.mark.skipif(
-    not _pg_tools_17(), reason="PostgreSQL 17 클라이언트(pg_dump) 없음: 운영 이미지에서 검증"
-)
+@pytest.mark.skipif(not _pg_tools_17(), reason=NO_PG17)
 def test_backup_verify_and_restore_test(
     engine: Engine, database: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -139,3 +140,31 @@ def test_backup_verify_and_restore_test(
     with pytest.raises(backup.BackupError) as error:
         backup.verify(path)
     assert error.value.code == "checksum_mismatch"
+
+
+@pytest.mark.skipif(not _pg_tools_17(), reason=NO_PG17)
+def test_migrate_check_upgrades_a_restored_older_backup(
+    engine: Engine, database: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from alembic import command
+    from conftest import alembic_config
+
+    from agent_office.monitoring import expected_revision
+
+    command.downgrade(alembic_config(), "0005")
+    monkeypatch.setenv("AGENT_OFFICE_DATABASE_URL", database)
+    monkeypatch.setenv(backup.BACKUP_KEY_ENV, base64.urlsafe_b64encode(KEY).decode())
+    monkeypatch.delenv(backup.OFFSITE_DIR_ENV, raising=False)
+
+    info = backup.create_backup(tmp_path)
+    result = backup.restore_test(tmp_path / info.name, migrate=True)
+
+    assert result["migration_before"] == "0005"
+    assert result["migration"] == expected_revision()
+    # 운영 DB는 그대로다.
+    with engine.connect() as connection:
+        from sqlalchemy import text
+
+        assert (
+            connection.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0005"
+        )
