@@ -35,7 +35,27 @@ jobs:
       - name: Build packages
         env:
           VERSION: ${{ inputs.version }}
+          # 업데이트 manifest 서명 공개 키(Environment 변수). 없으면 자체 업데이트가 꺼진 빌드가 된다.
+          AGENT_OFFICE_UPDATE_KEYS: ${{ vars.COLLECTOR_UPDATE_PUBLIC_KEYS }}
         run: collector/packaging/build.sh "$VERSION" "$PWD/dist"
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: collector/core/go.mod
+      - name: Sign update manifest
+        env:
+          VERSION: ${{ inputs.version }}
+          SIGNING_KEY: ${{ secrets.COLLECTOR_UPDATE_SIGNING_KEY }}
+        run: |
+          channel=stable
+          [[ "$VERSION" == *-* ]] && channel=beta
+          cd collector/core
+          go run ./cmd/agent-office-release manifest "$GITHUB_WORKSPACE/dist" "$VERSION" "$channel" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/collector-v$VERSION"
+          umask 077
+          printf '%s' "$SIGNING_KEY" >"$RUNNER_TEMP/update.key"
+          go run ./cmd/agent-office-release sign "$RUNNER_TEMP/update.key" "$GITHUB_WORKSPACE/dist/manifest.json"
+          rm -f "$RUNNER_TEMP/update.key"
       - name: Draft GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -43,4 +63,4 @@ jobs:
         run: |
           gh release create "collector-v$VERSION" --draft --prerelease \
             --title "Collector $VERSION" --notes "초안. 서명·공증 전 배포물입니다. docs/installation/collector-packages.md" \
-            dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/SHA256SUMS
+            dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/SHA256SUMS dist/manifest.json dist/manifest.json.sig
