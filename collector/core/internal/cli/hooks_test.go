@@ -130,3 +130,58 @@ func TestHooksPrint(t *testing.T) {
 		t.Errorf("상대 경로 print: %d", code)
 	}
 }
+
+// GUI(#40)가 읽는 `hooks status --json`은 버전·enum·개수만 담는다.
+func TestHooksStatusJSON(t *testing.T) {
+	te := newTestEnv(t, "u")
+	te.env.ToolVersion = func(tool string) (string, error) {
+		if tool == "claude" {
+			return "2.1.308", nil
+		}
+		return "", errors.New("not found")
+	}
+	settings := hooks.ClaudeSettingsPath(te.dirs.ClaudeProjects)
+	if err := os.MkdirAll(filepath.Dir(settings), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settings, []byte(userSettings), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code := te.run("", "hooks", "status", "--json"); code != ExitOK {
+		t.Fatalf("exit %d: %s", code, te.stderr)
+	}
+	var out struct {
+		OS    string       `json:"os"`
+		Tools []ToolReport `json:"tools"`
+	}
+	if err := json.Unmarshal(te.stdout.Bytes(), &out); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, te.stdout)
+	}
+	if len(out.Tools) != 2 {
+		t.Fatalf("tools: %+v", out.Tools)
+	}
+	c, x := out.Tools[0], out.Tools[1]
+	if c.Tool != "claude" || !c.Detected || c.Version != "2.1.308" || c.HookInstall != "auto" ||
+		c.HookState != "not_installed" || c.Foreign != 1 || c.EventsTotal != 9 {
+		t.Errorf("claude: %+v", c)
+	}
+	if x.Tool != "codex" || x.Detected || x.Support != "unverified" || x.HookInstall != "print_only" {
+		t.Errorf("codex: %+v", x)
+	}
+	if strings.Contains(te.stdout.String(), te.home) || strings.Contains(te.stdout.String(), "my-notifier") {
+		t.Errorf("JSON에 경로·다른 Hook 명령 노출:\n%s", te.stdout)
+	}
+
+	if err := os.WriteFile(settings, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code := te.run("", "hooks", "status", "--json", "--tool", "claude"); code != ExitError {
+		t.Fatalf("unreadable exit %d", code)
+	}
+	if !strings.Contains(te.stdout.String(), `"parse_error"`) {
+		t.Errorf("unreadable JSON:\n%s", te.stdout)
+	}
+	if code := te.run("", "hooks", "install", "--json"); code != ExitUsage {
+		t.Errorf("--json on install: %d", code)
+	}
+}
