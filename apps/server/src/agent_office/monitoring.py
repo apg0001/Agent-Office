@@ -218,3 +218,85 @@ async def send_heartbeats() -> None:
                 await run_in_threadpool(notify_safely, "heartbeat.recovered")
         last_heartbeat.update(at=dt.datetime.now(dt.UTC).isoformat(), ok=ok)
         await asyncio.sleep(heartbeat_interval())
+
+
+# --- 배포·보안 점검(#61) ------------------------------------------------------------------
+
+
+def deployment() -> dict[str, Any]:
+    return {
+        "version": os.environ.get("AGENT_OFFICE_VERSION", "0.0.0-dev"),
+        "revision": os.environ.get("AGENT_OFFICE_REVISION", "unknown")[:40],
+        "migration_expected": expected_revision(),
+    }
+
+
+SECURITY_MESSAGES: dict[str, tuple[str, str]] = {
+    "cookie_not_secure": (
+        "high",
+        "세션 쿠키 Secure가 꺼져 있습니다(AGENT_OFFICE_COOKIE_SECURE=false). "
+        "HTTPS 앞단을 두고 켜세요.",
+    ),
+    "public_url_http": (
+        "high",
+        "접속 주소가 HTTPS가 아닙니다. Tailscale·Tunnel·Caddy HTTPS를 쓰세요.",
+    ),
+    "allowed_origins_wildcard": (
+        "critical",
+        "허용 Origin에 *가 있습니다. 정확한 주소만 넣으세요.",
+    ),
+    "secret_key_missing": (
+        "warning",
+        "AGENT_OFFICE_SECRET_KEY가 없어 SMTP·알림 비밀을 저장할 수 없습니다.",
+    ),
+    "backup_disabled": (
+        "warning",
+        "AGENT_OFFICE_BACKUP_KEY가 없어 자동 백업이 꺼져 있습니다.",
+    ),
+    "backup_no_offsite": (
+        "warning",
+        "외부 복제 위치가 없어 백업이 같은 디스크에만 있습니다.",
+    ),
+    "public_signup_open": (
+        "info",
+        "공개 가입 중입니다. 인터넷에 공개했다면 초대·관리자 승인 정책이나 "
+        "차단 도메인을 검토하세요.",
+    ),
+    "bootstrap_token_pending": (
+        "warning",
+        "사용하지 않은 bootstrap 토큰이 있습니다. 설치를 마치세요.",
+    ),
+    "setup_incomplete": (
+        "info",
+        "설치 마법사의 완료 단계를 아직 누르지 않았습니다.",
+    ),
+}
+
+
+def security_checks(connection: Connection) -> list[dict[str, str]]:
+    """설정만 보고 판단하는 보안 경고. 값(주소·키)은 담지 않고 무엇을 바꿀지만 적는다."""
+    from agent_office import backup, instance, secret_store
+    from agent_office.auth import accounts, sessions
+    from agent_office.setup import bootstrap
+
+    site = instance.get_dict(connection, instance.SITE_KEY)
+    url = str(site.get("public_url") or os.environ.get("AGENT_OFFICE_PUBLIC_URL", ""))
+    local = url.startswith(("http://localhost", "http://127."))
+    public_signup = accounts.signup_policy(connection) == "PUBLIC_VERIFIED_EMAIL"
+    found = {
+        "cookie_not_secure": not sessions.cookie_secure(),
+        "public_url_http": url.startswith("http://") and not local,
+        "allowed_origins_wildcard": "*" in os.environ.get("AGENT_OFFICE_ALLOWED_ORIGINS", ""),
+        "secret_key_missing": not secret_store.available(),
+        "backup_disabled": not backup.configured(),
+        "backup_no_offsite": backup.configured()
+        and not os.environ.get("AGENT_OFFICE_BACKUP_OFFSITE_DIR"),
+        "public_signup_open": public_signup and not accounts.blocked_domains(connection),
+        "bootstrap_token_pending": bootstrap.bootstrap_pending(connection),
+        "setup_incomplete": not bootstrap.setup_completed(connection),
+    }
+    return [
+        {"code": code, "level": SECURITY_MESSAGES[code][0], "text": SECURITY_MESSAGES[code][1]}
+        for code, hit in found.items()
+        if hit
+    ]

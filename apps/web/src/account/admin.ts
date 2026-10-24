@@ -30,6 +30,8 @@ export interface Metrics {
     last_restore_test_ok?: boolean | null;
     last_error?: string | null;
   };
+  deployment?: { version: string; revision: string; migration_expected: string | null };
+  security?: { code: string; level: string; text: string }[];
 }
 
 export interface AdminSettings {
@@ -119,6 +121,12 @@ export function warningsFor(metrics: Metrics, settings: AdminSettings, now: numb
   const needsMail = settings.signup_policy === "PUBLIC_VERIFIED_EMAIL" || settings.signup_policy === "ADMIN_APPROVAL";
   if (needsMail && settings.smtp_source === "none") {
     out.push({ level: "critical", text: "가입 정책이 이메일 확인을 요구하지만 SMTP 설정이 없습니다." });
+  }
+  for (const check of metrics.security ?? []) {
+    // 보안 점검(#61) 중 긴급·높음만 위로 올린다. 나머지는 보안 점검 목록에서 본다.
+    if (check.level === "critical" || check.level === "high") {
+      out.push({ level: "critical", text: `보안: ${check.text}` });
+    }
   }
   if (!settings.site.public_url) {
     out.push({ level: "warning", text: "접속 주소가 없어 메일 링크를 만들 수 없습니다." });

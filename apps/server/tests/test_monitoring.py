@@ -115,3 +115,48 @@ def test_ping_reports_success_and_failure() -> None:
     finally:
         server.shutdown()
     assert hits == ["/ok", "/fail"]
+
+
+def test_security_checks_and_deployment(
+    client: TestClient, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import base64
+    import os
+
+    for name in (
+        "AGENT_OFFICE_SECRET_KEY",
+        "AGENT_OFFICE_BACKUP_KEY",
+        "AGENT_OFFICE_BACKUP_OFFSITE_DIR",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("AGENT_OFFICE_COOKIE_SECURE", "false")
+    monkeypatch.setenv("AGENT_OFFICE_ALLOWED_ORIGINS", "*")
+    monkeypatch.setenv("AGENT_OFFICE_PUBLIC_URL", "http://office.example")
+    monkeypatch.setenv("AGENT_OFFICE_VERSION", "1.2.3")
+    headers = admin_headers(engine)
+
+    body = client.get("/api/v1/admin/metrics", headers=headers).json()
+    codes = {c["code"] for c in body["security"]}
+    assert {
+        "cookie_not_secure",
+        "allowed_origins_wildcard",
+        "public_url_http",
+        "secret_key_missing",
+        "backup_disabled",
+        "setup_incomplete",
+    } <= codes
+    assert body["deployment"]["version"] == "1.2.3"
+    assert body["deployment"]["migration_expected"] == "0006"
+    assert "office.example" not in json.dumps(body["security"])
+
+    key = base64.urlsafe_b64encode(os.urandom(32)).decode()
+    monkeypatch.setenv("AGENT_OFFICE_COOKIE_SECURE", "true")
+    monkeypatch.setenv("AGENT_OFFICE_ALLOWED_ORIGINS", "")
+    monkeypatch.setenv("AGENT_OFFICE_PUBLIC_URL", "https://office.example")
+    monkeypatch.setenv("AGENT_OFFICE_SECRET_KEY", key)
+    monkeypatch.setenv("AGENT_OFFICE_BACKUP_KEY", key)
+    monkeypatch.setenv("AGENT_OFFICE_BACKUP_OFFSITE_DIR", "/backups-offsite")
+    codes = {
+        c["code"] for c in client.get("/api/v1/admin/metrics", headers=headers).json()["security"]
+    }
+    assert codes == {"setup_incomplete"}

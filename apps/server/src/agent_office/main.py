@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from typing import Literal
@@ -53,7 +54,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     lifespan=lifespan,
     title="Agent Office API",
-    version="0.0.0",
+    version=os.environ.get("AGENT_OFFICE_VERSION", "0.0.0-dev"),
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
 )

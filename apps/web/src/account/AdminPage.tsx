@@ -69,6 +69,13 @@ function Diagnostics({ metrics, settings, csrf, reload }: { metrics: Metrics; se
       <table className="members metrics">
         <tbody>
           <tr>
+            <th>배포</th>
+            <td>
+              서버 {metrics.deployment?.version ?? "—"} ({metrics.deployment?.revision.slice(0, 12) ?? "—"}) · 기대 마이그레이션{" "}
+              {metrics.deployment?.migration_expected ?? "—"}
+            </td>
+          </tr>
+          <tr>
             <th>준비 상태</th>
             <td>{metrics.readiness.ready ? "정상" : "준비 안 됨"} (DB 마이그레이션 {database.migration ?? "—"})</td>
           </tr>
@@ -132,6 +139,18 @@ function Diagnostics({ metrics, settings, csrf, reload }: { metrics: Metrics; se
           </tr>
         </tbody>
       </table>
+      {(metrics.security ?? []).length > 0 && (
+        <>
+          <h3>보안 점검</h3>
+          <ul className="warnings" aria-label="보안 점검">
+            {(metrics.security ?? []).map((check) => (
+              <li key={check.code} className={check.level === "critical" || check.level === "high" ? "critical" : "warning"}>
+                {check.text}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <Notice error={error} info={info} />
       <div className="actions">
         <button type="button" disabled={busy || !backup.configured} onClick={() => void run("run")}>
