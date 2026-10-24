@@ -1,4 +1,4 @@
-// Agent Office Collector GUI 프런트엔드(#40, #41). 빌드 도구·외부 의존성 없이 Wails 바인딩만 쓴다.
+// Agent Office Collector GUI 프런트엔드(#40, #41, #43). 빌드 도구·외부 의존성 없이 Wails 바인딩만 쓴다.
 // 화면에는 Go 백엔드가 고른 코드·개수·한국어 문구만 표시한다. 장치 토큰은 백엔드도 다루지 않는다.
 "use strict";
 
@@ -86,6 +86,19 @@ $("register-form").addEventListener("submit", async (e) => {
   if (result.ok) {
     $("reg-force").checked = false;
   }
+});
+
+$("logout").addEventListener("click", async () => {
+  const local = $("logout-local").checked;
+  const text = local
+    ? "서버에 알리지 않고 이 PC의 장치 토큰과 등록 정보만 지웁니다. 웹 /devices에서 따로 폐기해야 합니다. 계속할까요?"
+    : "서버에서 이 PC를 폐기하고 로컬 장치 토큰과 등록 정보를 지웁니다. 계속할까요?";
+  if (!window.confirm(text)) {
+    return;
+  }
+  const r = await call("Logout", local, true);
+  show("logout-result", r);
+  showOutput("logout-output", r.ok ? "" : r.output);
 });
 
 // --- 도구 탐지·Hook ---------------------------------------------------------------
@@ -191,6 +204,37 @@ $("service-install").addEventListener("click", async () => {
   showOutput("service-output", r.output);
 });
 
+const GUI_AUTOSTART = {
+  installed: "켜짐",
+  outdated: "켜짐(이전 위치의 GUI를 가리킴, 다시 켜면 갱신)",
+  absent: "꺼짐",
+  foreign: "같은 위치에 다른 항목이 있음(건드리지 않음)",
+  unsupported: "이 OS 미지원",
+};
+
+async function loadGUIAutostart() {
+  const v = await call("GUIAutostartStatus");
+  const state = (v && v.state) || "unsupported";
+  $("gui-autostart-state").textContent = "현재: " + (GUI_AUTOSTART[state] || state) + (v && v.location ? " · " + v.location : "");
+}
+loaders.service = loadGUIAutostart;
+
+$("gui-autostart-install").addEventListener("click", async () => {
+  if (!window.confirm("로그인 시 GUI(트레이)를 자동으로 띄우는 사용자 정의를 설치합니다. 계속할까요?")) {
+    return;
+  }
+  show("gui-autostart-result", await call("GUIAutostartInstall", true));
+  void loadGUIAutostart();
+});
+
+$("gui-autostart-uninstall").addEventListener("click", async () => {
+  if (!window.confirm("Agent Office가 만든 GUI 자동 시작 정의만 지웁니다. Core 수집은 계속됩니다. 계속할까요?")) {
+    return;
+  }
+  show("gui-autostart-result", await call("GUIAutostartUninstall", true));
+  void loadGUIAutostart();
+});
+
 // --- 수집 상태 ---------------------------------------------------------------------
 const REGISTRATION = { registered: "등록됨", not_registered: "미등록", config_invalid: "설정 파일 손상(다시 등록 필요)", unknown: "알 수 없음" };
 const RUN_STATE = {
@@ -201,8 +245,10 @@ const RUN_STATE = {
   not_registered: "등록 대기",
   config_invalid: "설정 손상",
   stopped: "정지됨",
+  token_unavailable: "보안 저장소 잠김(장치 토큰을 읽지 못해 대기)",
   unknown: "알 수 없음",
 };
+const TOKEN_STORAGE = { os_keyring: "OS 보안 저장소", file_fallback: "설정 파일(0600, 대체 경로: OS 보안 저장소 없음)", unknown: "알 수 없음" };
 const SERVICE = { installed: "설치됨", absent: "없음", foreign: "다른 파일이 있음(덮어쓰지 않음)", unsupported: "이 OS 미지원", unknown: "알 수 없음" };
 
 function time(v) {
@@ -234,6 +280,9 @@ async function loadStatus() {
   addRow(dl, "등록", REGISTRATION[r.registration] || r.registration);
   if (r.server_scheme) {
     addRow(dl, "서버", r.server_scheme + (r.server_loopback ? ", loopback" : "") + " (주소는 표시하지 않음)");
+  }
+  if (r.token_storage) {
+    addRow(dl, "장치 토큰 보관", TOKEN_STORAGE[r.token_storage] || r.token_storage);
   }
   addRow(dl, "수집 설정", r.paused ? "일시중지" : "수집 중");
   addRow(dl, "Core 프로세스", r.process_running ? "실행 중" : "실행 중 아님(자동 시작을 설치·활성화하세요)");

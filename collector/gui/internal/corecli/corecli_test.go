@@ -106,6 +106,9 @@ func TestStatusDiagnoseTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if rep.TokenStorage != "os_keyring" {
+		t.Errorf("token storage: %q", rep.TokenStorage)
+	}
 	if rep.Registration != "registered" || rep.Run == nil || rep.Run.State != "running" || rep.Run.QueueDepth != 2 ||
 		rep.Queue == nil || rep.Queue.DeadLetter != 1 || rep.Run.LastHeartbeatOKAt == nil || len(rep.Run.Errors) != 1 {
 		t.Errorf("status: %+v", rep)
@@ -141,10 +144,13 @@ func TestParseReportSanitizes(t *testing.T) {
 	in := `{"registration":"weird","service":"installed","server":"https://host.example/x",
 	"run":{"state":"hacked","watch_root":"/home/me/.claude/projects","counters":{"ok_count":1,"/etc/passwd":2},
 	"errors":[{"code":"network","count":1},{"code":"dial tcp 10.0.0.1:443: refused","count":1}]},
-	"queue":{"state":"<script>"}}`
+	"queue":{"state":"<script>"},"token_storage":"/home/me/keyring"}`
 	r, err := ParseReport(in)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if r.TokenStorage != "unknown" {
+		t.Errorf("token storage not sanitized: %q", r.TokenStorage)
 	}
 	if r.Registration != "unknown" || r.Server != "unknown" || r.Run.State != "unknown" || r.Run.WatchRoot != "unknown" || r.Queue.State != "unknown" {
 		t.Errorf("enums not sanitized: %+v %+v", r, r.Run)
@@ -265,5 +271,23 @@ func TestRegisterPassesCodeOnStdin(t *testing.T) {
 	}
 	if n := len(fakecore.ReadCalls(log)); n != 1 {
 		t.Errorf("invalid input reached core: %d calls", n)
+	}
+}
+
+func TestLogoutArgs(t *testing.T) {
+	r, log := fake(t, "")
+	ctx := context.Background()
+	for _, local := range []bool{false, true} {
+		res, err := r.Logout(ctx, local)
+		if err != nil || res.Exit != 0 {
+			t.Fatalf("logout(%v): %+v %v", local, res, err)
+		}
+	}
+	calls := fakecore.ReadCalls(log)
+	if len(calls) != 2 || !slices.Equal(calls[0].Args, []string{"logout"}) || !slices.Equal(calls[1].Args, []string{"logout", "--local-only"}) {
+		t.Fatalf("calls: %+v", calls)
+	}
+	if rs, _ := ParseReport(`{"registration":"registered","service":"absent","run":{"state":"token_unavailable"}}`); rs.Run.State != "token_unavailable" {
+		t.Fatalf("token_unavailable state: %+v", rs.Run)
 	}
 }

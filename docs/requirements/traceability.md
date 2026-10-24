@@ -557,3 +557,19 @@
 | GUI-008 | COL-003 도구 탐지·Hook 동의 | Core `hooks status --json`(감지·버전·검증 수준·Hook 상태), 미리보기 → 승인 순서·일회성 승인, 실제 Core로 남의 Hook 보존 설치·제거, Codex는 print 전용 |
 | GUI-009 | 프런트엔드 계약 | `main_test.go`: `app.js` 호출 메서드가 모두 바인딩됨, 외부 리소스·인라인 스크립트 없음, CSP |
 | GUI-GAP-001 | 미검증 | macOS·Windows 빌드·실행, 실제 데스크톱 세션의 브라우저 열기, webkit2gtk 4.1 배포판, 실제 서버 종단 등록은 미실행(`docs/installation/collector-gui.md`) |
+
+## Collector 키체인·트레이 검증 매핑(#41, #43)
+
+위 GUI-006의 "OS 보안 저장소는 미구현", GUI-007의 "Core 로그아웃 명령은 미구현"은 아래 KEY-001~004로 대체합니다.
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| KEY-001 | DEV-004·SEC-005 토큰 OS 보안 저장소 | `config/token_test.go`·`cli/logout_test.go`: register 뒤 `config.json`에 토큰 sentinel 없음(`token_store: keyring`), 저장 후 재조회 검증 실패·`config.json` 쓰기 실패 시 항목 정리, 출력·요청 본문에 토큰 없음. 실제 Linux Secret Service(gnome-keyring 42.1, 컨테이너) 저장·읽기·삭제. ADR-0004 |
+| KEY-002 | DEV-004 대체 경로·상태 표시 | 세션 D-Bus 없음·저장소 실패·`AGENT_OFFICE_COLLECTOR_TOKEN_STORE=file`이면 0600 파일, `status`·`diagnose` `token_storage: file_fallback`(정상 `os_keyring`), GUI 상태 화면 표시. 잠긴 저장소는 `token_unavailable` 대기 후 회복 |
+| KEY-003 | DEV-004 기존 파일 토큰 이전 | `run` 시작 시 legacy `config.json` 토큰을 저장소로 옮기고 파일에서 삭제(다른 필드 보존, 두 번째 실행 무변경, 실패 시 파일 유지). 실제 Secret Service에서도 확인 |
+| KEY-004 | DEV-005 로그아웃 | Core `logout`: 기존 `POST /api/v1/devices/revoke`(장치 토큰) → 로컬 항목·`config.json` 삭제, 실패 시 무변경, `--local-only`. 실행 중인 `run`의 heartbeat 중지. GUI 버튼은 승인 필수(`logout_autostart_test.go`), 실제 Core로 서버 폐기 1회·이후 이벤트 미전송(`independence_test.go`) |
+| TRAY-001 | COL-001·USER-002 트레이 상태·메뉴 | `tray_test.go`: Core 상태 → 수집 중·일시중지·Core 정지·폐기·토큰 잠김·미등록·응답 없음 표시, 메뉴 동작, 아이콘. Linux 컨테이너(Xvfb·dbus·최소 StatusNotifierWatcher)에서 dbusmenu 클릭으로 일시중지·재개·창 열기·GUI 종료 확인 |
+| TRAY-002 | COL-001 창 닫기와 Core 분리 | 트레이가 보일 때만 닫기 = 숨기기, 트레이 종료는 GUI만 종료. openbox `wmctrl -c`로 Watcher 있음(숨김)·없음(종료) 확인 |
+| TRAY-003 | COL-001 GUI/Core 독립성 | `independence_test.go`(CI `Go GUI`, 실제 Core): GUI 프로세스 SIGKILL·트레이 종료 뒤 Core 생존·Hook 이벤트 전송, Core SIGKILL → `core_stopped` → 재시작 후 `running` 회복 |
+| TRAY-004 | COL-002·DIST-007 GUI 자동 시작 | `autostart_test.go`: XDG `.desktop`·LaunchAgent·HKCU Run 생성, `Exec` 인용, 소유 표시 없는 파일·Run 값·심볼릭 링크 교체·삭제 거부, `--autostart` 숨김 시작 조건. `.desktop`은 `desktop-file-validate` 통과 |
+| TRAY-GAP-001 | 미검증 | macOS·Windows 트레이(미구현), macOS Keychain·Windows Credential Manager, 실제 데스크톱 패널·로그인 키링, 실제 로그인·재부팅 뒤 GUI·Core 자동 시작은 미실행(`docs/installation/collector-gui.md`) |

@@ -21,6 +21,7 @@ type Report struct {
 	Registration     string            `json:"registration"`
 	ServerScheme     string            `json:"server_scheme,omitempty"`
 	ServerLoopback   bool              `json:"server_loopback,omitempty"`
+	TokenStorage     string            `json:"token_storage,omitempty"`
 	Paused           bool              `json:"paused"`
 	PauseState       string            `json:"pause_state"`
 	ProcessRunning   bool              `json:"process_running"`
@@ -85,7 +86,8 @@ type ToolReport struct {
 // 알려진 enum. 모르는 값은 "unknown"으로 바꿔 화면에 임의 문자열이 나오지 않게 한다.
 var (
 	registrations = set("registered", "not_registered", "config_invalid")
-	runStates     = set("starting", "running", "paused", "device_revoked", "not_registered", "config_invalid", "stopped")
+	runStates     = set("starting", "running", "paused", "device_revoked", "not_registered", "config_invalid", "stopped", "token_unavailable")
+	tokenStores   = set("os_keyring", "file_fallback")
 	services      = set("installed", "absent", "foreign", "unsupported")
 	hookStates    = set("installed", "partial", "modified", "not_installed", "unreadable", "unknown")
 	supports      = set("verified", "partial", "unverified")
@@ -131,6 +133,9 @@ func ParseReport(out string) (Report, error) {
 	}
 	r.Registration = enum(r.Registration, registrations)
 	r.Service = enum(r.Service, services)
+	if r.TokenStorage != "" {
+		r.TokenStorage = enum(r.TokenStorage, tokenStores)
+	}
 	if r.Server != "" && !isCode(r.Server, 32) {
 		r.Server = "unknown"
 	}
@@ -328,4 +333,13 @@ func (r Runner) Register(ctx context.Context, server, code, name string, force b
 		args = append(args, "--force")
 	}
 	return r.Run(ctx, c+"\n", args...)
+}
+
+// Logout은 `logout [--local-only]`다. 서버 폐기·로컬 토큰 삭제는 Core가 한다(GUI는 토큰을 다루지 않음).
+func (r Runner) Logout(ctx context.Context, localOnly bool) (Result, error) {
+	args := []string{"logout"}
+	if localOnly {
+		args = append(args, "--local-only")
+	}
+	return r.Run(ctx, "", args...)
 }

@@ -1,8 +1,8 @@
 # Collector CLI·백그라운드 실행·진단
 
-관련 이슈: #34 (`EP-04/ISS-06`, 요구사항 COL-001~003, COL-010). 선행: #29 어댑터, #30 tail, #32 정규화, #33 큐·전송.
+관련 이슈: #34 (`EP-04/ISS-06`, 요구사항 COL-001~003, COL-010), #41(장치 토큰 OS 보안 저장소·`logout`, DEV-004~005). 선행: #29 어댑터, #30 tail, #32 정규화, #33 큐·전송.
 
-GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니다. GUI는 나중에 이 명령들을 감쌉니다. Hook 설치·제거는 #31에서 추가했습니다(아래 [Hook 설치](#hook-설치hooks-31)). OS 보안 저장소 토큰 보관(#41), 설치 패키지·서명(#42~#44)은 범위가 아닙니다.
+GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니다. GUI는 나중에 이 명령들을 감쌉니다. Hook 설치·제거는 #31에서 추가했습니다(아래 [Hook 설치](#hook-설치hooks-31)). 장치 토큰 OS 보안 저장소와 `logout`은 #41에서 추가했습니다(아래 [장치 토큰 보관](#장치-토큰-보관41)). 설치 패키지·서명(#42), 업데이트(#44)는 범위가 아닙니다.
 
 ## 검증 범위
 
@@ -16,6 +16,8 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | Claude Code 사용자 설정 Hook 설치·제거(`hooks`, #31) | **Linux arm64 컨테이너에서 파일 처리만 검증**: 임시 디렉터리의 합성 `settings.json`으로 백업·원자적 쓰기·소유 항목만 제거·거부 조건 테스트 | `hooks_test.go`, `cli/hooks_test.go` |
 | Hook 명령 인용(linux·darwin·windows) | **생성만 검증**: 골든 테스트. macOS·Windows에서 실제 셸이 명령을 실행하는지 미확인 | `hooks/testdata/*.golden` |
 | 실제 Claude Code·Codex가 설치된 `hook` 명령을 호출하는 경로 | **미실행**: 컨테이너에 인증된 Claude·Codex가 없어 실행하지 않음. 사용자 실제 `~/.claude`·`~/.codex`는 건드리지 않음 | — |
+| 장치 토큰 Linux Secret Service(#41) | **검증(컨테이너)**: gnome-keyring 42.1·dbus 1.14.10, `AGENT_OFFICE_TEST_REAL_KEYRING=1` 테스트(저장·읽기·삭제, register→status→logout, 파일 토큰 이전) | `tests/poc/collector/desktop/keyring-secret-service.sh` |
+| 장치 토큰 macOS Keychain·Windows Credential Manager | **미검증**: `GOOS=darwin\|windows go vet`만 | ADR-0004 |
 | Codex Hook 자동 설치 | **미지원(print 전용)**: 사용자 범위 Hook 설정 위치·신뢰 흐름이 실측되지 않음(#17은 `-c` inline, #18은 프로젝트 `.codex/hooks.json` + Desktop 신뢰) | — |
 
 검증되지 않은 OS에서는 지원한다고 표시하지 않습니다. 실장비 검증 전까지 macOS·Windows 서비스 정의는 미리보기·수동 등록용입니다.
@@ -24,7 +26,8 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 
 | 명령 | 동작 |
 |---|---|
-| `register --server URL --code XXXX-XXXX\|--code-stdin --name PC [--force]` | `--code-stdin`은 코드를 표준 입력 첫 줄(최대 64바이트)에서 읽습니다(GUI가 사용, 프로세스 목록에 코드가 보이지 않음). `POST /api/v1/devices/register`로 장치를 등록하고 `device_id`·장치 토큰을 설정 파일(0600, 원자적 쓰기)에 저장합니다. 토큰은 출력하지 않습니다. 서버 주소는 https만 받고, http는 `localhost`·`127.x`·`::1`만 허용합니다. 이미 등록돼 있으면 `--force`가 필요합니다 |
+| `register --server URL --code XXXX-XXXX\|--code-stdin --name PC [--force]` | `--code-stdin`은 코드를 표준 입력 첫 줄(최대 64바이트)에서 읽습니다(GUI가 사용, 프로세스 목록에 코드가 보이지 않음). `POST /api/v1/devices/register`로 장치를 등록하고 장치 토큰을 OS 보안 저장소에 저장합니다(쓸 수 없으면 설정 파일 0600, [장치 토큰 보관](#장치-토큰-보관41)). 토큰은 출력하지 않습니다. `--force`로 다시 등록하면 이전 장치의 보안 저장소 항목을 지웁니다(서버 폐기는 하지 않음). 서버 주소는 https만 받고, http는 `localhost`·`127.x`·`::1`만 허용합니다. 이미 등록돼 있으면 `--force`가 필요합니다 |
+| `logout [--local-only]` | 장치 토큰으로 `POST /api/v1/devices/revoke`를 호출해 서버에서 이 장치를 폐기한 뒤(204, 또는 이미 폐기돼 401·403) 보안 저장소 항목과 `config.json`을 지웁니다. 서버 오류·네트워크 오류·보안 저장소 잠김이면 아무것도 지우지 않고 1로 끝납니다. `--local-only`는 서버 요청 없이 로컬만 지웁니다(웹 `/devices`에서 따로 폐기). 미등록이면 0. 실행 중인 `run`은 다음 주기에 전송·heartbeat를 멈추고 새 등록을 기다립니다. 로컬 큐는 지우지 않습니다 |
 | `run` | 포그라운드 장기 실행. SIGINT/SIGTERM(Windows는 Ctrl+C)으로 정상 종료(큐 보존, 종료 코드 0). 사용자당 1개만 실행(잠금 파일) |
 | `hook claude\|codex [--product codex-desktop] [--tool-version V] [--mode M]` | Hook stdin JSON 한 건을 받아 실행 중인 `run`에 spool로 넘깁니다. **항상 종료 코드 0**, stdout·stderr 출력 없음 |
 | `pause` / `resume` | 일시중지 상태를 설정 디렉터리 `pause.json`에 저장합니다. 실행 중인 `run`이 다음 주기(기본 2초)에 반영합니다 |
@@ -142,7 +145,24 @@ agent-office-collector hooks print --tool codex # Codex hooks.json 형식 미리
 | Windows | `%APPDATA%\AgentOffice\Collector` | `%LOCALAPPDATA%\AgentOffice\Collector` |
 | 재정의 | `$AGENT_OFFICE_COLLECTOR_HOME/config` | `$AGENT_OFFICE_COLLECTOR_HOME/state` |
 
-디렉터리는 0700, 파일은 0600으로 만듭니다(Windows는 사용자 프로필 ACL). 설정 파일은 임시 파일 → fsync → rename으로 원자적으로 쓰고, 심볼릭 링크 대상이면 쓰지 않습니다. 장치 토큰은 지금 0600 설정 파일에 있으며 OS 보안 저장소 이전은 #41입니다.
+디렉터리는 0700, 파일은 0600으로 만듭니다(Windows는 사용자 프로필 ACL). 설정 파일은 임시 파일 → fsync → rename으로 원자적으로 쓰고, 심볼릭 링크 대상이면 쓰지 않습니다. 장치 토큰은 OS 보안 저장소에 두고 `config.json`에는 `token_store`만 남깁니다(대체 경로에서만 파일에 토큰).
+
+## 장치 토큰 보관(#41)
+
+| OS | 저장소 | 라이브러리 경로 |
+|---|---|---|
+| Linux | Secret Service(D-Bus: GNOME Keyring, KWallet 등) 기본 모음 | `github.com/zalando/go-keyring v0.2.8` → `godbus/dbus/v5` |
+| macOS(미검증) | 로그인 키체인 일반 암호 | `/usr/bin/security`(비밀 값은 `-i` 표준 입력으로 전달) |
+| Windows(미검증) | 자격 증명 관리자 일반 자격 증명 | `danieljoos/wincred`(순수 Go) |
+
+- 항목: 서비스 `io.github.apg0001.agent-office.collector`, 계정 = 장치 ID(비밀 아님). 토큰은 출력·로그·진단에 넣지 않습니다.
+- `register`는 저장소에 쓰고 다시 읽어 같을 때만 `config.json`에 `"token_store": "keyring"`을 쓰고 토큰 필드를 비웁니다. `config.json` 쓰기가 실패하면 방금 만든 항목을 지웁니다.
+- **대체 경로**: 저장소를 쓸 수 없으면(세션 D-Bus 없음 — headless 서버·컨테이너·SSH, 저장소 잠김·거부, 10초 응답 없음) 0600 `config.json`에 `"token_store": "file"`로 둡니다. `status`·`diagnose`의 `token_storage`가 `file_fallback`, 텍스트 출력은 "장치 토큰 보관: 설정 파일(0600, 대체 경로…)"입니다. 정상은 `os_keyring`입니다.
+- Linux에서 `DBUS_SESSION_BUS_ADDRESS`도 `/run/user/<uid>/bus`도 없으면 저장소를 시도하지 않습니다(D-Bus 자동 실행 `dbus-launch` 방지). systemd 사용자 서비스는 보통 세션 버스 주소를 물려받습니다(실제 세션 미검증).
+- `AGENT_OFFICE_COLLECTOR_TOKEN_STORE=file`이면 저장소를 쓰지 않습니다(알 수 없는 값도 `file`로 취급). 비우거나 `auto`면 저장소를 먼저 시도합니다.
+- **이전**: `run`이 시작하거나 등록 정보 변경으로 다시 시작할 때, 파일에 토큰이 있으면(#41 이전 형식 포함) 저장소에 쓰고 다시 읽어 확인한 뒤 `config.json`을 토큰 없이 원자적으로 다시 씁니다. 실패하면 파일 보관을 유지하고 다음 시작에서 다시 시도합니다. 디스크의 이전 블록까지 덮어쓰지는 않습니다.
+- `token_store`가 `keyring`인데 저장소에서 읽지 못하면 `run`은 `token_unavailable` 상태로 10초마다 다시 시도하고 아무것도 보내지 않습니다.
+- `hook` 명령은 토큰을 읽지 않습니다(등록 여부만 확인).
 
 ## 자동 시작(`service`)
 
@@ -159,7 +179,7 @@ agent-office-collector hooks print --tool codex # Codex hooks.json 형식 미리
 
 ## 진단(`status`·`diagnose`)
 
-출력에는 버전, OS·아키텍처, 등록 여부, 서버 scheme과 loopback 여부(호스트 이름은 표시하지 않음), 일시중지, run 프로세스 실행 여부, 마지막 실행 상태, 감시 루트 상태(`available`/`not_found`/`unavailable`), 개수(`acked`, `enqueued_transcript`, `normalize_*`, `baseline_skipped_files` 등), 오류 코드별 개수·마지막 시각, 큐 대기·drop-oldest·dead-letter 개수, 자동 시작 정의 상태만 들어갑니다. 위치는 `$XDG_STATE_HOME/agent-office/collector` 같은 기호 이름으로만 표시합니다.
+출력에는 버전, OS·아키텍처, 등록 여부, 장치 토큰 보관 위치(`token_storage`: `os_keyring`/`file_fallback`), 서버 scheme과 loopback 여부(호스트 이름은 표시하지 않음), 일시중지, run 프로세스 실행 여부, 마지막 실행 상태, 감시 루트 상태(`available`/`not_found`/`unavailable`), 개수(`acked`, `enqueued_transcript`, `normalize_*`, `baseline_skipped_files` 등), 오류 코드별 개수·마지막 시각, 큐 대기·drop-oldest·dead-letter 개수, 자동 시작 정의 상태만 들어갑니다. 위치는 `$XDG_STATE_HOME/agent-office/collector` 같은 기호 이름으로만 표시합니다.
 
 넣지 않는 값: 장치 토큰, 등록 코드, 서버 호스트·URL, 장치 ID, 로컬 경로 원문, 세션·도구 ID, 이벤트 내용, OS·네트워크 오류 문자열(경로·URL 포함 가능).
 
@@ -189,6 +209,8 @@ Linux arm64 Docker `golang:1.24-bookworm`에서 `gofmt -l`, `go vet ./...`(linux
 | `service_test.go` | OS별 골든(systemd·launchd·작업 XML), systemd 인용·XML 이스케이프·UTF-16LE BOM·CRLF, 상대 경로·개행 주입 거부, 소유 파일만 교체·제거, 남의 파일·작업은 명령 실행 없이 거부, 활성화 실패 보고 |
 | `cli_test.go` | Hook fail-open 9가지 입력(인자 없음, 미지 제공자, 잘못된 플래그, 미등록, 깨진 JSON, 빈 입력, 세션 없음, 8MiB 초과, 일시중지)과 끝나지 않는 stdin·쓸 수 없는 spool, 실제 하위 프로세스 종료 코드 0·출력 없음, spool에 원문 sentinel 없음, pause/resume, 진단 출력에 토큰·경로·호스트·장치 ID sentinel 없음, service 명령, 두 번째 `run` 거부 |
 | `hooks_test.go`, `cli/hooks_test.go` (#31) | Claude·Codex × linux·darwin·windows 골든, 위험 경로 거부, 소유 판정, 남의 Hook·알 수 없는 키 보존과 백업(0600)·권한 보존, 제거 후 의미상 동일 JSON, 두 번째 설치·제거 무변경, 깨진 JSON 7종 거부(쓰기·백업 없음), 읽기 전용 파일·심볼릭 링크·쓸 수 없는 디렉터리 거부, 실행 파일 이동 교체·`partial` 판정, `--yes` 없는 미리보기, CLI 출력에 토큰·홈 경로 없음, `claude_version` 기록, 버전 문자열 추출·검증 수준 판정 |
+| `secret_test.go`, `config/token_test.go` (#41) | 저장소 선택(강제 `file`·알 수 없는 값·세션 버스 없음·OS), 호출 시간 제한·OS 오류 문자열 버림, `token_store` 검증 규칙, 저장 후 재조회 검증·실패 시 항목 정리·파일 대체 경로, `config.json` 쓰기 실패 시 항목 롤백, 파일 토큰 이전(다른 필드 보존·두 번째 실행 무변경) |
+| `cli/logout_test.go` (#41) | register가 `config.json`에 토큰을 쓰지 않음·`status` `os_keyring`, 저장소 없음 → `file_fallback`, `--force`가 이전 항목 삭제, logout 8가지(204·대체 경로·401·500·네트워크 오류·`--local-only`·저장소 잠김·잠김+`--local-only`)에서 서버 호출 Bearer·삭제 여부·출력에 토큰/URL 없음, 손상 설정, `run`의 legacy 토큰 이전과 logout 뒤 heartbeat 중지, 잠긴 저장소 → `token_unavailable` → 풀리면 전송. `AGENT_OFFICE_TEST_REAL_KEYRING=1`이면 실제 저장소로 register→logout→이전 |
 | `e2e_test.go` | `httptest` 서버로 register → run → 기존 transcript 건너뜀 → 새 transcript(#20 합성 fixture `tests/fixtures/collector/claude/dual-source/transcript.jsonl`)와 Hook 이벤트 전송·heartbeat → 일시중지 동안의 줄·Hook 미수집 → 재개 후 새 줄 수집 → 정상 종료(`stopped`, 큐 0) → diagnose `reachable`. 서버 본문·상태 디렉터리에 원문·토큰 sentinel 없음, 같은 event_id 중복 전달 없음 |
 
 ## 알려진 제한·후속
@@ -196,5 +218,6 @@ Linux arm64 Docker `golang:1.24-bookworm`에서 `gofmt -l`, `go vet ./...`(linux
 - macOS·Windows 실장비에서 `run`·`service install --activate`·`hook`을 실행하지 않았습니다(#62 실장비 검증 또는 별도 Issue).
 - 실제 systemd 사용자 세션에서 unit을 기동하지 않았습니다. 로그아웃 뒤에도 실행하려면 `loginctl enable-linger`가 필요하며 자동으로 켜지 않습니다.
 - 큐 기록이 실패하면 그 주기에 정규화한 결정적 중복 제거 키가 메모리에 남아, 같은 Hook·transcript 이벤트가 이번 실행에서 다시 나오지 않을 수 있습니다(디스크 가득 참 등 드문 경우).
-- 장치 토큰 회전(`/devices/token/rotate`), 로그아웃 시 `/devices/revoke` 호출, OS 보안 저장소는 #41입니다.
+- 장치 토큰 회전(`/devices/token/rotate`) 명령은 아직 없습니다.
+- macOS Keychain(첫 접근 허용 프롬프트, 서명 안 된 바이너리 교체 시 재허용)·Windows Credential Manager·실제 데스크톱 세션의 Secret Service 자동 잠금 해제는 실장비에서 확인해야 합니다.
 - Hook 설치(#31): 실제 Claude Code가 설치된 Hook을 호출하는 종단 확인, macOS·Windows 명령 인용 실기 확인, Codex 사용자 범위 설정 위치 실측(자동 설치 전제)이 남았습니다. 대화형 Claude 모드가 실측되기 전까지 `claude_mode`는 자동으로 채우지 않습니다.

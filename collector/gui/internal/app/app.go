@@ -8,11 +8,13 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/apg0001/Agent-Office/collector/gui/internal/autostart"
 	"github.com/apg0001/Agent-Office/collector/gui/internal/corecli"
 	"github.com/apg0001/Agent-Office/collector/gui/internal/prefs"
 )
@@ -31,6 +33,10 @@ type Options struct {
 	OpenURL func(ctx context.Context, url string)
 	// Runner를 주면 Core 위치 탐색을 건너뛴다(테스트).
 	Runner *corecli.Runner
+	// UserHomeDir는 GUI 자동 시작 정의 위치 계산용이다.
+	UserHomeDir func() (string, error)
+	// Registry는 Windows Run 키 접근자다(nil이면 autostart.SystemRegistry).
+	Registry autostart.Registry
 }
 
 // App은 Wails에 바인딩되는 구조체다. 공개 메서드가 프런트엔드에 노출된다.
@@ -58,6 +64,12 @@ func New(o Options) *App {
 	}
 	if o.GOOS == "" {
 		o.GOOS = goos
+	}
+	if o.UserHomeDir == nil {
+		o.UserHomeDir = os.UserHomeDir
+	}
+	if o.Registry == nil {
+		o.Registry = autostart.SystemRegistry()
 	}
 	return &App{opts: o, ctx: context.Background()}
 }
@@ -427,4 +439,131 @@ func (a *App) outputT(timeout time.Duration, okCode, failCode string, args ...st
 		return out
 	}
 	return okResult(okCode, res.Stdout)
+}
+
+// --- 로그아웃(#41) ------------------------------------------------------------------
+
+// Logout은 승인 시 Core `logout`을 실행한다. Core가 서버 `/devices/revoke`로 이 장치를 폐기하고
+// 보안 저장소·설정 파일의 장치 토큰을 지운다. GUI는 토큰을 다루지 않는다. localOnly면 서버 요청 없이
+// 로컬만 지운다(웹 /devices에서 따로 폐기해야 함).
+func (a *App) Logout(localOnly, confirmed bool) Result {
+	if !confirmed {
+		return fail("confirmation_required")
+	}
+	r, err := a.runner()
+	if err != nil {
+		return fail(errCode(err))
+	}
+	res, err := r.Logout(a.context(), localOnly)
+	if err != nil {
+		return fail(errCode(err))
+	}
+	if res.Exit != 0 {
+		out := fail("logout_failed")
+		out.Output = redact(res.Stderr)
+		return out
+	}
+	code := "logged_out"
+	if localOnly {
+		code = "logged_out_local"
+	}
+	return okResult(code, res.Stdout)
+}
+
+// --- GUI 자동 시작(#43) -------------------------------------------------------------
+
+func (a *App) guiExecutable() (string, error) {
+	exe, err := a.opts.Executable()
+	if err != nil {
+		return "", err
+	}
+	if r, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = r
+	}
+	return filepath.Abs(exe)
+}
+
+func (a *App) autostartDef() (autostart.Definition, error) {
+	exe, err := a.guiExecutable()
+	if err != nil {
+		return autostart.Definition{}, autostart.ErrInvalidExecutable
+	}
+	home, _ := a.opts.UserHomeDir()
+	return autostart.Generate(autostart.Params{GOOS: a.opts.GOOS, Exe: exe, Home: home, Getenv: a.opts.Getenv})
+}
+
+func autostartErrCode(err error) string {
+	switch {
+	case errors.Is(err, autostart.ErrForeign):
+		return "gui_autostart_foreign"
+	case errors.Is(err, autostart.ErrInvalidExecutable):
+		return "gui_autostart_invalid_exe"
+	case errors.Is(err, autostart.ErrUnsupportedOS):
+		return "gui_autostart_unsupported"
+	case errors.Is(err, autostart.ErrNotInstalled):
+		return "gui_autostart_absent"
+	default:
+		return "gui_autostart_failed"
+	}
+}
+
+// GUIAutostartView는 GUI 자동 시작 상태다. State는 installed / outdated / absent / foreign / unsupported다.
+type GUIAutostartView struct {
+	OK    bool   `json:"ok"`
+	State string `json:"state"`
+	// Location은 정의 위치의 기호 표기다(홈은 ~, 실제 경로 원문 아님).
+	Location string `json:"location,omitempty"`
+}
+
+func (a *App) displayLocation(p string) string {
+	if home, err := a.opts.UserHomeDir(); err == nil && home != "" && strings.HasPrefix(p, home) {
+		return "~" + p[len(home):]
+	}
+	return p
+}
+
+// GUIAutostartStatus는 로그인 시 GUI(트레이) 자동 시작 정의 상태다. Core 자동 시작과 별개다.
+func (a *App) GUIAutostartStatus() GUIAutostartView {
+	def, err := a.autostartDef()
+	if err != nil {
+		return GUIAutostartView{State: "unsupported"}
+	}
+	st := autostart.State(def, a.opts.Registry)
+	if def.GOOS == "windows" && a.opts.Registry == nil {
+		st = "unsupported"
+	}
+	return GUIAutostartView{OK: true, State: st, Location: a.displayLocation(def.Path)}
+}
+
+// GUIAutostartInstall은 승인 시 GUI 자동 시작 정의를 설치·갱신한다(소유하지 않은 항목은 덮어쓰지 않음).
+func (a *App) GUIAutostartInstall(confirmed bool) Result {
+	if !confirmed {
+		return fail("confirmation_required")
+	}
+	def, err := a.autostartDef()
+	if err != nil {
+		return fail(autostartErrCode(err))
+	}
+	if _, err := autostart.Install(def, a.opts.Registry); err != nil {
+		return fail(autostartErrCode(err))
+	}
+	return okResult("gui_autostart_installed", a.displayLocation(def.Path))
+}
+
+// GUIAutostartUninstall은 승인 시 이 도구가 만든 GUI 자동 시작 정의만 지운다.
+func (a *App) GUIAutostartUninstall(confirmed bool) Result {
+	if !confirmed {
+		return fail("confirmation_required")
+	}
+	def, err := a.autostartDef()
+	if err != nil {
+		return fail(autostartErrCode(err))
+	}
+	if err := autostart.Uninstall(def, a.opts.Registry); err != nil {
+		if errors.Is(err, autostart.ErrNotInstalled) {
+			return okResult("gui_autostart_absent", "")
+		}
+		return fail(autostartErrCode(err))
+	}
+	return okResult("gui_autostart_removed", "")
 }
