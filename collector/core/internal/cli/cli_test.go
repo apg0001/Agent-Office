@@ -16,6 +16,7 @@ import (
 	"github.com/apg0001/Agent-Office/collector/core/internal/config"
 	"github.com/apg0001/Agent-Office/collector/core/internal/paths"
 	"github.com/apg0001/Agent-Office/collector/core/internal/runner"
+	"github.com/apg0001/Agent-Office/collector/core/internal/secret"
 	"github.com/apg0001/Agent-Office/collector/core/internal/service"
 )
 
@@ -41,6 +42,8 @@ type testEnv struct {
 	stdout *bytes.Buffer
 	stderr *bytes.Buffer
 	env    Env
+	// secrets는 OS 보안 저장소 대신 쓰는 메모리 저장소다(테스트가 실제 키체인을 건드리지 않게).
+	secrets *secret.Memory
 }
 
 func newTestEnv(t *testing.T, homeName string) *testEnv {
@@ -58,12 +61,13 @@ func newTestEnv(t *testing.T, homeName string) *testEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	te := &testEnv{t: t, home: home, dirs: dirs, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}
+	te := &testEnv{t: t, home: home, dirs: dirs, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, secrets: secret.NewMemory()}
 	te.env = Env{
 		Version: "0.0.0-test", Stdin: strings.NewReader(""), Stdout: te.stdout, Stderr: te.stderr,
 		Getenv: getenv, Dirs: func() (paths.Dirs, error) { return dirs, nil },
 		Executable: func() (string, error) { return "/usr/local/bin/agent-office-collector", nil },
 		Command:    func(...string) ([]byte, error) { return nil, nil },
+		Secrets:    te.secrets,
 	}
 	return te
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/apg0001/Agent-Office/collector/core/internal/normalize"
 	"github.com/apg0001/Agent-Office/collector/core/internal/paths"
 	"github.com/apg0001/Agent-Office/collector/core/internal/queue"
+	"github.com/apg0001/Agent-Office/collector/core/internal/secret"
 	"github.com/apg0001/Agent-Office/collector/core/internal/spool"
 	"github.com/apg0001/Agent-Office/collector/core/internal/tail"
 	"github.com/apg0001/Agent-Office/collector/core/internal/transport"
@@ -73,6 +74,8 @@ type Options struct {
 	Now        func() time.Time
 	// Logf는 운영 로그다. 코드·개수만 넘긴다.
 	Logf func(format string, args ...any)
+	// Secrets는 장치 토큰 보안 저장소다(#41). nil이면 파일 보관 토큰만 쓰고 이전(migration)하지 않는다.
+	Secrets secret.Store
 }
 
 func (o *Options) defaults() {
@@ -143,16 +146,34 @@ func Run(ctx context.Context, o Options) error {
 			if errors.Is(err, config.ErrNotRegistered) {
 				state = StateNotRegistered
 			}
-			if r.m.setState(state) {
+			changed := r.m.setState(state)
+			if changed {
 				o.Logf("상태 %s: `agent-office-collector register`로 등록하면 자동으로 수집을 시작합니다", state)
 			}
-			r.writeStatus(false)
+			r.writeStatus(changed)
 			if !sleep(ctx, o.PollInterval) {
 				return nil
 			}
 			continue
 		}
-		err = r.session(ctx, cfg)
+		// 파일에 있는 토큰(#41 이전 형식·대체 경로)을 보안 저장소로 옮긴다. 실패하면 파일 보관을 유지한다.
+		if migrated, ok := config.MigrateToken(o.Dirs.ConfigFile(), cfg, o.Secrets); ok {
+			cfg = migrated
+			o.Logf("장치 토큰을 OS 보안 저장소로 옮기고 설정 파일에서 지웠습니다")
+		}
+		token, err := cfg.Token(o.Secrets)
+		if err != nil {
+			changed := r.m.setState(StateTokenUnavailable)
+			if changed {
+				o.Logf("상태 %s: OS 보안 저장소에서 장치 토큰을 읽지 못했습니다. 저장소 잠금을 해제하면 자동으로 다시 시도합니다", StateTokenUnavailable)
+			}
+			r.writeStatus(changed)
+			if !sleep(ctx, o.DiscoverInterval) {
+				return nil
+			}
+			continue
+		}
+		err = r.session(ctx, cfg, token)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -227,7 +248,7 @@ func (s countingStore) Reject(ctx context.Context, rejs []queue.Rejection) (queu
 	return r, err
 }
 
-func (r *runner) session(ctx context.Context, cfg config.Config) error {
+func (r *runner) session(ctx context.Context, cfg config.Config, tok config.Secret) error {
 	q, err := queue.Open(r.o.Dirs.QueueFile(), queue.Options{})
 	if err != nil {
 		return err
@@ -244,7 +265,7 @@ func (r *runner) session(ctx context.Context, cfg config.Config) error {
 	pipe := normalize.NewPipeline(norm)
 	r.pipe.Store(pipe)
 
-	token := string(cfg.DeviceToken)
+	token := string(tok)
 	client := &http.Client{
 		Transport:     observingTransport{base: r.o.Transport, m: r.m},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },

@@ -37,8 +37,11 @@ type Report struct {
 	// ServerScheme·ServerLoopback은 서버 주소 대신 남기는 안전한 요약이다.
 	ServerScheme   string `json:"server_scheme,omitempty"`
 	ServerLoopback bool   `json:"server_loopback,omitempty"`
-	Paused         bool   `json:"paused"`
-	PauseState     string `json:"pause_state"`
+	// TokenStorage는 장치 토큰 보관 위치다(#41): os_keyring(OS 보안 저장소) / file_fallback(0600 설정 파일,
+	// 보안 저장소를 쓸 수 없거나 강제 파일 모드). 미등록이면 비어 있다. 저장소 항목 존재는 확인하지 않는다.
+	TokenStorage string `json:"token_storage,omitempty"`
+	Paused       bool   `json:"paused"`
+	PauseState   string `json:"pause_state"`
 	// ProcessRunning은 run 프로세스가 실행 잠금을 갖고 있는지다.
 	ProcessRunning bool `json:"process_running"`
 	// Run은 마지막 status.json 내용이다(없으면 nil).
@@ -109,6 +112,10 @@ func buildReport(env Env, dirs paths.Dirs, diagnose bool) (Report, *config.Confi
 			h := u.Hostname()
 			ip := net.ParseIP(h)
 			rep.ServerLoopback = h == "localhost" || (ip != nil && ip.IsLoopback())
+		}
+		rep.TokenStorage = "file_fallback"
+		if cfg.InKeyring() {
+			rep.TokenStorage = "os_keyring"
 		}
 		cfgOut = &cfg
 	case errors.Is(err, config.ErrNotRegistered):
@@ -224,6 +231,12 @@ func printReport(w io.Writer, r Report, diagnose bool) {
 			loop = ", loopback"
 		}
 		fmt.Fprintf(w, "서버: %s%s (주소는 표시하지 않음)\n", r.ServerScheme, loop)
+	}
+	switch r.TokenStorage {
+	case "os_keyring":
+		fmt.Fprintln(w, "장치 토큰 보관: OS 보안 저장소")
+	case "file_fallback":
+		fmt.Fprintln(w, "장치 토큰 보관: 설정 파일(0600, 대체 경로: OS 보안 저장소를 쓸 수 없음)")
 	}
 	pause := "수집 중"
 	if r.Paused {

@@ -11,3 +11,4 @@
 - 설치·운영: bootstrap·설치 마법사, Caddy 단일 진입점, 백업·복원 시험, 알림, 승인형 배포·롤백, 보안 점검
 - 팀 사무실과 공유, 아이소메트릭 사무실 화면·상세 패널·계획 진행도
 - 헤드리스 Collector(Linux 검증, macOS·Windows 미검증)
+- Collector 장치 토큰 OS 보안 저장소 보관·기존 파일 토큰 이전·`logout`(Linux Secret Service 컨테이너 검증, macOS Keychain·Windows Credential Manager 미검증), GUI Linux 트레이·GUI 자동 시작(#41, #43)

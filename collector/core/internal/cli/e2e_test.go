@@ -27,6 +27,7 @@ type fakeOffice struct {
 	bodies     []string
 	heartbeats int
 	authFail   int
+	revoked    int
 }
 
 func (f *fakeOffice) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +55,9 @@ func (f *fakeOffice) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"device_id":"` + testDeviceID + `","device_token":"` + sentinelToken + `"}`))
 	case "/api/v1/devices/heartbeat":
 		f.heartbeats++
+		w.WriteHeader(http.StatusNoContent)
+	case "/api/v1/devices/revoke":
+		f.revoked++
 		w.WriteHeader(http.StatusNoContent)
 	case "/api/v1/events/batch":
 		var req struct {

@@ -1,7 +1,8 @@
 // Package config는 Collector 등록 정보(서버 주소·장치 ID·장치 토큰)와 일시중지 상태를 저장한다(#34).
 //
 // 파일은 0600으로 원자적으로 쓴다. 장치 토큰은 Secret 타입이라 fmt·로그로 출력해도 가려진다.
-// OS 보안 저장소(Keychain·Credential Manager·Secret Service) 연동은 GUI 설치 작업(#41)의 범위다.
+// 장치 토큰은 OS 보안 저장소(Keychain·Credential Manager·Secret Service)에 두고, 저장소를 쓸 수 없을
+// 때만 이 파일에 둔다(token_store, #41). 자세한 규칙은 token.go.
 package config
 
 import (
@@ -39,12 +40,15 @@ func (Secret) GoString() string { return "[redacted]" }
 
 // Config는 등록 결과다.
 type Config struct {
-	SchemaVersion int       `json:"schema_version"`
-	ServerURL     string    `json:"server_url"`
-	DeviceID      string    `json:"device_id"`
-	DeviceToken   Secret    `json:"device_token"`
-	DeviceName    string    `json:"device_name"`
-	RegisteredAt  time.Time `json:"registered_at"`
+	SchemaVersion int    `json:"schema_version"`
+	ServerURL     string `json:"server_url"`
+	DeviceID      string `json:"device_id"`
+	// DeviceToken은 TokenStore가 file일 때만 파일에 있다. keyring이면 비어 있고 OS 보안 저장소에 있다.
+	DeviceToken Secret `json:"device_token,omitempty"`
+	// TokenStore는 keyring / file이다. 비어 있으면 #41 이전 형식(파일 보관)이며 file과 같다.
+	TokenStore   string    `json:"token_store,omitempty"`
+	DeviceName   string    `json:"device_name"`
+	RegisteredAt time.Time `json:"registered_at"`
 	// ClaudeProjectsDir가 비어 있으면 OS 기본 위치(paths.Dirs.ClaudeProjects)를 감시한다.
 	ClaudeProjectsDir string `json:"claude_projects_dir,omitempty"`
 	// ClaudeVersion·ClaudeMode는 transcript 런타임 검증 수준 판정용이다(#31 버전 감지 전까지 수동).
@@ -93,7 +97,19 @@ func (c Config) Validate() error {
 	if _, err := NormalizeServerURL(c.ServerURL); err != nil {
 		return err
 	}
-	if !isUUID(c.DeviceID) || c.DeviceToken == "" || len(c.DeviceToken) > 512 {
+	if !isUUID(c.DeviceID) || len(c.DeviceToken) > 512 {
+		return ErrInvalid
+	}
+	switch c.TokenStore {
+	case "", TokenStoreFile:
+		if c.DeviceToken == "" {
+			return ErrInvalid
+		}
+	case TokenStoreKeyring:
+		if c.DeviceToken != "" {
+			return ErrInvalid
+		}
+	default:
 		return ErrInvalid
 	}
 	return nil
@@ -102,6 +118,7 @@ func (c Config) Validate() error {
 // Same은 서버·장치·토큰이 같은지 비교한다(실행 루프의 재적재 판단).
 func (c Config) Same(o Config) bool {
 	return c.ServerURL == o.ServerURL && c.DeviceID == o.DeviceID && c.DeviceToken == o.DeviceToken &&
+		c.storeKind() == o.storeKind() &&
 		c.ClaudeProjectsDir == o.ClaudeProjectsDir && c.ClaudeVersion == o.ClaudeVersion && c.ClaudeMode == o.ClaudeMode
 }
 

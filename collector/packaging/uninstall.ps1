@@ -9,7 +9,15 @@ if (-not $Yes) {
 }
 & $bin hooks uninstall --tool claude --yes 2>$null | Out-Null
 & $bin service uninstall 2>$null | Out-Null
+# GUI(트레이) 자동 시작(#43): 우리 형식("...\agent-office-collector-gui.exe" --autostart)인 Run 값만 지운다.
+$run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+$gui = (Get-ItemProperty -Path $run -Name AgentOfficeCollectorGUI -ErrorAction SilentlyContinue).AgentOfficeCollectorGUI
+if ($gui -and $gui -match '^"[A-Za-z]:\\[^"]*\\agent-office-collector-gui\.exe" --autostart$') {
+  Remove-ItemProperty -Path $run -Name AgentOfficeCollectorGUI
+}
 if ($Purge) {
+  # Credential Manager의 장치 토큰 항목(#41)을 먼저 지운다. 서버 폐기는 하지 않는다(웹 /devices 또는 logout).
+  & $bin logout --local-only 2>$null | Out-Null
   # Core의 경로 규칙과 같다(%APPDATA%·%LOCALAPPDATA%\AgentOffice\Collector).
   foreach ($dir in @((Join-Path $env:APPDATA "AgentOffice\Collector"), (Join-Path $env:LOCALAPPDATA "AgentOffice\Collector"))) {
     if ($dir.EndsWith("AgentOffice\Collector") -and (Test-Path $dir)) { Remove-Item -Recurse -Force -LiteralPath $dir }

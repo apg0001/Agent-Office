@@ -30,8 +30,8 @@ agent-office-collector service install --activate
 
 | 범위 | 명령 | 지우는 것 |
 |---|---|---|
-| 기본 | `agent-office-collector-uninstall`(Windows `uninstall.ps1`) | 우리가 설치한 Hook과 자동 시작(소유 표시가 있는 것만). 설정·장치 토큰·큐는 남김(재설치 시 그대로 이어감) |
-| 완전 삭제 | `… --purge`(Windows `-Purge`) | 위 + Core 설정·상태·큐 폴더(`~/.config/agent-office/collector` 등, Core 경로 규칙과 같음) |
+| 기본 | `agent-office-collector-uninstall`(Windows `uninstall.ps1`) | 우리가 설치한 Hook과 자동 시작(소유 표시가 있는 것만, GUI 자동 시작 `.desktop`·LaunchAgent·HKCU Run 값 포함 — #43, Windows 미검증). 설정·장치 토큰·큐는 남김(재설치 시 그대로 이어감) |
+| 완전 삭제 | `… --purge`(Windows `-Purge`) | 위 + OS 보안 저장소의 장치 토큰 항목(`logout --local-only`, 서버 폐기는 하지 않음, #41) + Core 설정·상태·큐 폴더(`~/.config/agent-office/collector` 등, Core 경로 규칙과 같음) |
 | 패키지 | `dpkg -r` / `rpm -e` | 바이너리만. 다른 사용자 홈은 건드리지 않음 |
 
 Claude·Codex의 원본 기록(`~/.claude/projects` 등)은 어떤 경우에도 지우지 않습니다. 장치를 서버에서도 끊으려면 웹 `/devices`에서 그 PC를 폐기합니다.

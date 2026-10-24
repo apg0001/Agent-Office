@@ -16,7 +16,7 @@ const (
 	EnvActive = "AO_FAKE_CORE"
 	// EnvLog는 호출 인자·표준 입력을 JSON 줄로 남길 파일이다.
 	EnvLog = "AO_FAKE_LOG"
-	// EnvScenario는 동작 변형이다(leak, slow, garbage, unreadable).
+	// EnvScenario는 동작 변형이다(leak, slow, garbage, unreadable, logout_offline).
 	EnvScenario = "AO_FAKE_SCENARIO"
 	// SentinelToken은 가짜 Core가 실수로 흘리는 토큰 형식 문자열이다(leak 시나리오).
 	SentinelToken = "aod_SENTINEL_TOKEN_gui_DO_NOT_SHOW"
@@ -55,6 +55,7 @@ const StatusJSON = `{
   "arch": "arm64",
   "registration": "registered",
   "server_scheme": "https",
+  "token_storage": "os_keyring",
   "paused": false,
   "pause_state": "ok",
   "process_running": true,
@@ -154,6 +155,15 @@ func run(args []string) int {
 			return 1
 		}
 		fmt.Println("등록했습니다. 장치 ID 0d6b2a10-7a4c-4b8e-9f00-1234567890ab. " + SentinelToken)
+	case args[0] == "logout":
+		if scenario == "logout_offline" && joined == "logout" {
+			fmt.Fprintln(os.Stderr, "서버에 연결할 수 없어 폐기하지 못했습니다. 로컬 정보는 그대로 두었습니다. 나중에 다시 시도하거나 --local-only를 쓰세요")
+			return 1
+		}
+		if joined != "logout" && joined != "logout --local-only" {
+			return 2
+		}
+		fmt.Println("서버에서 이 장치를 폐기했습니다.\n로컬 장치 토큰과 등록 정보를 지웠습니다. " + SentinelToken)
 	case joined == "pause" || joined == "resume":
 	case joined == "service print":
 		fmt.Println("[Unit]\nDescription=Agent Office Collector")

@@ -21,7 +21,16 @@ fi
 # 실행 중인 수집을 멈추고, 우리가 표시한 항목만 지운다(남의 Hook·서비스는 그대로).
 "$BIN" hooks uninstall --tool claude --yes >/dev/null 2>&1 || true
 "$BIN" service uninstall >/dev/null 2>&1 || true
+# GUI(트레이) 자동 시작(#43): 소유 표시가 있는 일반 파일만 지운다.
+for f in "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/agent-office-collector-gui.desktop" \
+  "$HOME/Library/LaunchAgents/io.github.apg0001.agent-office.collector-gui.plist"; do
+  if [ -f "$f" ] && [ ! -L "$f" ] && grep -q 'agent-office-collector-gui:managed-autostart:v1' "$f"; then
+    rm -f -- "$f"
+  fi
+done
 if [ "$PURGE" -eq 1 ]; then
+  # OS 보안 저장소의 장치 토큰 항목(#41)을 먼저 지운다. 서버 폐기는 하지 않는다(웹 /devices 또는 logout).
+  "$BIN" logout --local-only >/dev/null 2>&1 || true
   # Core의 경로 규칙(collector/core/internal/paths)과 같다. 우리 폴더 이름으로 끝날 때만 지운다.
   if [ -n "${AGENT_OFFICE_COLLECTOR_HOME:-}" ]; then
     set -- "$AGENT_OFFICE_COLLECTOR_HOME/config" "$AGENT_OFFICE_COLLECTOR_HOME/state"
