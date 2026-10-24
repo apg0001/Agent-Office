@@ -4,6 +4,7 @@ import { AccountPage, LoginPage, ResetPage, SignupPage, VerifyPage } from "./acc
 import { InvitePage } from "./account/InvitePage";
 import { AdminPage } from "./account/AdminPage";
 import { TeamsPage } from "./account/TeamsPage";
+import { DevicesPage } from "./account/DevicesPage";
 import { SetupWizard } from "./account/SetupWizard";
 import { type SessionInfo, call, routeFor } from "./account/api";
 import { OfficeView } from "./office/OfficeView";
@@ -40,6 +41,7 @@ function SessionBar() {
   return (
     <nav className="session-bar" aria-label="계정">
       <a href="/teams">팀</a>
+      <a href="/devices">PC</a>
       <a href="/account">계정</a>
       {["SUPER_ADMIN", "ADMIN"].includes(session.user.instance_role) && <a href="/admin">관리</a>}
       <span>{session.user.display_name}</span>
@@ -62,12 +64,13 @@ export function App({ pathname }: { pathname?: string }) {
       setup: SetupWizard,
       invite: InvitePage,
       teams: TeamsPage,
+      devices: DevicesPage,
       admin: AdminPage,
       account: AccountPage,
     };
     const Page = pages[route];
     return (
-      <main className={`shell account-shell${route === "teams" || route === "admin" ? " wide" : ""}`}>
+      <main className={`shell account-shell${route === "teams" || route === "devices" || route === "admin" ? " wide" : ""}`}>
         <p className="eyebrow">
           <a href="/">AGENT OFFICE</a>
         </p>

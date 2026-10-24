@@ -65,8 +65,10 @@ def test_ci_workflow_has_a_pinned_complete_gate() -> None:
         "python",
         "node",
         "go",
+        "go-gui",
         "compose",
         "images",
+        "e2e",
         "secret-scan",
     }
     assert workflow["jobs"]["ci-gate"]["name"] == "CI Gate"

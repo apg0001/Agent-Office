@@ -31,14 +31,52 @@ func platformOf(goos string) string {
 	}
 }
 
+// readCodeLine은 표준 입력 첫 줄(최대 64바이트)을 읽는다. 등록 코드는 32자 이하다.
+// 줄바꿈에서 멈추므로 입력을 닫지 않아도 된다.
+func readCodeLine(r io.Reader) (string, error) {
+	var line []byte
+	one := make([]byte, 1)
+	for {
+		n, err := r.Read(one)
+		if n == 1 {
+			if one[0] == '\n' || one[0] == '\r' {
+				return string(line), nil
+			}
+			if len(line) == 64 {
+				return "", errors.New("code line too long")
+			}
+			line = append(line, one[0])
+		}
+		if errors.Is(err, io.EOF) {
+			return string(line), nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+}
+
 func cmdRegister(args []string, env Env) int {
 	fs := newFlags("register", env)
 	server := fs.String("server", "", "Agent Office 서버 주소(https://...)")
 	code := fs.String("code", "", "웹에서 받은 일회용 등록 코드(XXXX-XXXX)")
 	name := fs.String("name", "", "이 PC의 표시 이름(1~80자)")
+	codeStdin := fs.Bool("code-stdin", false, "등록 코드를 표준 입력 첫 줄에서 읽음(GUI용, 프로세스 목록에 코드가 보이지 않음)")
 	force := fs.Bool("force", false, "이미 등록된 경우 새 장치로 다시 등록")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		return ExitUsage
+	}
+	if *codeStdin {
+		if *code != "" {
+			fmt.Fprintln(env.Stderr, "--code와 --code-stdin은 함께 쓸 수 없습니다")
+			return ExitUsage
+		}
+		line, err := readCodeLine(env.Stdin)
+		if err != nil {
+			fmt.Fprintln(env.Stderr, "표준 입력에서 등록 코드를 읽지 못했습니다")
+			return ExitUsage
+		}
+		*code = line
 	}
 	base, err := config.NormalizeServerURL(*server)
 	if err != nil {
@@ -56,7 +94,7 @@ func cmdRegister(args []string, env Env) int {
 	}
 	regCode := strings.TrimSpace(*code)
 	if regCode == "" || len(regCode) > 32 {
-		fmt.Fprintln(env.Stderr, "--code에 웹에서 받은 등록 코드를 넣으세요")
+		fmt.Fprintln(env.Stderr, "--code(또는 --code-stdin)에 웹에서 받은 등록 코드를 넣으세요")
 		return ExitUsage
 	}
 	dirs, err := env.Dirs()
