@@ -249,3 +249,34 @@ def test_oauth_settings(client: TestClient, admin: dict[str, str]) -> None:
     }
     assert SECRET not in saved.text
     assert put(client, admin, "/oauth/twitter", body).status_code == 422
+
+
+def test_backup_actions_require_key_and_record_status(
+    client: TestClient, admin: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agent_office import backup
+
+    monkeypatch.delenv(backup.BACKUP_KEY_ENV, raising=False)
+    missing = client.post("/api/v1/admin/backup/run", headers=admin)
+    assert missing.status_code == 503 and missing.json()["detail"] == "backup_key_missing"
+
+    monkeypatch.setenv(backup.BACKUP_KEY_ENV, base64.urlsafe_b64encode(os.urandom(32)).decode())
+
+    def fail() -> backup.BackupInfo:
+        raise backup.BackupError("pg_dump_failed")
+
+    monkeypatch.setattr(backup, "create_backup", fail)
+    result = client.post("/api/v1/admin/backup/run", headers=admin).json()
+    assert result == {"ok": False, "error": "pg_dump_failed", "name": None, "size_bytes": None}
+    status = client.get("/api/v1/admin/metrics", headers=admin).json()["backup"]
+    assert status["configured"] is True and status["last_backup_ok"] is False
+    assert status["last_error"] == "pg_dump_failed"
+
+    monkeypatch.setenv(backup.BACKUP_DIR_ENV, "/nonexistent-backups")
+    test = client.post("/api/v1/admin/backup/restore-test", headers=admin).json()
+    assert test["ok"] is False and test["error"] == "no_backup"
+    assert client.post("/api/v1/admin/backup/delete", headers=admin).status_code == 422
+    assert (
+        client.post("/api/v1/admin/backup/run", headers={"Cookie": admin["Cookie"]}).status_code
+        == 403
+    )

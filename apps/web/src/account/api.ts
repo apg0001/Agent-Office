@@ -116,7 +116,7 @@ export function tokenFromHash(hash: string): string | null {
   return match ? match[1]! : null;
 }
 
-export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite" | "teams";
+export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite" | "teams" | "admin";
 
 export function routeFor(pathname: string): Route {
   const routes: Record<string, Route> = {
@@ -127,6 +127,7 @@ export function routeFor(pathname: string): Route {
     "/setup": "setup",
     "/invite": "invite",
     "/teams": "teams",
+    "/admin": "admin",
   };
   return routes[pathname.replace(/\/+$/, "") || "/"] ?? "office";
 }
