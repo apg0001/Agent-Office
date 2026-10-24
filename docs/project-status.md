@@ -268,6 +268,8 @@
 182. #38·#62: 실제 Claude 하위 에이전트·TodoWrite 시나리오(`SCENARIO=subagent`)로 hook → spool → run 경로의 계획 상태 유실 2건 수정(spool 레코드 `plan` 필드, `run` spool 처리를 `Pipeline.Candidate`로). 실측 결과 하위 에이전트 lead 아래, `plan_steps` `["completed","completed"]`, 표식 DB 0건.
 183. PR #142 병합(`797219a`).
 184. #41·#43(PR #141): Core 장치 토큰을 OS 보안 저장소(go-keyring, 없으면 0600 파일 대체)에 보관·`logout [--local-only]`, Linux 트레이(fyne systray)·GUI 자동 시작. Linux arm64 Docker에서 실제 Secret Service·D-Bus 트레이 메뉴 검증. macOS Keychain·Windows Credential Manager·실제 데스크톱 패널·로그인 후 자동 시작은 미검증(#43 열어 둠).
+185. PR #141 병합(`36a2f38`), #41 종료, Epic #6 체크리스트 갱신. #43은 실제 데스크톱 확인까지 열어 둠.
+186. #63 72시간 무경합 실행 시작(2026-10-24 23시경 KST, `36a2f38`, 이미지 `ao-release-server:test`·`ao-release-web:test`). 출력 `~/ao-soak/soak72h.txt`, Compose 프로젝트 `ao-load`. 실행 중에는 Pi에서 무거운 빌드·테스트를 피한다.
 
 ## 이번 변경 요약(#22)
 
@@ -353,7 +355,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율, 2026-10-24 갱신): #41·#43 PR #141 병합 후 #41 종료, #43은 실제 데스크톱 로그인 자동 시작 확인까지 열어 둠 → 72시간 실행. 실제 Claude 흐름 재확인은 `SCENARIO=subagent tests/e2e/claude_flow.sh ao-release-server:test ao-release-web:test <Collector 실행 파일>`. 이전 순서: #63 PR 병합(이슈는 72시간 실행까지 열어 둠) → #65 릴리스 준비 PR(`docs/#65-release-prep` 브랜치에 초안 커밋 있음, 장시간 결과 반영 후 PR) → #41·#43 서브에이전트 PR 병합 → #42 설치 패키지·#44 업데이트 → 72시간 실행(`AGENT_OFFICE_LOAD_PORT=18480 tests/load/run.sh <서버> <웹> --rounds 129600 --interval 2 --timeout 30`, 다른 무거운 작업 없을 때) → #62·#87은 소유자 장비. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
+4. 진행 순서(자율, 2026-10-24 갱신): 72시간 실행 진행 중: 끝나면(약 2026-10-27 23시) `cat ~/ao-soak/soak72h.txt`로 결과를 확인해 `docs/operations/performance.md`·#63에 기록하고 #63을 닫는다. 중단 확인은 `docker ps | grep ao-load`. 그 뒤 #65 릴리스 준비(관리자 승인 필요). 실제 Claude 흐름 재확인은 `SCENARIO=subagent tests/e2e/claude_flow.sh ao-release-server:test ao-release-web:test <Collector 실행 파일>`. 이전 순서: #63 PR 병합(이슈는 72시간 실행까지 열어 둠) → #65 릴리스 준비 PR(`docs/#65-release-prep` 브랜치에 초안 커밋 있음, 장시간 결과 반영 후 PR) → #41·#43 서브에이전트 PR 병합 → #42 설치 패키지·#44 업데이트 → 72시간 실행(`AGENT_OFFICE_LOAD_PORT=18480 tests/load/run.sh <서버> <웹> --rounds 129600 --interval 2 --timeout 30`, 다른 무거운 작업 없을 때) → #62·#87은 소유자 장비. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
