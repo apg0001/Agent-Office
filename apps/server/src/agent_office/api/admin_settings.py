@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import Connection, select
 
-from agent_office import audit, instance, monitoring, retention, secret_store
+from agent_office import audit, backup, instance, monitoring, retention, secret_store
 from agent_office.api.deps import CsrfDep, CurrentUser, DbConnection, UserDep
 from agent_office.auth import accounts, mailer
 from agent_office.db import schema
@@ -318,4 +318,5 @@ def read_metrics(_admin: AdminDep, connection: DbConnection) -> dict[str, Any]:
             "last_ok": monitoring.last_heartbeat["ok"],
         },
         "retention": {"last_at": retention.last_run["at"], "last_ok": retention.last_run["ok"]},
+        "backup": {"configured": backup.configured(), **backup.read_status(connection)},
     }

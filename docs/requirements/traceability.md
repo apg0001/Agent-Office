@@ -407,3 +407,14 @@
 | HOOK-004 | COL-004 fail-open 명령 | linux·darwin·windows 골든: 타임아웃 5초, 공백·작은따옴표 경로 인용, Windows `"C:/…" hook <tool>`, 인용할 수 없는 경로 거부. 실제 Claude·Codex가 설치된 Hook을 호출하는 경로는 미실행 |
 | HOOK-005 | COL-009 상태·복구 | `hooks status`의 `installed`/`partial`/`modified`/`not_installed`/`unreadable`, 이동한 실행 파일 항목 교체, 누락 이벤트만 추가. CLI 출력에 토큰·홈 경로 원문 없음 |
 | HOOK-006 | COL-004 버전 감지 | `--version` 첫 줄에서 버전만 추출, 어댑터 실측 표와 제품·버전·OS가 정확히 같을 때만 verified/partial. 감지한 Claude 버전을 등록 설정 `claude_version`에 기록하고 실행 모드는 기록하지 않음 |
+
+## 백업·복원 시험 검증 매핑(#58)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| BAK-001 | OPS-004 일관성 덤프 | PostgreSQL 17 `pg_dump -Fc` 실제 덤프, `pg_restore --list` 검사 |
+| BAK-002 | OPS-005 암호화 | AES-256-GCM 청크, 평문 미기록, 변조·잘림·덧붙임·다른 키 거부 |
+| BAK-003 | OPS-006 보존 | 로컬 7개, 외부 일간 7개 + 주간 4개 |
+| BAK-004 | OPS-007 무결성 | 매니페스트 SHA-256, 손상 파일 `checksum_mismatch`, 외부 복사 체크섬 |
+| BAK-005 | OPS-008 복원 시험 | 임시 DB 복원·마이그레이션·표 확인 후 삭제, 운영 이미지 실측 |
+| BAK-006 | 비밀 | DB 암호는 환경 변수로만, 오류는 코드만 |
