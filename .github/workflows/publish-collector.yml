@@ -1,0 +1,46 @@
+name: Publish Collector
+
+# Collector 배포물을 GitHub Release 초안으로 올린다(#42). 외부 공개이므로 관리자가 수동으로만 실행하고
+# `collector-publish` Environment의 필수 리뷰어 승인을 받는다. 초안은 관리자가 확인한 뒤 공개한다.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Collector 버전(SemVer, 예: 0.1.0-beta.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-collector
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and draft release
+    runs-on: ubuntu-24.04
+    environment: collector-publish
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: '[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]'
+      - name: Build packages
+        env:
+          VERSION: ${{ inputs.version }}
+        run: collector/packaging/build.sh "$VERSION" "$PWD/dist"
+      - name: Draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "collector-v$VERSION" --draft --prerelease \
+            --title "Collector $VERSION" --notes "초안. 서명·공증 전 배포물입니다. docs/installation/collector-packages.md" \
+            dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/SHA256SUMS
