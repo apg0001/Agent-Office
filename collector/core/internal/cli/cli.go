@@ -176,6 +176,8 @@ func Main(args []string, env Env) int {
 		return cmdService(rest, env)
 	case "hooks":
 		return cmdHooks(rest, env)
+	case "update":
+		return cmdUpdate(rest, env)
 	case "help", "-h", "--help":
 		usage(env.Stdout)
 		return ExitOK
@@ -201,6 +203,8 @@ func usage(w io.Writer) {
                                                                Claude Code 사용자 설정에 Hook 추가/제거(미리보기 후 --yes로 적용, 백업)
   hooks status [--tool claude|codex] [--json]                           Hook 설치 상태와 도구 버전 검증 수준
   hooks print [--tool claude|codex] [--os OS] [--exe PATH]     Hook 항목 미리보기(Codex는 print 전용)
+  update check|apply [--channel stable|beta] [--manifest-url URL] [--yes]
+                                                               서명된 manifest로 새 버전 확인·적용(실패 시 되돌림)
   version
 `)
 }
