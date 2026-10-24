@@ -192,6 +192,10 @@ func (n *Normalizer) normalize(in Input) (Record, Outcome) {
 	if err != nil {
 		return Record{}, OutcomeDroppedInvalid
 	}
+	var planSteps []string
+	if eventType == string(adapter.EventPlanUpdated) && c.Plan != nil {
+		planSteps = sanitizePlan(c.Plan.Steps)
+	}
 	return Record{
 		Event: Event{
 			SchemaVersion: SchemaVersion,
@@ -207,9 +211,25 @@ func (n *Normalizer) normalize(in Input) (Record, Outcome) {
 			Confidence:    confidence,
 			OccurredAt:    occurredAt,
 			Sequence:      seq,
+			PlanSteps:     planSteps,
 		},
 		DeterministicID: deterministic,
 	}, OutcomeAccepted
+}
+
+// sanitizePlan은 상태를 v1 enum으로 다시 거르고 50개로 자른다(2차 방어선). 비면 nil이다.
+func sanitizePlan(steps []string) []string {
+	if len(steps) == 0 {
+		return nil
+	}
+	if len(steps) > adapter.MaxPlanSteps {
+		steps = steps[:adapter.MaxPlanSteps]
+	}
+	out := make([]string, len(steps))
+	for i, s := range steps {
+		out[i] = adapter.PlanStatusOf(s)
+	}
+	return out
 }
 
 // occurredAt은 검증된 원본 시각, 없으면 관측 시각을 UTC RFC 3339로 반환한다.

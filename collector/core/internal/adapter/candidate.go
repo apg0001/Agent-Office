@@ -37,6 +37,7 @@ const (
 	EventApprovalRequested EventType = "approval.requested"
 	EventAgentStarted      EventType = "agent.started"
 	EventAgentCompleted    EventType = "agent.completed"
+	EventPlanUpdated       EventType = "plan.updated"
 	EventUnknown           EventType = "unknown"
 )
 
@@ -107,6 +108,8 @@ type Candidate struct {
 	AgentType    AgentTypeCategory
 	Confidence   Confidence
 	Support      SupportLevel
+	// Plan은 계획 도구 호출의 단계 상태다(#38). 도구 후보에 붙고 PlanUpdate가 plan.updated 후보를 만든다.
+	Plan *Plan
 }
 
 // DedupKind는 교차 소스 키의 종류다. 완료와 실패는 같은 호출의 끝이므로 합친다.
@@ -122,7 +125,7 @@ func (c Candidate) DedupRef() string {
 	switch c.EventType {
 	case EventTurnStarted:
 		return c.TurnRef
-	case EventToolStarted, EventToolCompleted, EventToolFailed:
+	case EventToolStarted, EventToolCompleted, EventToolFailed, EventPlanUpdated:
 		return c.ToolUseRef
 	case EventAgentStarted, EventAgentCompleted:
 		return c.AgentRef

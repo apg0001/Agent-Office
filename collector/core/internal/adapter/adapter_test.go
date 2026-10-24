@@ -167,7 +167,7 @@ func TestEnumsAreSubsetOfEventV1Schema(t *testing.T) {
 		"source":   {string(SourceHook), string(SourceJSONL)},
 		"event_type": {string(EventSessionStarted), string(EventSessionEnded), string(EventTurnStarted),
 			string(EventTurnCompleted), string(EventToolStarted), string(EventToolCompleted), string(EventToolFailed),
-			string(EventApprovalRequested), string(EventAgentStarted), string(EventAgentCompleted), string(EventUnknown)},
+			string(EventApprovalRequested), string(EventAgentStarted), string(EventAgentCompleted), string(EventPlanUpdated), string(EventUnknown)},
 		"activity": {string(ActivityReading), string(ActivityBrowsing), string(ActivityCoding), string(ActivityPlanning),
 			string(ActivityDelegating), string(ActivityUnknown)},
 		"confidence": {string(ConfidenceObserved), string(ConfidenceInferred)},

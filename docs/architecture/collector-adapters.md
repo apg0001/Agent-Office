@@ -50,6 +50,20 @@ Codex·Claude Hook stdin과 Claude transcript JSONL 한 줄을 제공자 중립 
 
 transcript(Claude)는 `assistant`의 `tool_use` → `tool.started`, `user`의 `tool_result` → `tool.completed`/`tool.failed`(`is_error`가 JSON `true`일 때만), 프롬프트 줄(`promptId` 있음, `tool_result`·`isMeta`·`agentId` 없음) → `turn.started`입니다. 그 밖의 줄 유형(`api-request-blob`, `queue-operation`, `system` 등)은 후보 없이 `(nil, nil)`입니다.
 
+### 계획 단계(`plan.updated`, #38)
+
+계획 도구 호출은 기존 `tool.started`/`tool.completed` 후보에 단계 상태(`Candidate.Plan`)를 붙이고, `normalize.Pipeline`이 같은 세션·에이전트로 `plan.updated`(activity `planning`, `plan_steps`) 기록을 하나 더 만듭니다.
+
+| 제공자 | 입력 | 읽는 값 |
+|---|---|---|
+| Claude | Hook `PreToolUse`·`PostToolUse`의 `tool_name` `TodoWrite`, transcript `tool_use`(`name` `TodoWrite`) | `tool_input.todos[].status` / `input.todos[].status`만 |
+| Codex | Hook `PreToolUse`(Desktop은 `PostToolUse`도)의 `tool_name` `update_plan` | `tool_input.plan[].status`만(`tool_input`이 객체일 때만) |
+
+- 상태는 정확히 `pending`·`in_progress`·`completed`만 그대로, 그 밖(대소문자 차이, 문자열 아님, 객체 아닌 원소)은 `unknown`입니다. 앞 50개만 남기고, 빈 목록이면 이벤트를 만들지 않습니다. `PostToolUseFailure`는 계획을 만들지 않습니다.
+- 할 일·단계 문장(`content`, `activeForm`, `step`, `explanation`)은 읽지 않습니다. Normalizer는 `plan.updated`에서만 `plan_steps`를 내보내며 상태를 enum으로 다시 거릅니다.
+- 중복 제거 키는 `device|provider|session|plan.updated|tool_use_id`라 Hook Pre/Post와 transcript가 같은 호출을 여러 번 보고해도 한 번만 통과합니다.
+- `TodoWrite`·`update_plan` 입력 형식은 #17~#20 실측에서 보존하지 않았으므로 계획 후보는 항상 `unverified` → `confidence: inferred`입니다(도구 이벤트 자체의 수준은 그대로). Codex Hook에 `update_plan`이 실제로 전달되는지와 `tool_input` 형식은 미실측입니다.
+
 ## 활동(activity) 분류
 
 보수적으로 이름이 명확한 도구만 분류합니다. Bash는 테스트·빌드·임의 명령을 구분할 수 없어 `unknown`입니다.
