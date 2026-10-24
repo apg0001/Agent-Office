@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import datetime as dt
+import os
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
@@ -320,3 +322,65 @@ def read_metrics(_admin: AdminDep, connection: DbConnection) -> dict[str, Any]:
         "retention": {"last_at": retention.last_run["at"], "last_ok": retention.last_run["ok"]},
         "backup": {"configured": backup.configured(), **backup.read_status(connection)},
     }
+
+
+class BackupRunResult(StrictModel):
+    ok: bool
+    error: str | None = None
+    name: str | None = None
+    size_bytes: int | None = None
+
+
+def _run_backup_action(action: str) -> BackupRunResult:
+    from pathlib import Path as FsPath
+
+    try:
+        if action == "backup":
+            info = backup.create_backup()
+            return BackupRunResult(ok=True, name=info.name, size_bytes=info.size_bytes)
+        directory = FsPath(os.environ.get(backup.BACKUP_DIR_ENV, backup.DEFAULT_BACKUP_DIR))
+        latest = backup.backups(directory)
+        if not latest:
+            return BackupRunResult(ok=False, error="no_backup")
+        backup.restore_test(latest[-1])
+        return BackupRunResult(ok=True, name=latest[-1].name)
+    except backup.BackupError as error:
+        return BackupRunResult(ok=False, error=error.code)
+
+
+@metrics_router.post("/backup/{action}", response_model=BackupRunResult)
+def run_backup(
+    action: Annotated[Literal["run", "restore-test"], Path()],
+    admin: AdminDep,
+    _csrf: CsrfDep,
+    connection: DbConnection,
+) -> BackupRunResult:
+    """관리 화면의 "지금 백업"·"복원 시험"(#68). 결과는 코드만 돌려주고 상태에 기록한다."""
+    if not backup.configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="backup_key_missing"
+        )
+    now = dt.datetime.now(dt.UTC).isoformat()
+    result = _run_backup_action("backup" if action == "run" else "restore")
+    fields: dict[str, Any] = (
+        {"last_backup_at": now, "last_backup_ok": result.ok, "last_error": result.error}
+        if action == "run"
+        else {
+            "last_restore_test_at": now,
+            "last_restore_test_ok": result.ok,
+            "last_error": result.error,
+        }
+    )
+    if result.ok and action == "run":
+        fields["last_backup_size_bytes"] = result.size_bytes
+    instance.put_value(
+        connection, backup.STATUS_KEY, {**backup.read_status(connection), **fields}, admin.id
+    )
+    audit.record(
+        connection,
+        "backup.run" if action == "run" else "backup.restore_test",
+        "success" if result.ok else "failure",
+        actor_user_id=admin.id,
+        details={"reason": result.error} if result.error else None,
+    )
+    return result

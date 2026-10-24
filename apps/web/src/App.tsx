@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { LoginPage, ResetPage, SignupPage, VerifyPage } from "./account/AccountPages";
 import { InvitePage } from "./account/InvitePage";
+import { AdminPage } from "./account/AdminPage";
 import { TeamsPage } from "./account/TeamsPage";
 import { SetupWizard } from "./account/SetupWizard";
 import { type SessionInfo, call, routeFor } from "./account/api";
@@ -39,6 +40,7 @@ function SessionBar() {
   return (
     <nav className="session-bar" aria-label="계정">
       <a href="/teams">팀</a>
+      {["SUPER_ADMIN", "ADMIN"].includes(session.user.instance_role) && <a href="/admin">관리</a>}
       <span>{session.user.display_name}</span>
       <button type="button" onClick={() => void logout()}>
         로그아웃
@@ -59,10 +61,11 @@ export function App({ pathname }: { pathname?: string }) {
       setup: SetupWizard,
       invite: InvitePage,
       teams: TeamsPage,
+      admin: AdminPage,
     };
     const Page = pages[route];
     return (
-      <main className={`shell account-shell${route === "teams" ? " wide" : ""}`}>
+      <main className={`shell account-shell${route === "teams" || route === "admin" ? " wide" : ""}`}>
         <p className="eyebrow">
           <a href="/">AGENT OFFICE</a>
         </p>
