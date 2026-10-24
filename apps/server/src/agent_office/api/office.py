@@ -27,7 +27,8 @@ from agent_office.state.engine import connection_state, effective_lifecycle
 
 # 종료된 세션은 퇴근 연출을 위해 이 시간 동안 스냅샷에 남긴다.
 ENDED_SESSION_GRACE = dt.timedelta(minutes=10)
-POLL_INTERVAL_SECONDS = 1.0
+# 표시 지연 P95 2초 목표(#63 실측: 30세션 90에이전트에서 수집 약 1초 + 이 주기).
+POLL_INTERVAL_SECONDS = 0.5
 # 늦게 커밋된 트랜잭션도 놓치지 않도록 매 조회마다 이 기간을 다시 본다(중복은 change_seq로 거름).
 CHANGE_LOOKBACK = dt.timedelta(seconds=30)
 PING_INTERVAL_SECONDS = 25.0
