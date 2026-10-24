@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from agent_office import monitoring, retention
+from agent_office import backup, monitoring, retention
 from agent_office.api import accounts, admin_settings, auth, devices, events, office, setup, teams
 from agent_office.db.engine import get_engine
 from agent_office.http_limits import BodySizeLimitMiddleware
@@ -27,6 +27,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     tasks = [
         asyncio.create_task(retention.run_periodically()),
         asyncio.create_task(monitoring.send_heartbeats()),
+        # 백업(#58)은 AGENT_OFFICE_BACKUP_KEY를 설정했을 때만 돈다.
+        asyncio.create_task(backup.run_periodically()),
     ]
     try:
         yield

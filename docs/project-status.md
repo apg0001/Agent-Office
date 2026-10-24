@@ -11,7 +11,7 @@
 ## 현재 위치
 
 - 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
-- 활성 작업 A(Pi, 직접): 없음(체크포인트)
+- 활성 작업 A(Pi, 직접): #58 `EP-09/ISS-03 백업·암호화·복원 시험` (`feat/#58-backup`)
 - 활성 작업 B(Pi, 서브에이전트): 없음
 - 직전 완료(Pi): #31(PR #120, `7346425`, 서브에이전트, Epic #4 종료), #59(PR #121, `5881ba5`), #39(PR #119, `53682b7`), #53(PR #118, `ac09293`, Epic #8 종료), #52(PR #117, `9db2315`), #54·#55(PR #116, `8c74cb1`), #34(PR #113, `5b85ade`, 서브에이전트), #57(PR #114, `985c59f`), #27(PR #112, `b111d67`), #67(PR #110 서버 `b101c9a`, PR #111 웹 `217531e`), #66(PR #109, `c7722b1`), #33(PR #108, `113905c`, 서브에이전트), #23(PR #107, `e008e28`), #46(PR #106, `119ae9d`, Epic #7 종료), #51(PR #105, `fe6592d`), #32(PR #103, `4ed866c`, 서브에이전트), #50(PR #104, `bd5b25a`), #49(PR #102, `74d70c3`), #48(PR #101, `8a1d885`), #30(PR #98, `a589e62`, 서브에이전트), #47(PR #100, `09ea7b7`), #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
@@ -239,6 +239,7 @@
 153. #59: `GET /api/v1/system/ready`(DB·마이그레이션 head 비교, 503), `GET /api/v1/admin/metrics`(호스트·DB·수집 지표, 식별자 없음), 외부 Heartbeat(`AGENT_OFFICE_HEARTBEAT_URL`, 준비 정상일 때만 push). 문서 `docs/operations/monitoring.md`. 서버 테스트 232개 통과.
 154. PR #121 병합(`5881ba5`), #59 종료. #31 서브에이전트 PR #120(`agent-office-collector hooks install|uninstall|status|print`: Claude `settings.json` hooks에 #19 검증 9개 이벤트 등록, 미리보기 후 `--yes`로만 쓰기, 0600 타임스탬프 백업·원자적 쓰기·읽은 뒤 변경 감지, 파싱 오류·읽기 전용·심볼릭 링크 거부, 소유 항목만 제거, Claude 버전 감지로 `claude_version` 기록; Codex는 사용자 설정 위치가 PoC로 확정되지 않아 print 전용)을 최신 `develop` 병합·추적표 충돌 해결·CI 통과 후 병합(`7346425`), #31 종료, Epic #4 종료. 서브에이전트 사용량 약 18만 토큰. 미검증: 실제 Claude·Codex가 설치된 Hook 호출, macOS·Windows 인용 규칙 실기기.
 155. 체크포인트: 세부 Issue 62개 중 41개. 종료 Epic: #2·#4·#7·#8.
+156. 소유자 재개 지시. #58: 서버 이미지에 `postgresql-client-17`(Debian 13, 17.11) 추가, `backup.py`(`pg_dump -Fc` 출력을 바로 AES-256-GCM 청크 암호화, `pg_restore --list` 검사, SHA-256 매니페스트, 로컬 7개·외부 일7/주4, 임시 DB 복원 시험, 서버가 하루 1회 백업·30일마다 복원 시험, `agent-office-backup`), 키 `AGENT_OFFICE_BACKUP_KEY`(비밀 키와 별개), 지표에 백업 상태. 운영 이미지 실측에서 외부 복제 마운트 지점이 root 소유라 쓰기 실패하는 문제를 발견해 이미지에 마운트 지점 생성, 오류를 코드로 정리. 로컬 테스트 이미지에 PostgreSQL 17 클라이언트 추가(CI 러너에는 없어 실제 덤프 테스트는 이유를 표시하고 건너뜀). 서버 테스트 242개 통과.
 
 ## 이번 변경 요약(#22)
 
@@ -324,7 +325,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율, 소유자 재개 지시 후): #58 백업·암호화·복원 시험(`pg_dump` 일관성 덤프, 암호화, 로컬 7개 보존, 외부 복제 목적지, 복원 시험 명령) → #68 운영 설정·진단 UI(`/api/v1/admin/metrics`·`/api/v1/admin/settings` 화면) → #28 공개 가입 보호(가입 속도·CAPTCHA 대안·감사 로그 조회) → #38 계획 메타데이터 → EP-12 알림(#70~#74) → #60·#61·#69. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
+4. 진행 순서(자율): #58 PR 병합 → #68 운영 설정·진단 UI(`/api/v1/admin/metrics`·`/api/v1/admin/settings` 화면) → #28 공개 가입 보호(가입 속도·CAPTCHA 대안·감사 로그 조회) → #38 계획 메타데이터 → EP-12 알림(#70~#74) → #60·#61·#69. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.

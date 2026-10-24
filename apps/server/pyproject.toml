@@ -23,6 +23,8 @@ dependencies = [
 agent-office-bootstrap = "agent_office.setup.bootstrap:main"
 # 보존 기간 정리를 즉시 한 번 실행한다(#39). 서버도 한 시간마다 실행한다.
 agent-office-retention = "agent_office.retention:main"
+# 백업·검사·복원 시험(#58).
+agent-office-backup = "agent_office.backup:main"
 
 [project.optional-dependencies]
 dev = [

@@ -56,6 +56,14 @@ services:
       AGENT_OFFICE_COOKIE_SECURE: ${AGENT_OFFICE_COOKIE_SECURE:-true}
       # 외부 Heartbeat push URL(비밀, #59). 비우면 보내지 않는다.
       AGENT_OFFICE_HEARTBEAT_URL: ${AGENT_OFFICE_HEARTBEAT_URL:-}
+      # 백업 암호화 키(32바이트 URL-safe base64, 비밀 키와 별개, #58). 비우면 자동 백업을 하지 않는다.
+      AGENT_OFFICE_BACKUP_KEY: ${AGENT_OFFICE_BACKUP_KEY:-}
+      AGENT_OFFICE_BACKUP_DIR: /backups
+      # 외부 복제 위치(아래 볼륨). AGENT_OFFICE_BACKUP_OFFSITE_PATH를 지정했을 때만 /backups-offsite로 켠다.
+      AGENT_OFFICE_BACKUP_OFFSITE_DIR: ${AGENT_OFFICE_BACKUP_OFFSITE_DIR:-}
+    volumes:
+      - ${AGENT_OFFICE_BACKUP_PATH:-backups}:/backups
+      - ${AGENT_OFFICE_BACKUP_OFFSITE_PATH:-backups-offsite}:/backups-offsite
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,5 +114,7 @@ services:
 
 volumes:
   postgres-data:
+  backups:
+  backups-offsite:
   caddy-data:
   caddy-config:

@@ -29,6 +29,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
+# 백업(#58)용 pg_dump·pg_restore. 서버 PostgreSQL과 같은 주 버전(17)이어야 한다.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-17 \
+    && rm -rf /var/lib/apt/lists/*
+
 # wheel은 바인드 마운트로만 읽어 런타임 이미지 레이어에 남기지 않는다.
 RUN --mount=type=bind,from=build,source=/wheels,target=/tmp/wheels \
     python -m pip install --no-index --find-links /tmp/wheels agent-office-server
@@ -36,6 +41,9 @@ RUN --mount=type=bind,from=build,source=/wheels,target=/tmp/wheels \
 WORKDIR /app
 # 마이그레이션 실행용: `alembic -c /app/alembic.ini upgrade head`
 COPY alembic.ini ./alembic.ini
+# 백업·외부 복제 위치. 운영 Compose가 볼륨을 붙인다(읽기 전용 루트 파일시스템). 마운트 지점을
+# 미리 만들어 두지 않으면 named volume이 root 소유로 생겨 비루트 서버가 쓰지 못한다(#58 실측).
+RUN mkdir -p /backups /backups-offsite && chown 65532:65532 /backups /backups-offsite
 
 USER 65532:65532
 EXPOSE 8000
