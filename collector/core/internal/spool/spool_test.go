@@ -3,6 +3,7 @@ package spool
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,5 +70,47 @@ func TestInvalidFilesAndStaleTemps(t *testing.T) {
 	r.SessionRef = "bad ref with spaces"
 	if _, err := r.Candidate(); err != ErrInvalid {
 		t.Fatalf("bad ref accepted: %v", err)
+	}
+}
+
+func TestPlanRoundTripKeepsOnlyStatusEnums(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "spool")
+	now := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	c := cand()
+	steps := make([]string, 0, adapter.MaxPlanSteps+5)
+	steps = append(steps, adapter.PlanPending, adapter.PlanInProgress, adapter.PlanCompleted, "SENTINEL-STEP")
+	for len(steps) < adapter.MaxPlanSteps+5 {
+		steps = append(steps, adapter.PlanPending)
+	}
+	c.Plan = &adapter.Plan{Steps: steps, Support: adapter.SupportVerified}
+	if err := Write(dir, FromCandidate(c, now), 0); err != nil {
+		t.Fatal(err)
+	}
+	got, err := List(dir, 10, now)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("list %d %v", len(got), err)
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, got[0].Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "SENTINEL") {
+		t.Fatalf("spool kept a non-enum plan value: %s", raw)
+	}
+	back, err := got[0].Record.Candidate()
+	if err != nil || back.Plan == nil {
+		t.Fatalf("candidate %+v %v", back, err)
+	}
+	if len(back.Plan.Steps) != adapter.MaxPlanSteps || back.Plan.Support != adapter.SupportVerified {
+		t.Fatalf("plan %+v", back.Plan)
+	}
+	want := []string{adapter.PlanPending, adapter.PlanInProgress, adapter.PlanCompleted, adapter.PlanUnknown}
+	for i, w := range want {
+		if back.Plan.Steps[i] != w {
+			t.Fatalf("step %d = %q", i, back.Plan.Steps[i])
+		}
+	}
+	if _, ok := adapter.PlanUpdate(back); !ok {
+		t.Fatal("restored candidate must still produce plan.updated")
 	}
 }

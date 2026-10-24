@@ -70,6 +70,9 @@ func (p *Pipeline) Transcript(res tail.Result, rt adapter.Runtime, observedAt ti
 	return out
 }
 
+// Candidate는 이미 어댑터를 거친 후보(spool 레코드 등)를 정규화한다. 계획 후보면 plan.updated도 만든다.
+func (p *Pipeline) Candidate(in Input) []Record { return p.emit(nil, in) }
+
 // emit은 후보 하나를 정규화하고, 계획 도구 후보면 같은 입력 시각으로 plan.updated를 하나 더 만든다(#38).
 // 두 번째 기록은 자체 중복 제거 키(plan.updated|tool_use_id)를 가지므로 도구 후보가 중복이어도
 // 독립적으로 판정된다.
