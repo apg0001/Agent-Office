@@ -11,7 +11,7 @@
 ## 현재 위치
 
 - 운영 방식(2026-10-23 소유자 지시): 별도 지시 전까지 승인 자동, 병렬 작업 최대 2개, 토큰은 이 프로젝트에 약 70%만 사용
-- 활성 작업 A(Pi, 직접): #63 `EP-10/ISS-02 부하·장시간·FPS` (`feat/#63-load-tests`)
+- 활성 작업 A(Pi, 직접): #42 `EP-06/ISS-03 설치·제거 패키지` (`feat/#42-collector-packages`)
 - 활성 작업 B(Pi, 서브에이전트·별도 worktree): #41 나머지·#43 키체인·트레이 (`feat/#41-keychain-tray`)
 - 직전 완료(Pi): #24(PR #132, `2e754ba`, 서브에이전트, Epic #3 종료), #60(PR #131, `221fb8e`, Epic #9 종료), #38(PR #126 서버 `4eeb9a0`, PR #128 Collector `2d14891`, Epic #5 종료), #61(PR #129, `3fb1982`), #70~#74(PR #127, `41446c7`, Epic #12 종료), #28(PR #125, `e7e2ce2`), #68(PR #124, `8153abb`), #58(PR #123, `9af0f4c`), #31(PR #120, `7346425`, 서브에이전트, Epic #4 종료), #59(PR #121, `5881ba5`), #39(PR #119, `53682b7`), #53(PR #118, `ac09293`, Epic #8 종료), #52(PR #117, `9db2315`), #54·#55(PR #116, `8c74cb1`), #34(PR #113, `5b85ade`, 서브에이전트), #57(PR #114, `985c59f`), #27(PR #112, `b111d67`), #67(PR #110 서버 `b101c9a`, PR #111 웹 `217531e`), #66(PR #109, `c7722b1`), #33(PR #108, `113905c`, 서브에이전트), #23(PR #107, `e008e28`), #46(PR #106, `119ae9d`, Epic #7 종료), #51(PR #105, `fe6592d`), #32(PR #103, `4ed866c`, 서브에이전트), #50(PR #104, `bd5b25a`), #49(PR #102, `74d70c3`), #48(PR #101, `8a1d885`), #30(PR #98, `a589e62`, 서브에이전트), #47(PR #100, `09ea7b7`), #45(PR #99, `f1b7d7b`), #37(PR #97, `95bac53`), #29(PR #95, `019faae`, 서브에이전트), #36(PR #96, `01e4aed`). 그 전: #25(PR #94, `21f2d61`), #35(PR #93, `f3feac8`), #26(PR #91, `7e2df6b`), #88 수정 PR #90(`e2deaa7`), #22(PR #89, `9914373`)
 - 직전 완료(Windows PC): #88 Windows 실검증 실패 0으로 종료(2026-10-23), 상태 기록 PR #92(`docs/#88-windows-verification`)
@@ -259,6 +259,8 @@
 173. #69: `deploy/compose.build.yaml`(운영 Compose에 build만 겹침), `tests/install/probe.py`·`compare.sh`(두 방식 새 볼륨 설치·외부 동작 비교), `docs/installation/install-methods.md`. Pi 실측에서 두 방식 동일(인증 이후 흐름 포함). 기존 개발 Compose가 프록시·보안 설정이 없어 운영 경로와 다르다는 점을 문서화.
 174. PR #133 병합(`b64cc15`), #69 종료, Epic #11 종료. Collector 종단 테스트가 ACK 반영 전 종료로 CI에서 간헐 실패하던 문제를 같은 PR에서 수정. #64 서브에이전트 PR #134(보안 시나리오 38개: 모든 라우트 열거 멀티테넌시·권한 상승·CSRF·토큰·유출·입력 남용·세션 철회. 취약점 2건 수정: ADMIN이 SUPER_ADMIN 상태 변경 가능, NUL 문자 500·로그에 SQL 파라미터 노출)를 병합(`ef5ebb3`), #64 종료. 서브에이전트 약 26만 토큰. #40·#41 서브에이전트 PR #135(Wails v2.12 GUI, Core는 하위 프로세스로만, 웹 `/devices` 등록 코드, CI `Go GUI`)를 병합(`4425db5`), #40·#41은 macOS·Windows·키체인이 남아 열어 둠. 서브에이전트 약 24만 토큰.
 175. #63: `tests/load`(부하 생성기·실행기·장애 주입·Playwright FPS), `tests/e2e`(실제 브라우저 화면 흐름, CI `E2E (browser)` 추가), WebSocket 주기 1초→0.5초. 실측(Pi 5+SSD): 표시 지연 P95 1.45초, 재시작 회복 3.4초, FPS 평균 39.8, E2E 7단계 통과, 1시간 실행 실패 0이나 경합 하 P95 2.73초. 부하 생성기가 처음엔 세션별로 보내 장치 속도 제한에 걸린 것을 실제 Collector 방식(장치당 배치)으로 수정. 72시간·경합 없는 장시간 재측정은 남음.
+176. PR #136 병합(`1f6798e`, #63은 72시간 남아 열어 둠), #65 릴리스 노트 초안·절차 PR #137 병합(`2cc4c65`, 게시·main·태그는 승인 대기로 열어 둠).
+177. #42: `collector/packaging`(6개 대상 정적 빌드, nfpm deb·rpm, tar.gz·zip, SHA256SUMS, 사용자별 제거 도우미 기본 보존·`--purge`), 게시 워크플로 `publish-collector.yml`(수동·`collector-publish` 승인·Release 초안), `docs/installation/collector-packages.md`. Debian deb·Fedora rpm 설치·제거 실측. 서명·macOS·Windows 패키지는 미구현.
 
 ## 이번 변경 요약(#22)
 

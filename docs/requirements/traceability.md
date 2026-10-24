@@ -576,3 +576,13 @@
 | REL-001 | DIST-008 릴리스 노트 | 실제 검증·미검증·위험·호환성 초안 `docs/releases/0.1.0-beta.1.md` |
 | REL-002 | DIST-009~012 승인 게이트 | 게시·main·태그는 관리자 승인 후(`docs/operations/release.md`), 게시 워크플로 `image-publish` Environment |
 | REL-003 | DOC-001~004 | 설치·업그레이드·롤백·복원 문서 연결 |
+
+## Collector 설치 패키지 검증 매핑(#42)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| PKG-001 | OS·아키텍처별 배포물 | 6개 대상 정적 빌드, Linux deb·rpm |
+| PKG-002 | 해시 | SHA256SUMS 생성·확인 |
+| PKG-003 | 설치·제거 | Debian deb·Fedora rpm 설치·실행·제거(실측) |
+| PKG-004 | Hook·자격 증명 보존/삭제 선택 | 제거 도우미 기본 보존·`--purge` 삭제, Claude 기록 유지(실측) |
+| PKG-005 | 서명·실장비 | 서명·공증·macOS·Windows는 미구현·미검증(문서화) |
