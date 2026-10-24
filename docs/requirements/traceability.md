@@ -504,3 +504,13 @@
 | OAUTH-007 | 계정 상태 | 비활성 사용자 로그인 거부, 승인 대기 사용자 세션 없음 |
 | OAUTH-008 | 민감정보 | 액세스 토큰·client secret·이메일·인가 코드·프로필 문구가 서버 로그·감사 로그·리디렉션 URL에 없음 |
 | OAUTH-009 | 실제 제공자 | 미실행: 실제 Google·GitHub OAuth 앱 왕복은 검증하지 않음 |
+
+## 설치 방식 동일성 검증 매핑(#69)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| INST-001 | DIST-004 같은 구성 | 두 방식 모두 운영 Compose, 소스는 build 겹침 파일만 추가 |
+| INST-002 | SETUP-007 같은 마법사 | 설치 상태 전·후, bootstrap 거부·성공, 설치 완료 동일 |
+| INST-003 | DIST-005 같은 보안 기본값 | 가입 차단, 교차 사이트 거부, 쿠키 속성, 보안 헤더, CSRF, 보안 점검 코드 동일 |
+| INST-004 | DIST-006 클린 설치 실측 | Pi arm64에서 새 볼륨 두 벌 설치·비교(`tests/install/compare.sh`) |
+| INST-005 | DOC-001~004 | `docs/installation/install-methods.md` |
