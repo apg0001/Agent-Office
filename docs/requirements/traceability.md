@@ -557,3 +557,14 @@
 | GUI-008 | COL-003 도구 탐지·Hook 동의 | Core `hooks status --json`(감지·버전·검증 수준·Hook 상태), 미리보기 → 승인 순서·일회성 승인, 실제 Core로 남의 Hook 보존 설치·제거, Codex는 print 전용 |
 | GUI-009 | 프런트엔드 계약 | `main_test.go`: `app.js` 호출 메서드가 모두 바인딩됨, 외부 리소스·인라인 스크립트 없음, CSP |
 | GUI-GAP-001 | 미검증 | macOS·Windows 빌드·실행, 실제 데스크톱 세션의 브라우저 열기, webkit2gtk 4.1 배포판, 실제 서버 종단 등록은 미실행(`docs/installation/collector-gui.md`) |
+
+## 부하·안정성·브라우저 실측 매핑(#63)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| PERF-001 | OFF-003 표시 지연 | 30세션·90에이전트 표시 P95 1.45초(정상), 1시간 경합 하 2.73초 |
+| PERF-002 | EVT-002 수집 안정성 | 1시간 16만 이벤트 배치 실패 0·누락 0 |
+| PERF-003 | OPS-009~012 재연결 | 서버 재시작 중 WebSocket 3.4초 회복, 배치 손실 0 |
+| PERF-004 | OFF-010 브라우저 FPS | Chromium(SwiftShader) 평균 39.8·하위 5% 29.9FPS |
+| PERF-005 | 화면 흐름 | 실제 브라우저 E2E 7단계 통과(CI `E2E (browser)`) |
+| PERF-006 | 자원 | 서버 메모리 1시간 91→97MB(누수 징후 없음) |

@@ -225,6 +225,15 @@ async def main(args: argparse.Namespace) -> dict[str, Any]:
             "max": round(max(latencies), 3) if latencies else None,
             "mean": round(statistics.fmean(latencies), 3) if latencies else None,
         },
+        # 장시간 실행에서 데이터 증가에 따른 저하를 보려고 처음·마지막 10% 라운드를 따로 낸다.
+        "display_p95_first_10pct": percentile(
+            latencies[: max(1, len(latencies) // 10)], 0.95
+        ),
+        "display_p95_last_10pct": percentile(
+            latencies[-max(1, len(latencies) // 10) :], 0.95
+        ),
+        "ingest_p95_first_10pct": percentile(ingest[: max(1, len(ingest) // 10)], 0.95),
+        "ingest_p95_last_10pct": percentile(ingest[-max(1, len(ingest) // 10) :], 0.95),
         # 라운드의 모든 배치가 서버 응답(저장·상태 반영 완료)을 받기까지.
         "ingest_seconds": {
             "p50": percentile(ingest, 0.5),
