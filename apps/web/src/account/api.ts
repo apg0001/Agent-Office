@@ -86,6 +86,9 @@ const MESSAGES: Record<string, string> = {
   use_transfer: "소유자 지정은 소유권 넘기기로만 할 수 있습니다.",
   too_many_teams: "속할 수 있는 팀 수(50개)를 넘었습니다.",
   not_found: "찾을 수 없거나 권한이 없습니다.",
+  email_domain_blocked: "이 이메일 도메인으로는 가입할 수 없습니다.",
+  invalid_domain: "도메인 형식이 올바르지 않습니다.",
+  not_awaiting_approval: "승인 대기 상태가 아닙니다(이메일 확인 전일 수 있음).",
 };
 
 export function messageFor(code: string | null): string {

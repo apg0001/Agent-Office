@@ -47,6 +47,7 @@ const settings: AdminSettings = {
   smtp_source: "none",
   oauth: {},
   secret_storage_available: true,
+  blocked_email_domains: [],
 };
 
 describe("admin warnings", () => {

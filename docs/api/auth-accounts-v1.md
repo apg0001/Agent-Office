@@ -58,6 +58,13 @@
 
 SMTP나 기준 주소가 없으면 가입·복구 요청은 `503 mail_not_configured`이고 계정을 만들지 않습니다(확인할 수 없는 계정 방지). 발송 실패는 오류 종류만 로그에 남기고 주소·토큰은 남기지 않습니다.
 
+## 남용 방지(#28)
+
+- 인스턴스 전체 가입 한도(시간당 30회). 여러 IP로 나눠 들어오는 대량 가입을 막습니다.
+- 사람에게는 보이지 않는 입력란(`website`)을 채운 요청은 같은 `202`를 돌려주고 계정을 만들지 않습니다.
+- 관리자가 정한 차단 도메인(`auth.blocked_email_domains`, 하위 도메인 포함)은 `400 email_domain_blocked`.
+- CAPTCHA는 외부 서비스 의존·개인정보 문제로 넣지 않았습니다. 공개 인터넷에서는 `INVITE_ONLY`·`ADMIN_APPROVAL`과 Cloudflare Access를 권합니다(`docs/installation/remote-access.md`).
+
 ## 속도 제한
 
 메모리 고정 창, 단일 서버 프로세스 기준입니다.

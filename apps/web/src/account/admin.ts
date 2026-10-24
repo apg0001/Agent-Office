@@ -46,6 +46,7 @@ export interface AdminSettings {
   smtp_source: "settings" | "environment" | "none";
   oauth: Record<string, { enabled: boolean; client_id: string; client_secret_set: boolean }>;
   secret_storage_available: boolean;
+  blocked_email_domains: string[];
 }
 
 export function formatBytes(bytes: number | null | undefined): string {

@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Card, Field, Notice } from "./AccountPages";
 import { type SessionInfo, call, messageFor, smtpMessage } from "./api";
 import { type AdminSettings, type Metrics, SETTING_BOUNDARIES, formatBytes, warningsFor } from "./admin";
+import { AdminUsers, AuditLog } from "./AdminUsers";
 import { POLICY_LABELS } from "./wizard";
 
 const BACKUP_ERRORS: Record<string, string> = {
@@ -157,6 +158,7 @@ function SettingsForms({ settings, csrf, reload }: { settings: AdminSettings; cs
     sender: settings.smtp?.sender ?? "",
     password: "",
   });
+  const [blocked, setBlocked] = useState(settings.blocked_email_domains.join("\n"));
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -198,6 +200,29 @@ function SettingsForms({ settings, csrf, reload }: { settings: AdminSettings; cs
             </label>
           ))}
         </fieldset>
+        <button type="submit">저장</button>
+      </form>
+      <form
+        onSubmit={save(
+          () =>
+            call(
+              "PUT",
+              "/api/v1/admin/settings/blocked-domains",
+              { domains: blocked.split(/[\s,]+/).filter(Boolean) },
+              csrf,
+            ),
+          "차단 도메인을 저장했습니다.",
+        )}
+      >
+        <h3>가입 차단 이메일 도메인</h3>
+        <p className="hint">한 줄에 하나(일회용 메일 등). 하위 도메인도 함께 막습니다.</p>
+        <textarea
+          className="domains"
+          aria-label="차단 도메인"
+          rows={4}
+          value={blocked}
+          onChange={(event) => setBlocked(event.target.value)}
+        />
         <button type="submit">저장</button>
       </form>
       <form
@@ -350,7 +375,9 @@ export function AdminPage() {
     <>
       <Notice error={error ? messageFor(error) : null} />
       {metrics && settings && <Diagnostics metrics={metrics} settings={settings} csrf={session.csrf_token} reload={() => void load()} />}
+      <AdminUsers me={session.user.id} myRole={session.user.instance_role} csrf={session.csrf_token} />
       {settings && <SettingsForms key={JSON.stringify(settings)} settings={settings} csrf={session.csrf_token} reload={() => void load()} />}
+      <AuditLog />
       <Card title="설정은 어디서 바꾸나요">
         <table className="members">
           <tbody>

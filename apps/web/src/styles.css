@@ -480,3 +480,23 @@ h1 {
 .account-card h3 {
   margin: 1.25rem 0 0.5rem;
 }
+
+/* 봇 차단용 입력란. 화면 밖으로 빼서 사람에게는 보이지 않게 한다. */
+.trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+textarea.domains {
+  width: 100%;
+  margin-bottom: 0.6rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(167, 196, 220, 0.3);
+  border-radius: 8px;
+  background: #0d1624;
+  color: inherit;
+  font: inherit;
+}
