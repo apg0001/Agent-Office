@@ -542,3 +542,11 @@
 | SEC-INPUT-004~006 | SEC-006 ID·퍼즈 | 경로 조작 ID 404/405/422, 이벤트 enum 퍼즈 150회 500 없음·미반사, 커서·필터 퍼즈 |
 | SEC-INPUT-007 | SEC-004 SSRF | Webhook 내부 주소·다른 스킴·호스트 혼동·자격 증명 400 |
 | SEC-GAP-001 | 미검증 | TLS·프록시 헤더·DNS 재바인딩·웹 XSS·실제 외부 서비스·DoS·타이밍은 `docs/security/threat-scenarios.md`에 미검증으로 기록 |
+
+## 릴리스 준비 검증 매핑(#65 준비)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| REL-001 | DIST-008 릴리스 노트 | 실제 검증·미검증·위험·호환성 초안 `docs/releases/0.1.0-beta.1.md` |
+| REL-002 | DIST-009~012 승인 게이트 | 게시·main·태그는 관리자 승인 후(`docs/operations/release.md`), 게시 워크플로 `image-publish` Environment |
+| REL-003 | DOC-001~004 | 설치·업그레이드·롤백·복원 문서 연결 |
