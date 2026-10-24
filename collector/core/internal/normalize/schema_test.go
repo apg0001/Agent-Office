@@ -177,7 +177,7 @@ func sampleEvent() Event {
 
 func TestEventKeySetEqualsSchemaRequiredAndProperties(t *testing.T) {
 	s := loadSchema(t)
-	for _, ev := range []Event{sampleEvent(), {}} {
+	marshalKeys := func(ev Event) []string {
 		raw, err := json.Marshal(ev)
 		if err != nil {
 			t.Fatal(err)
@@ -186,12 +186,20 @@ func TestEventKeySetEqualsSchemaRequiredAndProperties(t *testing.T) {
 		if err := json.Unmarshal(raw, &obj); err != nil {
 			t.Fatal(err)
 		}
-		got := keys(obj)
-		required := append([]string(nil), s.Required...)
-		sort.Strings(required)
-		if fmt.Sprint(got) != fmt.Sprint(required) || fmt.Sprint(got) != fmt.Sprint(keys(s.Properties)) {
-			t.Fatalf("event keys %v, required %v, properties %v", got, required, keys(s.Properties))
+		return keys(obj)
+	}
+	required := append([]string(nil), s.Required...)
+	sort.Strings(required)
+	// 계획 단계가 없으면 필수 필드만, 있으면 스키마 속성 전부(plan_steps는 선택 필드, #38).
+	for _, ev := range []Event{sampleEvent(), {}} {
+		if got := marshalKeys(ev); fmt.Sprint(got) != fmt.Sprint(required) {
+			t.Fatalf("event keys %v, required %v", got, required)
 		}
+	}
+	withPlan := sampleEvent()
+	withPlan.EventType, withPlan.PlanSteps = "plan.updated", []string{"completed", "pending"}
+	if got := marshalKeys(withPlan); fmt.Sprint(got) != fmt.Sprint(keys(s.Properties)) {
+		t.Fatalf("event keys %v, properties %v", got, keys(s.Properties))
 	}
 	if err := validateEvent(s, mustMarshal(t, sampleEvent())); err != nil {
 		t.Fatal(err)

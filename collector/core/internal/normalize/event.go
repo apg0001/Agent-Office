@@ -27,6 +27,8 @@ type Event struct {
 	Confidence    string  `json:"confidence"`
 	OccurredAt    string  `json:"occurred_at"`
 	Sequence      int64   `json:"sequence"`
+	// PlanSteps는 plan.updated에서만 쓰는 선택 필드다(#38). 단계 상태 enum만 담고 문장은 담지 않는다.
+	PlanSteps []string `json:"plan_steps,omitempty"`
 }
 
 // Record는 정규화 결과다. Event만 서버로 보낸다.
