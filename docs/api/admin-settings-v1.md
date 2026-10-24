@@ -58,6 +58,7 @@
 | `POST /api/v1/admin/users/{id}/disable` | 비활성화 + 모든 브라우저 세션 폐기. 자기 계정은 `409 cannot_modify_self` |
 | `POST /api/v1/admin/users/{id}/enable` | 이메일 확인됐으면 `active`, 아니면 `pending` |
 | `PUT /api/v1/admin/users/{id}/role {instance_role}` | SUPER_ADMIN만. 마지막 활성 SUPER_ADMIN 강등은 DB 트리거가 막아 `409 last_super_admin` |
+| (승인·비활성화·재활성화 공통) | 대상이 `SUPER_ADMIN`이면 SUPER_ADMIN만 할 수 있습니다. `ADMIN`은 `403 forbidden`(#64) |
 | `PUT /api/v1/admin/settings/blocked-domains {domains}` | 가입 차단 도메인(최대 500개, 형식 검사) |
 | `GET /api/v1/admin/audit?limit=&before=&action=` | 최신순 감사 로그, `before` 커서, `action` 접두어 필터. 행위자는 표시 이름만 |
 

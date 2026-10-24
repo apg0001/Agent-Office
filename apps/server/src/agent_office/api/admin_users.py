@@ -76,6 +76,14 @@ def _user(connection: Connection, user_id: uuid.UUID) -> Any:
     return row
 
 
+def _managed_user(connection: Connection, admin: CurrentUser, user_id: uuid.UUID) -> Any:
+    """상태를 바꿀 대상. ADMIN은 SUPER_ADMIN 계정을 승인·비활성화·재활성화할 수 없다(#64)."""
+    row = _user(connection, user_id)
+    if row.instance_role == "SUPER_ADMIN" and admin.instance_role != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    return row
+
+
 def _as_admin_user(row: Any) -> AdminUser:
     return AdminUser(
         id=row.id,
@@ -147,7 +155,7 @@ def list_users(
 def approve_user(
     user_id: UserId, admin: AdminDep, _csrf: CsrfDep, connection: DbConnection
 ) -> AdminUser:
-    row = _user(connection, user_id)
+    row = _managed_user(connection, admin, user_id)
     if row.status != "pending" or row.email_verified_at is None:
         # 이메일 확인 전에는 승인하지 않는다(주소 소유가 확인된 계정만).
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="not_awaiting_approval")
@@ -158,7 +166,7 @@ def approve_user(
 def disable_user(
     user_id: UserId, admin: AdminDep, _csrf: CsrfDep, connection: DbConnection
 ) -> AdminUser:
-    _user(connection, user_id)
+    _managed_user(connection, admin, user_id)
     result = _change(connection, admin, user_id, "user.disabled", status="disabled")
     # 로그인 중인 브라우저 세션도 바로 끊는다.
     session_service.revoke_all(connection, user_id)
@@ -169,7 +177,7 @@ def disable_user(
 def enable_user(
     user_id: UserId, admin: AdminDep, _csrf: CsrfDep, connection: DbConnection
 ) -> AdminUser:
-    row = _user(connection, user_id)
+    row = _managed_user(connection, admin, user_id)
     if row.status != "disabled":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="not_disabled")
     target = "active" if row.email_verified_at is not None else "pending"
