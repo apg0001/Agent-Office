@@ -542,3 +542,18 @@
 | SEC-INPUT-004~006 | SEC-006 ID·퍼즈 | 경로 조작 ID 404/405/422, 이벤트 enum 퍼즈 150회 500 없음·미반사, 커서·필터 퍼즈 |
 | SEC-INPUT-007 | SEC-004 SSRF | Webhook 내부 주소·다른 스킴·호스트 혼동·자격 증명 400 |
 | SEC-GAP-001 | 미검증 | TLS·프록시 헤더·DNS 재바인딩·웹 XSS·실제 외부 서비스·DoS·타이밍은 `docs/security/threat-scenarios.md`에 미검증으로 기록 |
+
+## Collector GUI 검증 매핑(#40, #41)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| GUI-001 | COL-001 GUI와 Core 분리 | GUI는 Core 명령만 하위 프로세스로 실행(`corecli`), 수집 루프 없음. Xvfb에서 GUI 종료 뒤 Core `status` 정상. ADR-0003 |
+| GUI-002 | COL-001 Core 호출 안전성 | `corecli_test.go`: Core 위치 탐색(절대 경로만), 시간 초과 시 프로세스 정지, 출력 상한, 깨진 JSON 거부, 모르는 enum·코드 아닌 오류·개수 키 정리 |
+| GUI-003 | COL-001·USER-002 상태 화면 | `app_test.go`·`integration_test.go`: 실제 Core `status`·`diagnose --json`(등록·서버 scheme·loopback·일시중지·큐·자동 시작·서버 도달), 일시중지·재개 |
+| GUI-004 | COL-002 자동 시작 | `service print`·`service install [--activate]` 승인 필수, 실제 Core로 systemd unit 파일 설치·상태 `installed`(활성화는 미실행) |
+| GUI-005 | DEV-001·002 브라우저 로그인·PC 이름 | 웹 `/devices` 코드 발급(`devices.test.tsx`), GUI는 `<서버>/devices` 열기만 하고 비밀번호를 받지 않음, PC 이름 1~80자·제어 문자 거부, 실제 Core 등록에서 서버가 받은 코드·이름 일치 |
+| GUI-006 | DEV-003·004 일회용 코드·토큰 보호 | 코드는 표준 입력(`register --code-stdin`)으로만 전달·형식 오류는 Core 미실행, 화면 값·`gui.json`에 토큰·코드 없음, 흘린 토큰 가림. OS 보안 저장소는 미구현 |
+| GUI-007 | DEV-005 폐기 | 웹 `/devices` 소유 PC 폐기 버튼(기존 `POST /devices/{id}/revoke`), Core 로그아웃 명령은 미구현 |
+| GUI-008 | COL-003 도구 탐지·Hook 동의 | Core `hooks status --json`(감지·버전·검증 수준·Hook 상태), 미리보기 → 승인 순서·일회성 승인, 실제 Core로 남의 Hook 보존 설치·제거, Codex는 print 전용 |
+| GUI-009 | 프런트엔드 계약 | `main_test.go`: `app.js` 호출 메서드가 모두 바인딩됨, 외부 리소스·인라인 스크립트 없음, CSP |
+| GUI-GAP-001 | 미검증 | macOS·Windows 빌드·실행, 실제 데스크톱 세션의 브라우저 열기, webkit2gtk 4.1 배포판, 실제 서버 종단 등록은 미실행(`docs/installation/collector-gui.md`) |

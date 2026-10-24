@@ -1,6 +1,6 @@
 // Package cli는 headless Collector 명령줄이다(#34). GUI(#40~#44)는 이 명령들을 감싼다.
 //
-//	agent-office-collector register --server URL --code XXXX-XXXX --name PC [--force]
+//	agent-office-collector register --server URL --code XXXX-XXXX|--code-stdin --name PC [--force]
 //	agent-office-collector run
 //	agent-office-collector hook claude|codex [--product P] [--tool-version V] [--mode M]
 //	agent-office-collector pause | resume
@@ -9,7 +9,7 @@
 //	agent-office-collector service install|uninstall [--activate]
 //	agent-office-collector service print [--os linux|darwin|windows] [--exe PATH]
 //	agent-office-collector hooks install|uninstall [--tool claude] [--yes] [--scope user]
-//	agent-office-collector hooks status [--tool claude|codex]
+//	agent-office-collector hooks status [--tool claude|codex] [--json]
 //	agent-office-collector hooks print [--tool claude|codex] [--os linux|darwin|windows] [--exe PATH]
 //	agent-office-collector version
 //
@@ -175,7 +175,7 @@ func Main(args []string, env Env) int {
 func usage(w io.Writer) {
 	fmt.Fprint(w, `사용법: agent-office-collector <명령>
 
-  register --server URL --code XXXX-XXXX --name PC [--force]  장치 등록(토큰은 0600 설정 파일에 저장, 출력하지 않음)
+  register --server URL --code XXXX-XXXX|--code-stdin --name PC [--force]  장치 등록(토큰은 0600 설정 파일에 저장, 출력하지 않음)
   run                                                          수집·전송 실행(포그라운드, SIGINT/SIGTERM으로 종료)
   hook claude|codex                                            Hook stdin을 실행 중인 Collector에 전달(항상 종료 코드 0)
   pause | resume                                               수집·전송 일시중지/재개
@@ -185,7 +185,7 @@ func usage(w io.Writer) {
   service print [--os linux|darwin|windows] [--exe PATH]       자동 시작 정의 미리보기
   hooks install|uninstall [--tool claude] [--yes] [--scope user]
                                                                Claude Code 사용자 설정에 Hook 추가/제거(미리보기 후 --yes로 적용, 백업)
-  hooks status [--tool claude|codex]                           Hook 설치 상태와 도구 버전 검증 수준
+  hooks status [--tool claude|codex] [--json]                           Hook 설치 상태와 도구 버전 검증 수준
   hooks print [--tool claude|codex] [--os OS] [--exe PATH]     Hook 항목 미리보기(Codex는 print 전용)
   version
 `)

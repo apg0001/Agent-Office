@@ -1,0 +1,84 @@
+:root {
+  --bg: #f7f6f2;
+  --fg: #1d1d1b;
+  --muted: #5d5b55;
+  --line: #d9d6cc;
+  --accent: #2f5d50;
+  --error: #9b2c2c;
+  --info: #2f5d50;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1c1a;
+    --fg: #ecebe6;
+    --muted: #a7a59d;
+    --line: #3a3b37;
+    --accent: #7fb8a4;
+    --error: #f0a3a3;
+    --info: #9fd3bf;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px 24px 32px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif;
+}
+
+.eyebrow { margin: 0; letter-spacing: 0.12em; font-size: 12px; color: var(--muted); }
+h1 { margin: 2px 0 4px; font-size: 24px; }
+h2 { margin-top: 8px; font-size: 18px; }
+h3 { margin: 20px 0 6px; font-size: 15px; }
+.lede, .hint { color: var(--muted); }
+.hint { display: block; font-size: 13px; }
+
+nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 16px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 6px;
+  cursor: pointer;
+}
+button.secondary, nav button { background: transparent; color: var(--fg); border-color: var(--line); }
+nav button.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+form { display: grid; gap: 10px; max-width: 520px; }
+label { display: grid; gap: 4px; }
+label.check { display: flex; gap: 6px; align-items: center; margin: 8px 0; }
+input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); }
+input[type="checkbox"] { padding: 0; }
+
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.steps li { margin-bottom: 8px; }
+.notice { padding: 8px 10px; border-left: 3px solid var(--info); }
+.notice.error { border-color: var(--error); color: var(--error); }
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  padding: 10px;
+  border-radius: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+table { border-collapse: collapse; margin: 10px 0; width: 100%; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+
+dl.grid { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+ul.counters { columns: 2; }
+code { font-size: 13px; }

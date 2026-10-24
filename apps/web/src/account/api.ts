@@ -105,6 +105,7 @@ const MESSAGES: Record<string, string> = {
   invalid_invite: "초대 링크가 만료되었거나 이미 사용되었습니다.",
   identity_in_use: "이 제공자 계정은 이미 다른 사용자에 연결되어 있습니다.",
   provider_already_linked: "이 제공자의 다른 계정이 이미 연결되어 있습니다. 먼저 연결을 해제하세요.",
+  too_many_open_codes: "아직 쓰지 않은 등록 코드가 너무 많습니다(최대 5개). 기존 코드가 만료(10분)된 뒤 다시 시도하세요.",
   last_login_method: "비밀번호가 없는 계정의 마지막 로그인 수단은 해제할 수 없습니다.",
 };
 
@@ -164,7 +165,18 @@ export function tokenFromHash(hash: string): string | null {
   return match ? match[1]! : null;
 }
 
-export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite" | "teams" | "admin" | "account";
+export type Route =
+  | "office"
+  | "login"
+  | "signup"
+  | "verify"
+  | "reset"
+  | "setup"
+  | "invite"
+  | "teams"
+  | "devices"
+  | "admin"
+  | "account";
 
 export function routeFor(pathname: string): Route {
   const routes: Record<string, Route> = {
@@ -175,6 +187,7 @@ export function routeFor(pathname: string): Route {
     "/setup": "setup",
     "/invite": "invite",
     "/teams": "teams",
+    "/devices": "devices",
     "/admin": "admin",
     "/account": "account",
   };
