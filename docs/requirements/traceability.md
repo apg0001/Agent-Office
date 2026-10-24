@@ -514,3 +514,31 @@
 | INST-003 | DIST-005 같은 보안 기본값 | 가입 차단, 교차 사이트 거부, 쿠키 속성, 보안 헤더, CSRF, 보안 점검 코드 동일 |
 | INST-004 | DIST-006 클린 설치 실측 | Pi arm64에서 새 볼륨 두 벌 설치·비교(`tests/install/compare.sh`) |
 | INST-005 | DOC-001~004 | `docs/installation/install-methods.md` |
+
+## 보안 시나리오 검증 매핑(#64)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| SEC-ROUTE-001 | SEC-001 경로 전수 | `app.routes` 펼친 목록 = OpenAPI 연산, 모든 경로 분류(새 경로는 분류 전까지 실패) |
+| SEC-ROUTE-002 | AUTH-005 미인증 | 모든 사용자·관리 경로가 쿠키 없음·위조·과대 세션에 401 |
+| SEC-TENANT-001 | SEC-002·TEAM-001 IDOR | 경로 변수 있는 모든 경로를 A의 ID로 B가 호출하면 403/404, 응답에 A의 값 없음, A 상태 불변 |
+| SEC-TENANT-002 | TEAM-002 역할 독립 | ADMIN·SUPER_ADMIN도 남의 개인·팀 자원 404 |
+| SEC-TENANT-003 | SEC-002 목록 격리 | 경로 변수 없는 모든 조회 경로에 남의 데이터 없음, 팀원은 공유 세션만(양성 대조) |
+| SEC-TENANT-004 | TEAM-004 교차 범위 | 남의 프로젝트 공유·남의 팀에 공유·내 팀 범위로 남의 에이전트·가로챈 초대 토큰 거부 |
+| SEC-TENANT-005~006 | SEC-002 WebSocket 범위 | 개인·통합 스냅샷 격리, 비구성원 `?team=` 4404, 내보낸 구성원 WS 4404·REST 404 |
+| SEC-TENANT-007 | DEV-004 장치 판정 | 다른 `device_id` 거부, 같은 Collector 세션 ID는 장치별 분리 |
+| SEC-ROLE-001~002 | AUTH-006 관리자 경계 | USER는 모든 관리 경로 403, ADMIN의 승격·강등·설치 잠금 403 |
+| SEC-ROLE-003 | AUTH-006 상위 역할 보호 | (수정) ADMIN이 SUPER_ADMIN 비활성화·재활성화·승인 403, SUPER_ADMIN은 가능 |
+| SEC-ROLE-004 | TEAM-003 팀 역할 상승 | MEMBER·MANAGER의 상위 동작 403, 인스턴스 SUPER_ADMIN인 MEMBER도 403, 수락 본문 역할 주입 422 |
+| SEC-CSRF-001~002 | SEC-003 CSRF | 모든 쿠키 쓰기 경로: 토큰 없음·다른 사용자·같은 사용자 다른 세션·임의 값 403, 정적 의존성 확인 |
+| SEC-CSRF-003~004 | SEC-003 로그인 전 쓰기 | 다른 Origin·`null`·폼·multipart 403, 허용 Origin 정확 일치 |
+| SEC-CSRF-005~006 | SEC-003 WS·쿠키 | 교차 사이트 WS 4403(개인·팀·통합), 쿠키 HttpOnly·SameSite=Lax·Secure |
+| SEC-TOKEN-001~004 | SEC-005 자격 증명 분리 | 장치 토큰으로 브라우저 경로·WS 불가, 세션으로 장치 경로 불가, 폐기·만료·비활성·삭제 계정 토큰 401 |
+| SEC-MASS-001~002 | SEC-006 대량 할당 | 모든 요청 모델 `extra="forbid"`, 역할·ID 주입 422(값 미반사) |
+| SEC-SESSION-001~005 | AUTH-005 세션 철회 | 로그아웃·개별 폐기·전체 로그아웃·비밀번호 재설정·비활성화 뒤 REST 401·WS 4401 즉시, 강등 즉시 반영 |
+| SEC-LEAK-001 | SEC-004~006 비밀·원문 | 비밀번호·SMTP·OAuth·Webhook·Telegram·bootstrap·세션·재설정·장치·초대 토큰·원문 필드 sentinel이 응답·전체 DB·로그·메일에 없음(1회 발급 응답만 허용) |
+| SEC-INPUT-001~002 | SEC-006 본문 남용 | 413/411/400, 3만 단계 중첩 JSON 4xx |
+| SEC-INPUT-003 | SEC-006 문자 남용 | (수정) NUL 400 `invalid_input`, 제어·유니코드·HTML·SQL 모양 문자열은 데이터로 저장 |
+| SEC-INPUT-004~006 | SEC-006 ID·퍼즈 | 경로 조작 ID 404/405/422, 이벤트 enum 퍼즈 150회 500 없음·미반사, 커서·필터 퍼즈 |
+| SEC-INPUT-007 | SEC-004 SSRF | Webhook 내부 주소·다른 스킴·호스트 혼동·자격 증명 400 |
+| SEC-GAP-001 | 미검증 | TLS·프록시 헤더·DNS 재바인딩·웹 XSS·실제 외부 서비스·DoS·타이밍은 `docs/security/threat-scenarios.md`에 미검증으로 기록 |
