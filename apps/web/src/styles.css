@@ -243,13 +243,39 @@ h1 {
 }
 
 .session-bar button,
-.account-card button {
+.account-card button,
+.account-card a.button {
   padding: 0.45rem 0.9rem;
   border: 1px solid rgba(167, 196, 220, 0.35);
   border-radius: 8px;
   background: #1d3350;
   color: inherit;
   cursor: pointer;
+}
+
+.account-card a.button {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.oauth-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.identity-list {
+  padding: 0;
+  list-style: none;
+}
+
+.identity-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
 }
 
 .account-card button:disabled {

@@ -1,6 +1,15 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
-import { call, messageFor, pendingInvite, tokenFromHash } from "./api";
+import {
+  OAUTH_LABELS,
+  type SessionInfo,
+  call,
+  messageFor,
+  oauthResult,
+  oauthStartUrl,
+  pendingInvite,
+  tokenFromHash,
+} from "./api";
 
 interface FieldProps {
   label: string;
@@ -66,10 +75,46 @@ function useSubmit() {
   return { busy, error, run };
 }
 
+/** 서버 OAuth 콜백이 돌려준 `#oauth=<코드>`를 한 번 읽고 주소창에서 지운다(#24). */
+export function useOAuthResult() {
+  const [result, setResult] = useState<{ error: string | null; info: string | null } | null>(null);
+  useEffect(() => {
+    const found = oauthResult(window.location.hash);
+    if (found) {
+      window.history.replaceState(null, "", window.location.pathname);
+      setResult(found);
+    }
+  }, []);
+  return result;
+}
+
+/** 관리자가 설정을 끝낸 제공자만 버튼으로 보인다. 설정이 없으면 아무것도 그리지 않는다. */
+export function OAuthButtons({ verb }: { verb: string }) {
+  const [providers, setProviders] = useState<string[]>([]);
+  useEffect(() => {
+    void call<{ providers: string[] }>("GET", "/api/v1/auth/oauth/providers").then((result) =>
+      setProviders(result.data?.providers ?? []),
+    );
+  }, []);
+  if (providers.length === 0) {
+    return null;
+  }
+  return (
+    <div className="oauth-buttons">
+      {providers.map((provider) => (
+        <a key={provider} className="button" href={oauthStartUrl(provider, "login", pendingInvite())}>
+          {OAUTH_LABELS[provider] ?? provider}(으)로 {verb}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { busy, error, run } = useSubmit();
+  const oauth = useOAuthResult();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -94,11 +139,12 @@ export function LoginPage() {
           onChange={setPassword}
           autoComplete="current-password"
         />
-        <Notice error={error} />
+        <Notice error={error ?? oauth?.error} info={oauth?.info} />
         <button type="submit" disabled={busy}>
           로그인
         </button>
       </form>
+      <OAuthButtons verb="로그인" />
       <p className="account-links">
         <a href="/signup">가입</a> · <a href="/reset-password">비밀번호 찾기</a>
       </p>
@@ -166,6 +212,7 @@ export function SignupPage() {
           가입
         </button>
       </form>
+      <OAuthButtons verb="가입" />
       <p className="account-links">
         <a href="/login">로그인</a>
       </p>
@@ -266,6 +313,91 @@ export function ResetPage() {
       )}
       <p className="account-links">
         <a href="/login">로그인</a>
+      </p>
+    </Card>
+  );
+}
+
+interface IdentitiesInfo {
+  password_set: boolean;
+  identities: { provider: string; linked_at: string }[];
+}
+
+/** 계정 화면: Google/GitHub 연결·해제(#24). 이메일이 같아도 자동 연결하지 않으므로 여기서 연결한다. */
+export function AccountPage() {
+  const [session, setSession] = useState<SessionInfo | null | undefined>(undefined);
+  const [info, setInfo] = useState<IdentitiesInfo | null>(null);
+  const [providers, setProviders] = useState<string[]>([]);
+  const oauth = useOAuthResult();
+  const { busy, error, run } = useSubmit();
+
+  const load = async () => {
+    const result = await call<IdentitiesInfo>("GET", "/api/v1/auth/identities");
+    setInfo(result.data);
+  };
+
+  useEffect(() => {
+    void call<SessionInfo>("GET", "/api/v1/auth/session").then((result) => {
+      setSession(result.data);
+      if (result.data) {
+        void load();
+      }
+    });
+    void call<{ providers: string[] }>("GET", "/api/v1/auth/oauth/providers").then((result) =>
+      setProviders(result.data?.providers ?? []),
+    );
+  }, []);
+
+  if (session === undefined) {
+    return <Card title="계정">{null}</Card>;
+  }
+  if (session === null) {
+    return (
+      <Card title="계정">
+        <Notice error={oauth?.error ?? messageFor("unauthorized")} />
+        <p className="account-links">
+          <a href="/login">로그인</a>
+        </p>
+      </Card>
+    );
+  }
+  const linked = new Set(info?.identities.map((identity) => identity.provider) ?? []);
+  const unlink = (provider: string) =>
+    void run(async () => {
+      const result = await call("DELETE", `/api/v1/auth/identities/${provider}`, undefined, session.csrf_token);
+      await load();
+      return result.error;
+    });
+  const all = Array.from(new Set([...providers, ...linked]));
+
+  return (
+    <Card title="계정">
+      <p>{session.user.display_name}</p>
+      <h3>로그인 수단</h3>
+      <p>비밀번호: {info?.password_set ? "설정됨" : "없음"}</p>
+      {all.length === 0 ? (
+        <p>연결할 수 있는 외부 로그인이 없습니다.</p>
+      ) : (
+        <ul className="identity-list">
+          {all.map((provider) => (
+            <li key={provider}>
+              <span>{OAUTH_LABELS[provider] ?? provider}</span>{" "}
+              {linked.has(provider) ? (
+                <button type="button" disabled={busy} onClick={() => unlink(provider)}>
+                  연결 해제
+                </button>
+              ) : providers.includes(provider) ? (
+                <a className="button" href={oauthStartUrl(provider, "link")}>
+                  연결
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Notice error={error ?? oauth?.error} info={oauth?.info} />
+      <p className="account-links">
+        <a href="/">사무실</a>
       </p>
     </Card>
   );

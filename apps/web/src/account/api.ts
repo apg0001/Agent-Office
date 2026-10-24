@@ -89,7 +89,52 @@ const MESSAGES: Record<string, string> = {
   email_domain_blocked: "이 이메일 도메인으로는 가입할 수 없습니다.",
   invalid_domain: "도메인 형식이 올바르지 않습니다.",
   not_awaiting_approval: "승인 대기 상태가 아닙니다(이메일 확인 전일 수 있음).",
+  // OAuth 결과 코드(#24). 서버는 `#oauth=<코드>`만 돌려준다.
+  provider_disabled: "이 로그인 수단은 지금 쓸 수 없습니다. 관리자에게 문의하세요.",
+  state_invalid: "로그인 요청이 만료되었거나 다른 브라우저에서 시작되었습니다. 처음부터 다시 시도하세요.",
+  denied: "제공자 화면에서 로그인이 취소되었습니다.",
+  exchange_failed: "제공자와 로그인 확인에 실패했습니다. 다시 시도하세요.",
+  identity_failed: "제공자에서 계정 정보를 받지 못했습니다. 다시 시도하세요.",
+  provider_unreachable: "제공자에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
+  provider_error: "제공자 응답이 올바르지 않습니다.",
+  email_unverified: "제공자 계정의 이메일이 확인되지 않아 가입할 수 없습니다.",
+  account_exists_link_required:
+    "이 이메일로 가입된 계정이 이미 있습니다. 기존 방법으로 로그인한 뒤 계정 화면에서 연결하세요.",
+  login_failed: "로그인할 수 없는 계정입니다.",
+  login_required: "먼저 로그인하세요.",
+  invalid_invite: "초대 링크가 만료되었거나 이미 사용되었습니다.",
+  identity_in_use: "이 제공자 계정은 이미 다른 사용자에 연결되어 있습니다.",
+  provider_already_linked: "이 제공자의 다른 계정이 이미 연결되어 있습니다. 먼저 연결을 해제하세요.",
+  last_login_method: "비밀번호가 없는 계정의 마지막 로그인 수단은 해제할 수 없습니다.",
 };
+
+const OAUTH_SUCCESS: Record<string, string> = {
+  linked: "계정을 연결했습니다.",
+  already_linked: "이미 연결된 계정입니다.",
+  signed_in: "로그인했습니다.",
+  signed_up: "가입하고 로그인했습니다.",
+};
+
+export const OAUTH_LABELS: Record<string, string> = { google: "Google", github: "GitHub" };
+
+/** `#oauth=<코드>`의 결과. 성공이면 info, 실패면 error 문구. 모르는 형식은 무시한다. */
+export function oauthResult(hash: string): { error: string | null; info: string | null } | null {
+  const match = /(?:^#|&)oauth=([a-z_]{1,64})(?:&|$)/.exec(hash);
+  if (!match) {
+    return null;
+  }
+  const code = match[1]!;
+  return code in OAUTH_SUCCESS ? { error: null, info: OAUTH_SUCCESS[code]! } : { error: messageFor(code), info: null };
+}
+
+/** OAuth 시작 주소. 초대 토큰은 초대 전용 정책 가입에만 붙인다. */
+export function oauthStartUrl(provider: string, intent: "login" | "link", invite?: string | null): string {
+  const params = new URLSearchParams({ intent });
+  if (invite) {
+    params.set("invite", invite);
+  }
+  return `/api/v1/auth/oauth/${encodeURIComponent(provider)}/start?${params.toString()}`;
+}
 
 export function messageFor(code: string | null): string {
   if (!code) {
@@ -119,7 +164,7 @@ export function tokenFromHash(hash: string): string | null {
   return match ? match[1]! : null;
 }
 
-export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite" | "teams" | "admin";
+export type Route = "office" | "login" | "signup" | "verify" | "reset" | "setup" | "invite" | "teams" | "admin" | "account";
 
 export function routeFor(pathname: string): Route {
   const routes: Record<string, Route> = {
@@ -131,6 +176,7 @@ export function routeFor(pathname: string): Route {
     "/invite": "invite",
     "/teams": "teams",
     "/admin": "admin",
+    "/account": "account",
   };
   return routes[pathname.replace(/\/+$/, "") || "/"] ?? "office";
 }

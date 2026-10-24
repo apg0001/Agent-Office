@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { App } from "../App";
-import { call, messageFor, routeFor, tokenFromHash } from "./api";
+import { call, messageFor, oauthResult, oauthStartUrl, routeFor, tokenFromHash } from "./api";
 import { nextStep, startStep } from "./wizard";
 
 describe("routing", () => {
@@ -89,5 +89,27 @@ describe("setup wizard steps", () => {
     expect(nextStep("policy")).toBe("mail");
     expect(nextStep("mail")).toBe("finish");
     expect(nextStep("finish")).toBe("finish");
+  });
+});
+
+describe("oauth", () => {
+  it("routes the account page", () => {
+    expect(routeFor("/account")).toBe("account");
+    expect(renderToString(<App pathname="/account" />)).toContain("계정");
+  });
+
+  it("reads only result codes from the fragment", () => {
+    expect(oauthResult("#oauth=linked")).toEqual({ error: null, info: "계정을 연결했습니다." });
+    expect(oauthResult("#oauth=account_exists_link_required")?.error).toContain("계정 화면에서 연결");
+    expect(oauthResult("#oauth=state_invalid")?.error).toContain("다시 시도");
+    expect(oauthResult("#oauth=<script>")).toBeNull();
+    expect(oauthResult("#token=abc")).toBeNull();
+    expect(oauthResult("")).toBeNull();
+  });
+
+  it("builds start URLs with the intent and optional invite", () => {
+    expect(oauthStartUrl("google", "login")).toBe("/api/v1/auth/oauth/google/start?intent=login");
+    expect(oauthStartUrl("github", "link", null)).toBe("/api/v1/auth/oauth/github/start?intent=link");
+    expect(oauthStartUrl("google", "login", "tok")).toBe("/api/v1/auth/oauth/google/start?intent=login&invite=tok");
   });
 });

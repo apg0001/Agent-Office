@@ -158,6 +158,10 @@ def purge(connection: Connection) -> dict[str, int] | None:
                 )
             ),
         )
+    # OAuth 시작 상태(#24)는 10분짜리라 만료 즉시 지운다.
+    counts["oauth_states"] = _count(
+        connection, delete(s.oauth_states).where(s.oauth_states.c.expires_at < now)
+    )
     invitations = s.team_invitations
     counts["team_invitations"] = _count(
         connection,

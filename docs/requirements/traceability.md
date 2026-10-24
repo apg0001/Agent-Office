@@ -490,3 +490,17 @@
 | DEP-004 | 수동 승인 | `deploy` 입력 없으면 변경 없음 |
 | DEP-005 | 롤백 | 점검 실패 시 새 이미지로 DB 다운그레이드 후 이전 이미지 복귀(실측) |
 | DEP-006 | 비역호환 복원 계획 | 다운그레이드 실패 시 백업 복원 절차 문서화 |
+
+## OAuth 검증 매핑(#24)
+
+| 테스트 ID | 요구사항 | 검증 근거 |
+|---|---|---|
+| OAUTH-001 | AUTH-004 제공자 비활성 | 켜기·client ID·secret·공개 주소가 모두 있어야 목록에 나옴, 미설정 시작은 `provider_disabled`, 목록에 비밀 없음 |
+| OAUTH-002 | SEC-003 state·로그인 CSRF | state 해시만 저장·10분 만료·일회용, 시작 브라우저 HttpOnly 쿠키 결속, 쿠키 없음·다른 쿠키·다른 제공자·만료 거부 |
+| OAUTH-003 | SEC-003 PKCE | Google·GitHub 모두 S256 challenge(RFC 7636 예시 값 일치), 토큰 교환에 verifier·같은 redirect_uri |
+| OAUTH-004 | AUTH-004 가입 정책 | CLOSED 거부, INVITE_ONLY는 초대 이메일 일치만, ADMIN_APPROVAL 대기, PUBLIC 활성, 차단 도메인, 미검증 이메일 거부 |
+| OAUTH-005 | SEC-003 계정 탈취 방지 | 같은 이메일 기존 계정에 자동 연결하지 않음, 다른 사용자 신원 연결 거부, 연결 중 세션 교체 거부 |
+| OAUTH-006 | AUTH-004 연결·해제 | 로그인 필요, 사용자당 제공자 하나, CSRF, 비밀번호 없는 계정의 마지막 수단 해제 거부 |
+| OAUTH-007 | 계정 상태 | 비활성 사용자 로그인 거부, 승인 대기 사용자 세션 없음 |
+| OAUTH-008 | 민감정보 | 액세스 토큰·client secret·이메일·인가 코드·프로필 문구가 서버 로그·감사 로그·리디렉션 URL에 없음 |
+| OAUTH-009 | 실제 제공자 | 미실행: 실제 Google·GitHub OAuth 앱 왕복은 검증하지 않음 |

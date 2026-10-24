@@ -12,7 +12,7 @@
 | `PUT /smtp {host, port, username, sender, starttls, password}` | `password`: 생략·`null`이면 유지, `""`이면 삭제 |
 | `DELETE /smtp` | 저장한 SMTP 설정과 암호 삭제(환경 변수 설정으로 돌아감) |
 | `POST /smtp/test` | 요청한 관리자 본인 주소로 시험 메일. `{ok, error}`, 오류는 `auth_failed`·`connect_failed`·`timeout`·`tls_failed`·`starttls_unsupported`·`recipient_refused`·`smtp_error`·`not_configured` 코드만 |
-| `PUT /oauth/{google\|github} {enabled, client_id, client_secret}` | 켜려면 client ID와 secret이 모두 있어야 함(`400 oauth_incomplete`). 로그인 흐름은 #24 |
+| `PUT /oauth/{google\|github} {enabled, client_id, client_secret}` | 켜려면 client ID와 secret이 모두 있어야 함(`400 oauth_incomplete`). 로그인 흐름은 [OAuth API](auth-oauth-v1.md)(#24) |
 
 `GET` 응답:
 
