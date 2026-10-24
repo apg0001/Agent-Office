@@ -265,6 +265,7 @@
 179. #44: `internal/update`(ed25519 서명 manifest, 채널·OS·아키텍처·SemVer, SHA-256, 안전한 압축 해제, 원자적 교체·`.bak`, 서비스 재기동 후 상태 확인·실패 시 되돌림, 패키지 설치 거부), CLI `update check|apply`, 릴리스 도구 `cmd/agent-office-release`(keygen·manifest·sign), 빌드 시 공개 키 주입, 게시 워크플로에서 manifest 서명. Go 전체 테스트 통과.
 180. PR #139 병합(`7e5e060`), #44 종료.
 181. #62 Linux 부분: `tests/e2e/claude_flow.sh`로 실제 Claude Code 2.1.308 `claude -p` → Hook → Collector → 서버 흐름 실측(세션 시작~종료, 턴·도구 이벤트, 표식 문자열 DB 0건, 사용자 설정 불변). macOS·Windows·Codex·대화형은 남음.
+182. #38·#62: 실제 Claude 하위 에이전트·TodoWrite 시나리오(`SCENARIO=subagent`)로 hook → spool → run 경로의 계획 상태 유실 2건 수정(spool 레코드 `plan` 필드, `run` spool 처리를 `Pipeline.Candidate`로). 실측 결과 하위 에이전트 lead 아래, `plan_steps` `["completed","completed"]`, 표식 DB 0건.
 
 ## 이번 변경 요약(#22)
 
@@ -350,7 +351,7 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율): #63 PR 병합(이슈는 72시간 실행까지 열어 둠) → #65 릴리스 준비 PR(`docs/#65-release-prep` 브랜치에 초안 커밋 있음, 장시간 결과 반영 후 PR) → #41·#43 서브에이전트 PR 병합 → #42 설치 패키지·#44 업데이트 → 72시간 실행(`AGENT_OFFICE_LOAD_PORT=18480 tests/load/run.sh <서버> <웹> --rounds 129600 --interval 2 --timeout 30`, 다른 무거운 작업 없을 때) → #62·#87은 소유자 장비. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
+4. 진행 순서(자율, 2026-10-24 갱신): #38 spool 계획 수정 PR(`fix/#38-spool-plan`) 병합 → #41·#43 서브에이전트 PR(`feat/#41-keychain-tray`) 병합 → 72시간 실행. 실제 Claude 흐름 재확인은 `SCENARIO=subagent tests/e2e/claude_flow.sh ao-release-server:test ao-release-web:test <Collector 실행 파일>`. 이전 순서: #63 PR 병합(이슈는 72시간 실행까지 열어 둠) → #65 릴리스 준비 PR(`docs/#65-release-prep` 브랜치에 초안 커밋 있음, 장시간 결과 반영 후 PR) → #41·#43 서브에이전트 PR 병합 → #42 설치 패키지·#44 업데이트 → 72시간 실행(`AGENT_OFFICE_LOAD_PORT=18480 tests/load/run.sh <서버> <웹> --rounds 129600 --interval 2 --timeout 30`, 다른 무거운 작업 없을 때) → #62·#87은 소유자 장비. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.

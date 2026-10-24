@@ -674,9 +674,7 @@ func (c *collector) drainSpool(ctx context.Context) {
 			continue
 		}
 		names = append(names, e.Name)
-		if rec, out := c.pipe.Normalizer().Normalize(normalize.Input{Candidate: cand, ObservedAt: e.Record.ObservedAt}); out == normalize.OutcomeAccepted {
-			recs = append(recs, rec)
-		}
+		recs = append(recs, c.pipe.Candidate(normalize.Input{Candidate: cand, ObservedAt: e.Record.ObservedAt})...)
 	}
 	er, err := c.q.Enqueue(ctx, recs, nil)
 	if err != nil {
