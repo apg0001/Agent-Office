@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 MAX_ERRORS = 20
 # 위치에는 API가 정의한 필드 이름 형태만 남긴다. 그 밖(원문이 담길 수 있는 임의 키)은 가린다.
@@ -61,3 +64,12 @@ def _model_field_names(request: Request) -> set[str]:
         for arg in getattr(model, "__args__", ()) or ():
             stack.append(arg)
     return names
+
+
+async def data_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """DB가 거부한 입력(문자열의 NUL 문자 등, #64). 500 대신 400으로 답한다.
+
+    SQLAlchemy 오류 문구에는 SQL과 매개변수(사용자 입력)가 들어 있으므로 응답·로그에 남기지 않는다.
+    """
+    logger.warning("request rejected by database: %s", type(exc).__name__)
+    return JSONResponse(status_code=400, content={"detail": "invalid_input"})
