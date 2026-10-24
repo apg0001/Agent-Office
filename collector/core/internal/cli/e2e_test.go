@@ -231,6 +231,9 @@ func TestEndToEndRegisterRunCollectSendShutdown(t *testing.T) {
 		}
 		return false
 	})
+	// 서버가 받은 뒤 ACK 처리가 끝나기 전에 종료하면 큐에 한 건이 남는다(재전송되므로 정상 동작).
+	// 최종 큐 깊이 0을 확인하려면 ACK 반영을 기다린 뒤 종료한다(CI 간헐 실패 원인).
+	waitFor(t, "queue drained", func() bool { return status().QueueDepth == 0 })
 
 	cancel()
 	select {
