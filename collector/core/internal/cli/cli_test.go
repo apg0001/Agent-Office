@@ -338,6 +338,7 @@ func TestDiagnoseHasNoSecretsOrPaths(t *testing.T) {
 func TestServiceCommands(t *testing.T) {
 	te := newTestEnv(t, "u")
 	te.env.GOOS = "linux"
+	te.env.Executable = func() (string, error) { return "/usr/local/bin/agent-office-collector", nil }
 	var calls [][]string
 	te.env.Command = func(args ...string) ([]byte, error) { calls = append(calls, args); return nil, nil }
 	if code := te.run("", "service", "print", "--os", "windows", "--exe", `C:\ao\agent-office-collector.exe`); code != ExitOK {

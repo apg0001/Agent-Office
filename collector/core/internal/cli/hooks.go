@@ -85,7 +85,7 @@ func cmdHooks(args []string, env Env) int {
 		fmt.Fprintln(env.Stderr, "--scope는 user만 지원합니다")
 		return ExitUsage
 	}
-	if sub != "print" && (*goos != env.GOOS || *exeFlag != "") {
+	if sub != "print" && (flagSet(fs, "os") || flagSet(fs, "exe")) {
 		fmt.Fprintln(env.Stderr, "--os, --exe는 hooks print에서만 쓸 수 있습니다")
 		return ExitUsage
 	}

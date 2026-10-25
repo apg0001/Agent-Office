@@ -250,6 +250,9 @@ def main() -> int:
             cmd, check=False, capture_output=True, text=True, timeout=120
         )
         record("uninstall_exit_zero", u.returncode == 0)
+        if u.returncode != 0:
+            # 일회용 러너 진단용: 제거 스크립트 오류의 마지막 몇 줄만 남긴다.
+            results["uninstall_error_tail"] = (u.stdout + u.stderr).strip().splitlines()[-6:]
         record("config_purged", not config_dir().exists())
         settings = json.loads(claude_settings.read_text(encoding="utf-8"))
         stop_hooks = [
