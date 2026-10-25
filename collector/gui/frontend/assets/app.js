@@ -220,7 +220,7 @@ async function loadGUIAutostart() {
 loaders.service = loadGUIAutostart;
 
 $("gui-autostart-install").addEventListener("click", async () => {
-  if (!window.confirm("로그인 시 GUI(트레이)를 자동으로 띄우는 사용자 정의를 설치합니다. 계속할까요?")) {
+  if (!window.confirm("로그인 시 트레이 아이콘(agent-office-collector-tray)을 자동으로 띄우는 사용자 정의를 설치합니다. 계속할까요?")) {
     return;
   }
   show("gui-autostart-result", await call("GUIAutostartInstall", true));

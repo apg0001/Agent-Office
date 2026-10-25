@@ -1,6 +1,6 @@
 # Collector 설치 패키지
 
-관련 이슈: #42. 대상은 headless Core(`agent-office-collector`)입니다. GUI(#40)는 OS별 Wails 빌드가 필요해 아직 패키지에 넣지 않습니다.
+관련 이슈: #42(headless Core 패키지), #159(GUI·트레이 설치 프로그램). GUI·트레이 설치 프로그램(Windows `.exe`, macOS `.pkg`, Linux desktop deb·rpm)의 설치·제거·서명 경고 우회는 [Collector GUI](collector-gui.md#설치-프로그램159)에 있습니다.
 
 ## 배포물
 
@@ -11,6 +11,9 @@
 | Linux | amd64·arm64 | `.deb`, `.rpm`, `.tar.gz` | `/usr/bin/agent-office-collector`, `/usr/bin/agent-office-collector-uninstall`, README |
 | macOS | amd64·arm64 | `.tar.gz` | 바이너리, `agent-office-collector-uninstall`, README |
 | Windows | amd64·arm64 | `.zip` | `agent-office-collector.exe`, `uninstall.ps1`, README |
+| Windows(#159) | amd64 | `agent-office-collector-setup-<버전>-windows-amd64.exe` | Core·GUI·트레이 사용자별 설치 프로그램(`build-windows-installer.sh`, NSIS) |
+| macOS(#159) | 유니버설 | `agent-office-collector-<버전>-macos-universal.pkg` | 앱 번들(GUI·Core·트레이)(`macos/build-pkg.sh`, macOS에서만) |
+| Linux(#159) | amd64·arm64 | `agent-office-collector-desktop` `.deb`, `.rpm` | GUI·트레이·앱 메뉴 항목·아이콘, 같은 버전 Core 패키지에 의존(`build-desktop-linux.sh`, 아키텍처별 러너) |
 
 - 정적 바이너리(`CGO_ENABLED=0`, `-trimpath`), 버전은 `-ldflags -X main.version`.
 - `SHA256SUMS`에 모든 배포물의 해시. 받은 쪽은 `sha256sum -c SHA256SUMS`(Windows `Get-FileHash`)로 확인합니다.
@@ -30,8 +33,10 @@ agent-office-collector service install --activate
 
 | 범위 | 명령 | 지우는 것 |
 |---|---|---|
-| 기본 | `agent-office-collector-uninstall`(Windows `uninstall.ps1`) | 우리가 설치한 Hook과 자동 시작(소유 표시가 있는 것만, GUI 자동 시작 `.desktop`·LaunchAgent·HKCU Run 값 포함 — #43, Windows 미검증). 설정·장치 토큰·큐는 남김(재설치 시 그대로 이어감) |
-| 완전 삭제 | `… --purge`(Windows `-Purge`) | 위 + OS 보안 저장소의 장치 토큰 항목(`logout --local-only`, 서버 폐기는 하지 않음, #41) + Core 설정·상태·큐 폴더(`~/.config/agent-office/collector` 등, Core 경로 규칙과 같음) |
+| 기본 | `agent-office-collector-uninstall`(Windows `uninstall.ps1`) | 우리가 설치한 Hook과 자동 시작(소유 표시가 있는 것만, 트레이 자동 시작 `.desktop`·LaunchAgent·HKCU Run 값 포함 — #43, #159), 이 사용자의 트레이·GUI 프로세스 종료. 설정·장치 토큰·큐는 남김(재설치 시 그대로 이어감) |
+| 완전 삭제 | `… --purge`(Windows `-Purge`) | 위 + OS 보안 저장소의 장치 토큰 항목(`logout --local-only`, 서버 폐기는 하지 않음, #41) + Core 설정·상태·큐 폴더(`~/.config/agent-office/collector` 등, Core 경로 규칙과 같음) + GUI 설정(`AgentOffice/CollectorGUI`) |
+| macOS 앱 | `… --remove-app`(앱 안 `Contents/Resources/agent-office-collector-uninstall`) | 위 기본 정리 + `/Applications/Agent Office Collector.app`(번들 ID 확인 뒤, 권한이 없으면 sudo로 앱만) + `pkgutil --forget` |
+| Windows 설치 프로그램 | 앱 제거(`uninstall.exe`) | `uninstall.ps1 -Yes` 기본 정리 + 설치 폴더·시작 메뉴·HKCU 제거 항목 |
 | 패키지 | `dpkg -r` / `rpm -e` | 바이너리만. 다른 사용자 홈은 건드리지 않음 |
 
 Claude·Codex의 원본 기록(`~/.claude/projects` 등)은 어떤 경우에도 지우지 않습니다. 장치를 서버에서도 끊으려면 웹 `/devices`에서 그 PC를 폐기합니다.
@@ -42,12 +47,12 @@ Claude·Codex의 원본 기록(`~/.claude/projects` 등)은 어떤 경우에도 
 |---|---|---|
 | 해시 | `SHA256SUMS` | 구현 |
 | 모든 배포물 서명 | GitHub OIDC keyless(cosign) 등 | 미구현(게시 워크플로에 `id-token: write`만 준비) |
-| macOS | Developer ID 서명·notarization, `.pkg` | 미구현(Apple 계정·macOS 필요) |
-| Windows | Authenticode 서명, MSI/MSIX | 미구현(인증서·Windows 필요) |
+| macOS | Developer ID 서명·notarization | 미구현(비용). `.pkg`는 #159에서 구현, 앱은 ad-hoc 서명만 |
+| Windows | Authenticode 서명 | 미구현(비용). 설치 프로그램은 #159에서 NSIS `.exe`로 구현(MSI는 고르지 않음, ADR-0005) |
 
 ## 게시
 
-`.github/workflows/publish-collector.yml`(수동 실행, `collector-publish` Environment 승인)이 같은 스크립트로 빌드해 GitHub Release **초안**으로 올립니다. 관리자가 확인 후 공개합니다. 아직 실행하지 않았습니다.
+`.github/workflows/publish-collector.yml`(수동 실행, `collector-publish` Environment 승인)이 같은 스크립트로 빌드해 GitHub Release **초안**으로 올립니다. 관리자가 확인 후 공개합니다. #159부터 Windows 설치 프로그램(ubuntu-24.04, Docker), macOS `.pkg`(macos-latest), Linux 데스크톱 패키지(ubuntu-24.04·ubuntu-24.04-arm)를 각각 만든 뒤 Core 배포물과 합쳐 `SHA256SUMS`를 다시 계산합니다(파일 이름에 `~`가 있으면 실패). Core를 품는 작업은 업데이트 공개 키 때문에 같은 Environment 승인을 받습니다. #159의 변경 뒤로는 아직 실행하지 않았습니다(같은 스크립트를 `Cross-OS Collector`가 PR마다 실행).
 
 ## 검증(Pi 5 arm64, 2026-10-24)
 

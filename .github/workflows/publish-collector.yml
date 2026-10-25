@@ -1,7 +1,13 @@
 name: Publish Collector
 
-# Collector 배포물을 GitHub Release 초안으로 올린다(#42). 외부 공개이므로 관리자가 수동으로만 실행하고
+# Collector 배포물을 GitHub Release 초안으로 올린다(#42, #159). 외부 공개이므로 관리자가 수동으로만 실행하고
 # `collector-publish` Environment의 필수 리뷰어 승인을 받는다. 초안은 관리자가 확인한 뒤 공개한다.
+#
+# 배포물: Core 압축본·deb·rpm(헤드리스), Linux 데스크톱 deb·rpm(GUI·트레이, amd64·arm64 러너에서 각각 빌드),
+# Windows 설치 프로그램(NSIS, Linux 컨테이너에서 교차 빌드), macOS 유니버설 .pkg(macOS 러너), SHA256SUMS,
+# 서명된 업데이트 manifest. 설치 프로그램은 코드 서명·공증하지 않는다(collector-gui.md의 경고 우회 안내).
+# Core를 품는 작업(Windows·macOS 설치 프로그램, Core 압축본)은 Environment 변수의 업데이트 공개 키를 넣으므로
+# 같은 Environment 승인을 받는다.
 on:
   workflow_dispatch:
     inputs:
@@ -18,8 +24,91 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  windows-installer:
+    name: Windows installer (NSIS)
+    runs-on: ubuntu-24.04
+    environment: collector-publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: '[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]'
+      - name: Build
+        env:
+          VERSION: ${{ inputs.version }}
+          AGENT_OFFICE_UPDATE_KEYS: ${{ vars.COLLECTOR_UPDATE_PUBLIC_KEYS }}
+        run: collector/packaging/build-windows-installer.sh "$VERSION" "$RUNNER_TEMP/out"
+      - name: Upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-installer
+          path: ${{ runner.temp }}/out
+          retention-days: 3
+          if-no-files-found: error
+
+  macos-pkg:
+    name: macOS .pkg (universal)
+    runs-on: macos-latest
+    environment: collector-publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: collector/core/go.mod
+          cache: false
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: '[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]'
+      - name: Build
+        env:
+          VERSION: ${{ inputs.version }}
+          AGENT_OFFICE_UPDATE_KEYS: ${{ vars.COLLECTOR_UPDATE_PUBLIC_KEYS }}
+        run: collector/packaging/macos/build-pkg.sh "$VERSION" "$RUNNER_TEMP/out"
+      - name: Upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-pkg
+          path: ${{ runner.temp }}/out
+          retention-days: 3
+          if-no-files-found: error
+
+  linux-desktop:
+    name: Linux desktop packages (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: '[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]'
+      - name: Build
+        env:
+          VERSION: ${{ inputs.version }}
+        run: collector/packaging/build-desktop-linux.sh "$VERSION" "$RUNNER_TEMP/out"
+      - name: Upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-desktop-${{ matrix.arch }}
+          path: ${{ runner.temp }}/out
+          retention-days: 3
+          if-no-files-found: error
+
   publish:
-    name: Build and draft release
+    name: Build Core and draft release
+    needs: [windows-installer, macos-pkg, linux-desktop]
     runs-on: ubuntu-24.04
     environment: collector-publish
     permissions:
@@ -32,12 +121,26 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: '[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]'
-      - name: Build packages
+      - name: Build Core packages
         env:
           VERSION: ${{ inputs.version }}
           # 업데이트 manifest 서명 공개 키(Environment 변수). 없으면 자체 업데이트가 꺼진 빌드가 된다.
           AGENT_OFFICE_UPDATE_KEYS: ${{ vars.COLLECTOR_UPDATE_PUBLIC_KEYS }}
         run: collector/packaging/build.sh "$VERSION" "$PWD/dist"
+      - name: Collect installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd dist
+          # GitHub Release는 파일 이름의 `~`를 `.`으로 바꾼다. 빌드 스크립트가 이미 맞췄는지 확인한다.
+          for f in *~*; do
+            if [ -e "$f" ]; then echo "파일 이름에 ~가 있습니다" >&2; exit 1; fi
+          done
+          sha256sum -- *.tar.gz *.zip *.deb *.rpm *.exe *.pkg >SHA256SUMS
+          cat SHA256SUMS
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -62,5 +165,5 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           gh release create "collector-v$VERSION" --draft --prerelease \
-            --title "Collector $VERSION" --notes "초안. 서명·공증 전 배포물입니다. docs/installation/collector-packages.md" \
-            dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/SHA256SUMS dist/manifest.json dist/manifest.json.sig
+            --title "Collector $VERSION" --notes "초안. 코드 서명·공증 전 배포물입니다(설치 경고 우회: docs/installation/collector-gui.md). docs/installation/collector-packages.md" \
+            dist/*.tar.gz dist/*.zip dist/*.deb dist/*.rpm dist/*.exe dist/*.pkg dist/SHA256SUMS dist/manifest.json dist/manifest.json.sig

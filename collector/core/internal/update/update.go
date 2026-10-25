@@ -396,10 +396,29 @@ type Hooks struct {
 	Healthy func() error
 }
 
+// Managed는 Core 실행 파일이 패키지 관리자(deb·rpm, /usr/bin) 또는 데스크톱 설치 프로그램(#159: macOS
+// 앱 번들, Windows 설치기·Linux 데스크톱 패키지처럼 트레이 도우미가 같은 폴더에 있음)으로 설치됐는지다.
+// 이때 Core만 바꾸면 GUI·트레이와 버전이 어긋나므로 자체 업데이트를 하지 않는다.
+func Managed(current string) bool {
+	if strings.HasPrefix(current, "/usr/bin/") || strings.HasPrefix(current, "/usr/sbin/") {
+		return true
+	}
+	if strings.Contains(filepath.ToSlash(current), ".app/Contents/MacOS/") {
+		return true
+	}
+	dir := filepath.Dir(current)
+	for _, n := range []string{"agent-office-collector-tray", "agent-office-collector-tray.exe"} {
+		if fi, err := os.Stat(filepath.Join(dir, n)); err == nil && fi.Mode().IsRegular() {
+			return true
+		}
+	}
+	return false
+}
+
 // Apply는 newBinary를 current 자리로 원자적으로 바꾼다. 실패하면 되돌린다.
 func Apply(current, newBinary, expectVersion string, h Hooks) error {
-	if strings.HasPrefix(current, "/usr/bin/") || strings.HasPrefix(current, "/usr/sbin/") {
-		// 패키지 관리자가 관리하는 파일은 패키지로 업데이트한다.
+	if Managed(current) {
+		// 패키지 관리자·설치 프로그램이 관리하는 파일은 그 수단으로 업데이트한다.
 		return fail("managed_by_package")
 	}
 	out, err := h.Version(newBinary)

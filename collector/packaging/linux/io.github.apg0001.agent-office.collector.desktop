@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Agent Office Collector
+Name[ko]=Agent Office Collector
+Comment=Register this PC, approve hooks and check collection status
+Comment[ko]=PC 등록·Hook 승인·수집 상태 확인(수집은 별도 Core 서비스)
+Exec=agent-office-collector-gui
+Icon=agent-office-collector
+Terminal=false
+Categories=Utility;Development;
+StartupNotify=true
+StartupWMClass=agent-office-collector-gui
