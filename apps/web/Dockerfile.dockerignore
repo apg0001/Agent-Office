@@ -1,0 +1,9 @@
+# apps/web/Dockerfile 전용(BuildKit). 저장소 루트 컨텍스트에서 웹 빌드에 필요한 파일만 보낸다.
+**
+!package.json
+!package-lock.json
+!apps/web/
+!packages/event-schema/package.json
+apps/web/node_modules
+apps/web/dist
+**/*.tsbuildinfo

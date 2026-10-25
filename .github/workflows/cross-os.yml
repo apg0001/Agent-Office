@@ -1,0 +1,117 @@
+name: Cross-OS Collector
+
+# macOS·Windows 실제 러너에서 Collector Core·GUI를 검증한다(#40~#43).
+# 러너는 일회용이라 실제 사용자 위치(OS 보안 저장소, 자동 시작, ~/.claude/settings.json)에 쓰고 지운다.
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "collector/**"
+      - "tests/cross_os/**"
+      - ".github/workflows/cross-os.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "collector/**"
+      - "tests/cross_os/**"
+      - ".github/workflows/cross-os.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-os-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  collector:
+    name: Collector (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      EXE: ${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.24.x"
+          cache: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Runner
+        run: |
+          uname -a
+          go version
+          python --version
+
+      - name: Core vet and test
+        working-directory: collector/core
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Core real OS secret store (Keychain / Credential Manager)
+        working-directory: collector/core
+        env:
+          AGENT_OFFICE_TEST_REAL_KEYRING: "1"
+        run: go test -count=1 -v -run 'TestRealKeyring' ./internal/secret ./internal/cli
+      - name: Build Core
+        if: ${{ !cancelled() }}
+        working-directory: collector/core
+        run: |
+          mkdir -p "$RUNNER_TEMP/ao"
+          go build -o "$RUNNER_TEMP/ao/agent-office-collector$EXE" ./cmd/agent-office-collector
+
+      - name: GUI backend test with real Core
+        if: ${{ !cancelled() }}
+        working-directory: collector/gui
+        env:
+          AGENT_OFFICE_TEST_CORE_BIN: ${{ runner.temp }}/ao/agent-office-collector${{ env.EXE }}
+        run: |
+          go vet ./...
+          go test ./...
+      - name: GUI real autostart (LaunchAgent / HKCU Run)
+        if: ${{ !cancelled() }}
+        working-directory: collector/gui
+        env:
+          AGENT_OFFICE_TEST_REAL_AUTOSTART: "1"
+        run: go test -count=1 -v -run 'TestRealSystemAutostart' ./internal/autostart
+      - name: GUI desktop build
+        if: ${{ !cancelled() }}
+        working-directory: collector/gui
+        run: |
+          flags="-s -w"
+          if [ "$EXE" = .exe ]; then flags="$flags -H windowsgui"; fi
+          go build -tags desktop,production -ldflags "$flags" -o "$RUNNER_TEMP/ao/agent-office-collector-gui$EXE" .
+      - name: GUI launch (stays up 15s)
+        if: ${{ !cancelled() }}
+        run: |
+          "$RUNNER_TEMP/ao/agent-office-collector-gui$EXE" &
+          pid=$!
+          sleep 15
+          if kill -0 "$pid" 2>/dev/null; then echo "GUI running after 15s"; else wait "$pid"; echo "GUI exited early: $?"; exit 1; fi
+          kill "$pid" 2>/dev/null || taskkill //F //IM "agent-office-collector-gui$EXE" >/dev/null 2>&1 || true
+
+      - name: Collector smoke (register, keyring, hooks, run, service, logout, uninstall)
+        if: ${{ !cancelled() }}
+        env:
+          AGENT_OFFICE_SMOKE_DISPOSABLE: "1"
+        run: |
+          if [ "$EXE" = .exe ]; then
+            cp collector/packaging/uninstall.ps1 "$RUNNER_TEMP/ao/uninstall.ps1"
+            u="$RUNNER_TEMP/ao/uninstall.ps1"
+          else
+            cp collector/packaging/uninstall.sh "$RUNNER_TEMP/ao/agent-office-collector-uninstall"
+            u="$RUNNER_TEMP/ao/agent-office-collector-uninstall"
+          fi
+          python tests/cross_os/collector_smoke.py "$RUNNER_TEMP/ao/agent-office-collector$EXE" "$u"

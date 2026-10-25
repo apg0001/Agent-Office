@@ -1,0 +1,7 @@
+# 서버 이미지에는 패키지 정의와 소스만 보낸다.
+**
+!pyproject.toml
+!alembic.ini
+!src/
+**/__pycache__
+**/*.py[cod]

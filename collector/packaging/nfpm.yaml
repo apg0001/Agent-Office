@@ -1,0 +1,27 @@
+# Linux deb·rpm(#42). 바이너리와 사용자별 제거 도우미만 설치한다.
+# 서비스·Hook은 사용자 계정 단위라 패키지가 자동으로 켜지 않는다(사용자가 직접 승인).
+name: agent-office-collector
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: utils
+priority: optional
+maintainer: Agent Office <noreply@users.noreply.github.com>
+description: |
+  Agent Office Collector Core. 코딩 에이전트의 안전한 활동 메타데이터만 서버로 보낸다.
+homepage: https://github.com/apg0001/Agent-Office
+license: UNLICENSED
+contents:
+  - src: /stage/agent-office-collector
+    dst: /usr/bin/agent-office-collector
+    file_info:
+      mode: 0755
+  - src: /stage/agent-office-collector-uninstall
+    dst: /usr/bin/agent-office-collector-uninstall
+    file_info:
+      mode: 0755
+  - src: /stage/README.txt
+    dst: /usr/share/doc/agent-office-collector/README.txt
+scripts:
+  postinstall: /pkg/scripts/postinstall.sh
+  preremove: /pkg/scripts/preremove.sh

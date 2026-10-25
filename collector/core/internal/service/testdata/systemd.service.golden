@@ -1,0 +1,18 @@
+# Agent Office Collector user service.
+# agent-office-collector:managed-service:v1
+# Only files carrying the marker above are replaced or removed by
+# "agent-office-collector service install|uninstall".
+[Unit]
+Description=Agent Office Collector
+Documentation=https://github.com/apg0001/Agent-Office/blob/develop/docs/installation/collector-cli.md
+
+[Service]
+Type=simple
+ExecStart="/opt/agent office/bin/agent-office-collector" run
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=20
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

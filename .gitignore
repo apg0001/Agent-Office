@@ -1,0 +1,41 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Go
+bin/
+*.test
+
+# Environment and secrets
+.env
+.env.*
+!deploy/.env.example
+!deploy/.env.production.example
+# 배포 이력(deploy/upgrade.sh)
+deploy/.deploy-history
+*.pem
+*.key
+
+# Local state and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+.agent-office/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

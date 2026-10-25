@@ -1,0 +1,131 @@
+# 사무실 스냅샷·실시간 API v1
+
+관련 이슈: #37
+
+브라우저는 첫 접속·새로고침 때 스냅샷을 받고, 이후 WebSocket 증분으로 화면을 갱신합니다. 재접속하면 다시 스냅샷부터 받습니다. 현재 범위는 **개인 사무실**(자기 장치)입니다. 팀 사무실은 #53~#55에서 같은 구조로 공유 범위 재검사를 추가합니다.
+
+## 데이터
+
+담는 값은 서버 ID, enum, 시각, 사용자가 붙인 장치 이름뿐입니다. Collector가 보낸 세션·에이전트 ID, 토큰, 원문은 없습니다.
+
+| 배열 | 필드 |
+|---|---|
+| `devices` | `id`, `name`, `connection`(`ONLINE`/`DISCONNECTED`) |
+| `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(개인 사무실 책상 번호, 반납되면 `null`, #48), `change_seq` |
+| `agents` | `id`, `session_id`, `parent_agent_id`, `role`(`lead`/`subagent`), `turn_state`, `activity`, `confidence`(현재 활동을 만든 이벤트의 `observed`/`inferred`, #47), `state_version`, `started_at`, `ended_at`, `change_seq` |
+
+- 스냅샷의 세션은 종료되지 않았거나 종료 후 10분이 지나지 않은 것입니다(퇴근 연출용).
+- 폐기된 장치와 그 세션은 포함하지 않습니다.
+- 상태 의미는 [상태 엔진](../architecture/state-engine.md)을 따릅니다.
+
+## `GET /api/v1/office`
+
+세션 쿠키 인증. `200 {type: "snapshot", server_time, devices, sessions, agents}`.
+
+## `GET /api/v1/office/agents/{agent_id}` (#51)
+
+세션 쿠키 인증. 캐릭터 상세 패널용으로, 본인 장치의 에이전트만 조회합니다. 다른 사용자의 에이전트와 없는 ID는 같은 `404`라 존재 여부가 드러나지 않습니다.
+
+`200 {agent, session, device, parent, children, timeline, plan_steps}`
+
+| 필드 | 내용 |
+|---|---|
+| `agent`·`session`·`device` | 스냅샷과 같은 모양 |
+| `parent`·`children` | 같은 세션의 상위·하위 에이전트(스냅샷 에이전트 모양) |
+| `timeline` | 이 에이전트의 최근 이벤트 50개, 최신순. `event_type`·`activity`·`confidence`·`source`·`occurred_at`만 담음 |
+| `plan_steps` | 세션 계획의 `step_index`·`status`만. 계획 본문은 저장하지 않음 |
+
+도구 입력·명령·경로·프롬프트는 서버에 저장되지 않으므로 응답에도 없습니다. 팀 공유 범위는 #54·#55에서 같은 권한 검사 구조로 추가합니다.
+
+## `WS /api/v1/live`
+
+| 단계 | 동작 |
+|---|---|
+| 연결 | 세션 쿠키로 인증. 브라우저가 보낸 `Origin`은 요청 `Host`와 같거나 `AGENT_OFFICE_ALLOWED_ORIGINS`(쉼표 구분)에 있어야 함(교차 사이트 WebSocket 하이재킹 방지) |
+| 첫 메시지 | 스냅샷(`type: "snapshot"`) |
+| 이후 | 변경이 있을 때 `{type: "delta", devices, sessions, agents}`. 장치는 연결 상태가 바뀔 때만 포함 |
+| 유휴 | 25초마다 `{type: "ping"}` |
+| 권한 철회 | 매 주기(1초) 세션을 다시 검증. 로그아웃·세션 폐기·사용자 비활성화 시 즉시 종료 |
+
+종료 코드: `4401`(인증 실패·철회), `4403`(허용되지 않은 Origin).
+
+### 증분 규칙
+
+- `change_seq`는 전역 시퀀스(`state_change_seq`)에서 나오며 화면에 보이는 값이 바뀔 때만 증가합니다. 클라이언트는 같은 `id`에 대해 `change_seq`가 더 큰 값만 적용합니다.
+- 서버는 매 주기 최근 30초 동안 바뀐 행을 다시 조회하고, 연결별로 이미 보낸 `change_seq`를 걸러 보냅니다. 늦게 커밋된 트랜잭션도 놓치지 않기 위해서입니다.
+- 화면 애니메이션은 이 사실 상태와 비동기로 움직입니다. 연출 상태는 서버로 보내지 않습니다.
+
+## 알려진 제한
+
+- 연결마다 1초 주기로 DB를 조회합니다. 30세션·소수 사용자 규모(Pi 목표) 기준이며, 부하 실측은 #63에서 합니다. 필요하면 PostgreSQL `LISTEN/NOTIFY`로 바꿉니다.
+- 클라이언트 메시지(구독 범위 변경 등)는 아직 받지 않습니다.
+- 계획 단계는 `plan.updated` 이벤트의 `plan_steps`(상태만)로 채워집니다(#38). Collector가 이 필드를 보내기 전까지는 빈 목록입니다.
+
+## 타임라인 페이지(#38)
+
+| 요청 | 설명 |
+|---|---|
+| `GET /api/v1/office/agents/{agent_id}/timeline?limit=&before=` | 내 에이전트. 최신순, `limit` 1~200(기본 50) |
+| `GET /api/v1/teams/{team_id}/office/agents/{agent_id}/timeline?limit=&before=` | 팀에 공유된 에이전트. 공유가 거둬지면 바로 404 |
+
+응답 `{entries: [{event_type, activity, confidence, source, occurred_at}], next}`. `next`는 다음 페이지 커서(불투명 문자열, 마지막이면 `null`)이며 `before`로 넘깁니다. 잘못된 커서는 `400 invalid_cursor`. 이벤트는 30일 보존(#39) 안의 것만 있습니다.
+
+## 팀 사무실(#54, #55)
+
+### 세션을 프로젝트에 넣기
+
+`PUT /api/v1/office/sessions/{session_id}/project {project_id | null}` (세션 쿠키 + CSRF, `204`). 내 장치의 세션을 내 프로젝트에만 넣을 수 있고, 그 밖은 `404`입니다. 스냅샷·증분의 세션에 `project_id`가 함께 나옵니다. 자동 연결(Collector 저장소 지문)은 아직 없어 이 요청으로만 정합니다.
+
+### 무엇이 보이나
+
+팀 사무실에는 다음을 모두 만족하는 세션만 나옵니다. 이벤트는 한 번만 저장되고, 여러 팀에 공유해도 각 팀이 같은 행을 이 조건으로 거릅니다.
+
+1. 세션이 프로젝트에 들어 있고, 그 프로젝트가 이 팀에 공유됨(소유자 동의)
+2. 프로젝트 소유자가 지금도 이 팀 구성원
+3. 세션이 프로젝트 소유자 본인의 폐기되지 않은 장치에서 옴
+4. 열려 있거나 종료 후 10분 이내
+
+장치 이름(PC 이름)은 팀원에게 보이지 않고 소유자 표시 이름으로 바뀝니다. 책상 번호는 팀 화면용 순번(시작 순서)이며 개인 사무실 번호와 무관합니다.
+
+| 요청 | 설명 |
+|---|---|
+| `GET /api/v1/teams/{team_id}/office` | 팀 스냅샷(`scope: {kind: "team", team_id}`) |
+| `GET /api/v1/teams/{team_id}/office/agents/{agent_id}` | 팀에 보이는 에이전트의 상세(개인 상세와 같은 허용 필드) |
+| `WS /api/v1/live?team={team_id}` | 팀 실시간 |
+
+구성원이 아니거나 팀이 없으면 REST는 `404`, WebSocket은 종료 코드 `4404`입니다.
+
+### 철회 즉시 반영
+
+- 팀 WebSocket은 매 주기(1초) 로그인 세션과 팀 구성원 자격을 다시 확인하고 팀 스냅샷을 다시 계산합니다. 탈퇴·추방되면 다음 주기에 `4404`로 닫습니다.
+- 보이던 세션·에이전트·장치가 빠지면(공유 해제, 프로젝트 지정 해제, 소유자 탈퇴·추방) 증분 대신 새 스냅샷을 보내 클라이언트가 지우게 합니다. 그 밖에는 바뀐 행만 증분으로 보냅니다.
+- 팀에서 나간(또는 내보내진) 사람이 그 팀에 공유했던 프로젝트 공유는 함께 지웁니다.
+- REST 응답은 캐시하지 않고 요청마다 같은 조건으로 다시 거릅니다.
+
+### 통합 큰 사무실(#53)
+
+| 요청 | 설명 |
+|---|---|
+| `GET /api/v1/office/combined` | 내 세션 + 내가 속한 모든 팀에 보이는 세션을 한 사무실에(`scope: {kind: "combined"}`) |
+| `GET /api/v1/office/combined/agents/{agent_id}` | 내 에이전트면 개인 상세, 아니면 그것이 보이는 팀의 상세 |
+| `WS /api/v1/live?view=combined` | 통합 실시간(팀 실시간과 같은 재검사·스냅샷 재계산 규칙) |
+
+- 이벤트·세션은 한 번만 저장되고, 여러 팀에 공유된 세션도 SQL `UNION`으로 한 번만 나옵니다. 화면 배치(책상 순번)만 범위마다 따로 계산합니다.
+- 내 장치는 PC 이름을, 남의 장치는 소유자 표시 이름을 보여 줍니다.
+
+### 웹
+
+사무실 위 선택 상자로 범위를 바꿉니다.
+
+| 범위 | 주소 | 화면 |
+|---|---|---|
+| 내 사무실 | `/` | 개인 실시간 |
+| 통합 사무실 | `/?view=combined` | 통합 실시간 하나 |
+| 나란히 보기 | `/?view=side` | 내 사무실 + 팀 사무실(최대 3개)을 작은 화면으로 나란히. 화면마다 연결이 따로 있어 같은 세션이 여러 화면에 보일 수 있음 |
+| 팀 사무실 | `/?team=<id>` | 팀 실시간 |
+
+상세 패널은 범위에 맞는 상세 API를 씁니다. 세션을 프로젝트에 넣는 화면은 `/teams`의 "내 프로젝트와 공유"입니다(#52).
+
+### 제한
+
+팀 실시간은 연결마다 매 주기 팀 스냅샷 전체를 계산합니다. 소규모 팀(Pi 목표) 기준이며 부하 측정은 #63입니다.

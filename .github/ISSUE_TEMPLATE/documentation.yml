@@ -1,0 +1,33 @@
+name: 문서 작업
+description: 설치, 운영, 호환성, API 또는 의사결정 문서를 개선합니다.
+title: "[DOCS] "
+labels:
+  - documentation
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문서 문제
+      description: 독자가 무엇을 재현하거나 판단할 수 없는지 설명하세요.
+    validations:
+      required: true
+  - type: textarea
+    id: audience
+    attributes:
+      label: 대상 독자와 범위
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 근거와 검증 방법
+      description: 실제 명령·버전·실측 결과인지, 계획인지 구분하세요.
+    validations:
+      required: true
+  - type: input
+    id: related
+    attributes:
+      label: 관련 Issue·요구사항
+      placeholder: "#13, DOC-004"
+    validations:
+      required: true

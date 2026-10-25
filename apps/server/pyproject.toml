@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-office-server"
+version = "0.0.0"
+description = "Agent Office FastAPI server"
+requires-python = ">=3.13"
+dependencies = [
+  "alembic>=1.20,<2",
+  "argon2-cffi>=25.1,<26",
+  "cryptography>=50,<51",
+  "fastapi>=0.159,<0.160",
+  "psycopg[binary]>=3.3,<4",
+  "pydantic>=2.14,<3",
+  "sqlalchemy>=2.1,<2.2",
+  "uvicorn[standard]>=0.54,<0.55",
+]
+
+[project.scripts]
+# 최초 관리자 bootstrap 토큰을 운영자 콘솔에만 출력한다(#66).
+agent-office-bootstrap = "agent_office.setup.bootstrap:main"
+# 보존 기간 정리를 즉시 한 번 실행한다(#39). 서버도 한 시간마다 실행한다.
+agent-office-retention = "agent_office.retention:main"
+# 백업·검사·복원 시험(#58).
+agent-office-backup = "agent_office.backup:main"
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<0.29",
+  "jsonschema>=4.26,<5",
+  "mypy>=2.4,<3",
+  "openapi-spec-validator>=0.9,<0.10",
+  "pytest>=9.1,<10",
+  "pyyaml>=6,<7",
+  "ruff>=0.17,<0.18",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_office"]
+# 마이그레이션 템플릿(.mako)도 패키지에 포함한다.
+artifacts = ["src/agent_office/db/migrations/script.py.mako"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# autogenerate한 마이그레이션의 긴 제약식은 줄을 나누지 않는다.
+"src/agent_office/db/migrations/versions/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+packages = ["agent_office"]

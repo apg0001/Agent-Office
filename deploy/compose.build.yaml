@@ -1,0 +1,19 @@
+# 소스에서 직접 빌드할 때 운영 Compose 위에 겹쳐 쓰는 파일(#69).
+# 공식 이미지 설치와 같은 프록시·보안 설정·볼륨·환경 변수를 그대로 쓰고, 이미지만 이 저장소에서 빌드한다.
+#
+#   docker compose --env-file deploy/.env.production \
+#     -f deploy/compose.production.yaml -f deploy/compose.build.yaml up -d --build --wait
+#
+# 이 경우 .env.production의 AGENT_OFFICE_SERVER_IMAGE·AGENT_OFFICE_WEB_IMAGE는 빌드 결과의 이름이 된다
+# (예: agent-office-server:source, agent-office-web:source).
+services:
+  server:
+    build:
+      context: ../apps/server
+      args:
+        VERSION: ${AGENT_OFFICE_BUILD_VERSION:-0.0.0-source}
+        REVISION: ${AGENT_OFFICE_BUILD_REVISION:-unknown}
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile

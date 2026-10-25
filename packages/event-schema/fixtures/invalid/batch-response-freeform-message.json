@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "accepted_event_ids": [],
+  "duplicate_event_ids": [],
+  "rejected_events": [
+    {
+      "event_id": "77777777-7777-4777-8777-777777777777",
+      "code": "internal_error",
+      "retryable": true,
+      "message": "free-form diagnostics are forbidden"
+    }
+  ]
+}

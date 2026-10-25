@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "accepted_event_ids": ["11111111-1111-4111-8111-111111111111"],
+  "duplicate_event_ids": ["55555555-5555-4555-8555-555555555555"],
+  "rejected_events": [
+    {
+      "event_id": "77777777-7777-4777-8777-777777777777",
+      "code": "internal_error",
+      "retryable": true
+    }
+  ]
+}

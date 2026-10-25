@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:agent-office:schema:collector-event-batch-response:1.0",
+  "title": "CollectorEventBatchResponseV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "accepted_event_ids",
+    "duplicate_event_ids",
+    "rejected_events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "accepted_event_ids": {
+      "$ref": "#/$defs/eventIdList"
+    },
+    "duplicate_event_ids": {
+      "$ref": "#/$defs/eventIdList"
+    },
+    "rejected_events": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/rejectedEvent"
+      }
+    }
+  },
+  "$defs": {
+    "eventIdList": {
+      "type": "array",
+      "maxItems": 500,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "minLength": 36,
+        "maxLength": 36
+      }
+    },
+    "rejectedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "code", "retryable"],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "unauthorized_device",
+            "unauthorized_scope",
+            "unsupported_schema_version",
+            "retention_window_exceeded",
+            "event_id_conflict",
+            "parent_agent_unknown",
+            "parent_agent_conflict",
+            "occurred_at_out_of_range",
+            "internal_error"
+          ]
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
