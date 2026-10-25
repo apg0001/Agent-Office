@@ -116,13 +116,15 @@ def win_key_exists(path: str) -> bool:
 
 def running(name: str) -> bool:
     if sys.platform == "win32":
+        # tasklist 출력은 콘솔 코드 페이지(한국어 등)라 바이트로 받아 ASCII 이름만 찾는다.
         p = subprocess.run(
-            ["tasklist", "/FI", f"IMAGENAME eq {name}.exe", "/NH"],
+            ["tasklist", "/FI", f"IMAGENAME eq {name}.exe", "/NH", "/FO", "CSV"],
             check=False,
             capture_output=True,
-            text=True,
         )
-        return f"{name}.exe".lower() in p.stdout.lower()
+        if p.returncode != 0:
+            raise RuntimeError(f"tasklist exit {p.returncode}")
+        return f'"{name}.exe"'.lower().encode() in p.stdout.lower()
     p = subprocess.run(
         ["pgrep", "-f", f"(^|/){name}( |$)"], check=False, capture_output=True
     )
