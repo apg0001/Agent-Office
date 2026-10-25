@@ -64,13 +64,6 @@ export const FURNITURE_ART: Record<Furniture, ArtPiece[]> = {
 /** 업무석 자리(걸을 수 있는 칸)에 그리는 의자. 캐릭터보다 먼저 그린다. */
 export const SEAT_ART: ArtPiece = { image: "chairDesk_NE", dx: 0, dy: 4, layer: 1 };
 
-/** 바깥 뒤쪽 벽. 왼쪽 위 변(x = 0)은 SE, 오른쪽 위 변(y = 0)은 SW를 본다. 몇 칸마다 창문. */
-export const WALL_ART = {
-  left: { plain: "wall_SE", window: "wallWindow_SE" },
-  right: { plain: "wall_SW", window: "wallWindow_SW" },
-  windowEvery: 3,
-} as const;
-
 /** 미리 불러올 그림 이름 전체. */
 export function artImages(): string[] {
   const names = new Set<string>([SEAT_ART.image]);
@@ -78,10 +71,6 @@ export function artImages(): string[] {
     for (const piece of pieces) {
       names.add(piece.image);
     }
-  }
-  for (const side of [WALL_ART.left, WALL_ART.right]) {
-    names.add(side.plain);
-    names.add(side.window);
   }
   return [...names].sort();
 }

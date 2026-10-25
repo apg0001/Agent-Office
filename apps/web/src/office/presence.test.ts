@@ -35,10 +35,10 @@ describe("presence", () => {
     expect(presenceOf(lead!, state).presence).toBe("leaving");
   });
 
-  it("dims inferred activity", () => {
+  it("draws inferred activity normally (the detail panel labels it)", () => {
     const state = office();
     state.agents[0]!.confidence = "inferred";
-    expect(presenceOf(state.agents[0]!, state).alpha).toBeLessThan(1);
+    expect(presenceOf(state.agents[0]!, state)).toEqual({ presence: "present", alpha: 1, badge: null });
   });
 
   it("changes idle spots periodically and staggers characters", () => {

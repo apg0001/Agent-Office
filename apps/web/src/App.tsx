@@ -89,7 +89,6 @@ export function App({ pathname }: { pathname?: string }) {
           코딩 에이전트의 안전한 활동 메타데이터를 하나의 아이소메트릭 사무실로
           연결합니다.
         </p>
-        <span className="status">기반 구축 중 · 실제 수집 비활성</span>
       </section>
       {typeof window !== "undefined" && scopeFromSearch(window.location.search).kind === "side" ? <SideBySide /> : <OfficeView />}
       <section className="principles" aria-label="프로젝트 원칙">

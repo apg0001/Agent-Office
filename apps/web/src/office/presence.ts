@@ -33,7 +33,9 @@ export function presenceOf(agent: AgentState, state: OfficeState): PresenceView 
   if (session.lifecycle === "UNKNOWN") {
     return { presence: "present", alpha: 0.6, badge: "unconfirmed" };
   }
-  return { presence: "present", alpha: agent.confidence === "inferred" ? 0.55 : 1, badge: null };
+  // 추정 상태는 상세 패널에서만 "추정"으로 밝힌다. 캐릭터를 흐리게 하면 거의 모든 캐릭터가 흐려진다
+  // (Claude가 자주 자동 업데이트돼 실측 버전과 달라지면 수집기는 보수적으로 추정을 붙인다).
+  return { presence: "present", alpha: 1, badge: null };
 }
 
 /** 휴게실 생활 연출: 일정 주기마다 다른 칸을 고른다(결정적, 연출 전용). */
