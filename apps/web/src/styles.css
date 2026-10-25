@@ -538,3 +538,56 @@ textarea.domains {
   padding: 0.35rem 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
+
+.zone-legend {
+  margin-top: 20px;
+  color: #b5c6d6;
+  font-size: 0.88rem;
+}
+
+.zone-legend h2 {
+  margin: 16px 0 8px;
+  color: #e8f1fa;
+  font-size: 0.95rem;
+}
+
+.zone-list,
+.mark-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.zone-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 6px 20px;
+}
+
+.zone-list li {
+  display: grid;
+  grid-template-columns: 14px 5.5em 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.zone-list .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  align-self: center;
+}
+
+.zone-list strong,
+.mark-list strong {
+  color: #e8f1fa;
+}
+
+.mark-list li {
+  margin: 4px 0;
+}
+
+.legend-note {
+  margin: 12px 0 0;
+  color: #8ea4b8;
+}

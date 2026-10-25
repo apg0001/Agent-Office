@@ -29,21 +29,11 @@ import {
 } from "./sprites";
 import { ART_BASE_URL, ART_SCALE, type ArtPiece, FURNITURE_ART, SEAT_ART, artImages } from "./furnitureArt";
 import type { OfficeMap, Point, ZoneKind } from "./grid";
-import { ZONE_LABELS } from "./grid";
+import { ZONE_COLORS, ZONE_LABELS } from "./grid";
 import { type ScreenPoint, TILE_HEIGHT, depthOf, gridToScreen, tileDiamond } from "./iso";
 import { WALL_HEIGHT, wallBase, wallQuad, wallSegments } from "./walls";
 import type { AgentState, OfficeState } from "./types";
 
-const ZONE_COLORS: Record<ZoneKind, number> = {
-  desk: 0xd8c8a8,
-  library: 0xb8c8e0,
-  internet: 0xb8e0d0,
-  meeting: 0xe0c8e0,
-  testing: 0xa7b0ba,
-  lounge: 0xc8e0b0,
-  corridor: 0xcfcfcf,
-  entrance: 0xa0a0a0,
-};
 const WALK_TILES_PER_SECOND = 2.5;
 /** 픽셀 하나를 화면 2px로 그린다. */
 const PIXEL = 2;
