@@ -9,7 +9,7 @@ import {
   resumeAutoFocus,
   zoomBy,
 } from "./camera";
-import { createDefaultOffice, isWalkable } from "./grid";
+import { canStep, createDefaultOffice, isBlockedEdge, isWalkable } from "./grid";
 import { findPath, nearestWalkable } from "./pathfinding";
 
 describe("pathfinding", () => {
@@ -86,4 +86,49 @@ describe("camera", () => {
       ),
     ).toEqual({ x: 2, y: 1 });
   });
+});
+
+describe("partitions and doors (#164)", () => {
+  for (const rows of [2, 3]) {
+    const map = createDefaultOffice(rows);
+
+    it(`reaches every walkable tile from the entrance through doors only (${rows} desk rows)`, () => {
+      const seen = new Set([`${map.entrance.x},${map.entrance.y}`]);
+      const queue = [map.entrance];
+      while (queue.length > 0) {
+        const here = queue.shift()!;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const next = { x: here.x + dx, y: here.y + dy };
+          const id = `${next.x},${next.y}`;
+          if (!seen.has(id) && canStep(map, here, next)) {
+            seen.add(id);
+            queue.push(next);
+          }
+        }
+      }
+      const unreachable = map.tiles.filter((t) => t.walkable && !seen.has(`${t.x},${t.y}`));
+      expect(unreachable.map((t) => `${t.zone}@${t.x},${t.y}`)).toEqual([]);
+    });
+
+    it(`never steps through a wall segment (${rows} desk rows)`, () => {
+      const walls = map.partitions.filter((p) => !p.door);
+      expect(walls.length).toBeGreaterThan(20);
+      expect(map.partitions.filter((p) => p.door).length).toBe(5);
+      for (const wall of walls) {
+        expect(isBlockedEdge(map, wall.a, wall.b)).toBe(true);
+        expect(isBlockedEdge(map, wall.b, wall.a)).toBe(true);
+      }
+      for (const zone of ["library", "internet", "testing", "meeting", "lounge"] as const) {
+        const tiles = map.tiles.filter((t) => t.zone === zone && t.walkable);
+        const target = tiles[tiles.length - 1]!;
+        const path = findPath(map, map.entrance, target);
+        expect(path.at(-1), zone).toEqual({ x: target.x, y: target.y });
+        let previous = map.entrance;
+        for (const step of path) {
+          expect(isBlockedEdge(map, previous, step), `${zone} ${step.x},${step.y}`).toBe(false);
+          previous = step;
+        }
+      }
+    });
+  }
 });

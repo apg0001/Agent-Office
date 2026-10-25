@@ -53,26 +53,6 @@ body {
   margin-bottom: 0;
 }
 
-.about {
-  margin-top: 32px;
-  color: #9eb3c6;
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-
-.about p {
-  margin: 0 0 8px;
-}
-
-.principles {
-  margin: 0;
-  padding-left: 1.1rem;
-}
-
-.principles strong {
-  color: #c9d8e6;
-}
-
 @media (max-width: 720px) {
   .shell {
     padding: 64px 0;

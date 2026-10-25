@@ -1,7 +1,7 @@
-/** 논리 그리드 A* 경로 탐색(4방향). 가구·벽을 피한다. */
+/** 논리 그리드 A* 경로 탐색(4방향). 가구·벽과 칸막이(문으로만 통과)를 피한다. */
 
 import type { OfficeMap, Point } from "./grid";
-import { isWalkable } from "./grid";
+import { canStep, isWalkable } from "./grid";
 
 const NEIGHBORS: ReadonlyArray<Point> = [
   { x: 1, y: 0 },
@@ -72,7 +72,7 @@ export function findPath(map: OfficeMap, start: Point, goal: Point): Point[] {
     for (const offset of NEIGHBORS) {
       const next = { x: current.x + offset.x, y: current.y + offset.y };
       const nextKey = key(next);
-      if (closed.has(nextKey) || !isWalkable(map, next)) {
+      if (closed.has(nextKey) || !canStep(map, current, next)) {
         continue;
       }
       const tentative = (cost.get(currentKey) ?? 0) + 1;

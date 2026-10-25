@@ -41,12 +41,21 @@ export interface Tile extends Point {
   walkable: boolean;
 }
 
+/** 두 이웃 칸 사이의 칸막이 벽 한 조각. 문이면 지나갈 수 있다(#164). */
+export interface Partition {
+  a: Point;
+  b: Point;
+  door: boolean;
+}
+
 export interface OfficeMap {
   width: number;
   height: number;
   tiles: Tile[];
   zones: Record<ZoneKind, Rect>;
   entrance: Point;
+  /** 구역 사이 칸막이(없으면 빈 배열). 벽 조각은 이동을 막고 문 조각은 통과한다. */
+  partitions: Partition[];
   /** 책상 자리(사람이 앉는 칸). 책상 가구 바로 앞의 걸을 수 있는 칸이다. */
   seats: Point[];
 }
@@ -105,6 +114,25 @@ export function isWalkable(map: OfficeMap, point: Point): boolean {
   return tileAt(map, point)?.walkable ?? false;
 }
 
+const edgeKey = (a: Point, b: Point) =>
+  a.x < b.x || (a.x === b.x && a.y < b.y) ? `${a.x},${a.y}|${b.x},${b.y}` : `${b.x},${b.y}|${a.x},${a.y}`;
+const blockedCache = new WeakMap<OfficeMap, Set<string>>();
+
+/** 이웃한 두 칸 사이가 칸막이 벽으로 막혀 있는지(문은 막히지 않음). */
+export function isBlockedEdge(map: OfficeMap, a: Point, b: Point): boolean {
+  let blocked = blockedCache.get(map);
+  if (!blocked) {
+    blocked = new Set(map.partitions.filter((p) => !p.door).map((p) => edgeKey(p.a, p.b)));
+    blockedCache.set(map, blocked);
+  }
+  return blocked.has(edgeKey(a, b));
+}
+
+/** a에서 이웃 b로 한 칸 걸어갈 수 있는지. */
+export function canStep(map: OfficeMap, a: Point, b: Point): boolean {
+  return isWalkable(map, b) && !isBlockedEdge(map, a, b);
+}
+
 /**
  * 기본 사무실. 위쪽 띠에 업무석, 아래쪽에 활동 구역, 가운데 복도, 왼쪽 아래 출입구.
  * `deskRows`를 늘리면 업무석만 아래로 늘어나 활동 중 다른 자리가 움직이지 않는다(#48).
@@ -135,7 +163,15 @@ export function createDefaultOffice(deskRows = 2): OfficeMap {
       tiles.push({ x, y, zone, furniture: null, walkable });
     }
   }
-  const map: OfficeMap = { width, height, tiles, zones, entrance: { x: 0, y: height - 1 }, seats: [] };
+  const map: OfficeMap = {
+    width,
+    height,
+    tiles,
+    zones,
+    entrance: { x: 0, y: height - 1 },
+    seats: [],
+    partitions: [],
+  };
   // 출입구에서 복도로 이어지는 통로.
   for (let y = deskHeight + 1; y < height; y += 1) {
     const tile = tileAt(map, { x: 0, y });
@@ -179,7 +215,56 @@ export function createDefaultOffice(deskRows = 2): OfficeMap {
   place({ x: zones.lounge.x + zones.lounge.width - 3, y: zones.lounge.y }, "coffee");
   place({ x: zones.lounge.x + zones.lounge.width - 2, y: zones.lounge.y }, "fridge");
   place({ x: zones.lounge.x + zones.lounge.width - 1, y: zones.lounge.y }, "plant");
+  addPartitions(map);
   return map;
+}
+
+/**
+ * 구역 칸막이(#164). 업무석은 트인 사무실이고, 아래 방들은 벽으로 둘러 문으로만 드나든다.
+ * - 도서관: 위(복도)는 벽(책장이 붙음), 왼쪽 복도 쪽에 문
+ * - 인터넷·테스트 구역: 복도 쪽에 문
+ * - 회의실·휴게실: 방 사이 빈 칸(x = 5, 10)을 좁은 통로로 열고 그 끝에 문
+ * 방끼리 맞닿은 변과 통로 양옆은 벽이다.
+ */
+function addPartitions(map: OfficeMap): void {
+  const { library, internet, testing, meeting, lounge, corridor } = map.zones;
+  const top = library.y; // 위쪽 방 첫 줄
+  const bottom = meeting.y; // 아래쪽 방 첫 줄
+  const add = (a: Point, b: Point, door = false) => map.partitions.push({ a, b, door });
+  const horizontal = (x0: number, x1: number, yAbove: number, doorX?: number) => {
+    for (let x = x0; x <= x1; x += 1) {
+      add({ x, y: yAbove }, { x, y: yAbove + 1 }, x === doorX);
+    }
+  };
+  const vertical = (y0: number, y1: number, xLeft: number, doorY?: number) => {
+    for (let y = y0; y <= y1; y += 1) {
+      add({ x: xLeft, y }, { x: xLeft + 1, y }, y === doorY);
+    }
+  };
+  const last = (r: Rect) => ({ x: r.x + r.width - 1, y: r.y + r.height - 1 });
+
+  // 복도 ↔ 위쪽 방(통로 칸 x = 5, 10은 열어 둔다).
+  horizontal(library.x, last(library).x, corridor.y);
+  horizontal(internet.x, last(internet).x, corridor.y, internet.x + 2);
+  horizontal(testing.x, last(testing).x, corridor.y, testing.x + 1);
+  // 왼쪽 복도(x = 0) ↔ 도서관(문)·회의실(벽).
+  vertical(library.y, last(library).y, 0, library.y + 1);
+  vertical(meeting.y, last(meeting).y, 0);
+  // 통로(x = 5, 10) 양옆 벽.
+  for (const hall of [library.x + library.width, internet.x + internet.width]) {
+    vertical(top, last(library).y, hall - 1);
+    vertical(top, last(library).y, hall);
+    for (let y = top; y <= last(library).y; y += 1) {
+      const t = tileAt(map, { x: hall, y });
+      if (t) {
+        t.zone = "corridor";
+        t.walkable = true;
+      }
+    }
+  }
+  // 위쪽 방 ↔ 아래쪽 방. 통로 끝(x = 5 → 회의실, x = 10 → 휴게실)은 문.
+  horizontal(meeting.x, last(meeting).x, bottom - 1, library.x + library.width);
+  horizontal(lounge.x, last(lounge).x, bottom - 1, internet.x + internet.width);
 }
 
 /** 구역 안의 걸을 수 있는 칸 목록. 활동 목적지를 고를 때 쓴다. */
