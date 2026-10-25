@@ -18,7 +18,7 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | 실제 Claude Code·Codex가 설치된 `hook` 명령을 호출하는 경로 | **미실행**: 컨테이너에 인증된 Claude·Codex가 없어 실행하지 않음. 사용자 실제 `~/.claude`·`~/.codex`는 건드리지 않음 | — |
 | 장치 토큰 Linux Secret Service(#41) | **검증(컨테이너)**: gnome-keyring 42.1·dbus 1.14.10, `AGENT_OFFICE_TEST_REAL_KEYRING=1` 테스트(저장·읽기·삭제, register→status→logout, 파일 토큰 이전) | `tests/poc/collector/desktop/keyring-secret-service.sh` |
 | 장치 토큰 macOS Keychain·Windows Credential Manager | **미검증**: `GOOS=darwin\|windows go vet`만 | ADR-0004 |
-| Codex Hook 자동 설치 | **미지원(print 전용)**: 사용자 범위 Hook 설정 위치·신뢰 흐름이 실측되지 않음(#17은 `-c` inline, #18은 프로젝트 `.codex/hooks.json` + Desktop 신뢰) | — |
+| Codex 사용자 범위 Hook 설치·제거(`hooks --tool codex`, #170) | **Linux arm64 실측**: Codex CLI 0.163.0에서 `$CODEX_HOME/hooks.json` 설치 → TUI 신뢰 → `codex exec` → Collector → 서버 종단 확인. macOS·Windows·Desktop은 미검증(소스상 같은 위치) | [Codex 사용자 Hook 실측](../verification/codex-user-hooks.md), `tests/e2e/codex_flow.sh` |
 
 검증되지 않은 OS에서는 지원한다고 표시하지 않습니다. 실장비 검증 전까지 macOS·Windows 서비스 정의는 미리보기·수동 등록용입니다.
 
@@ -35,9 +35,9 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | `diagnose [--json] [--offline]` | `status` + Go 런타임 버전, 기호 위치, 서버 health 도달 여부 |
 | `service install\|uninstall [--activate]` | 자동 시작 정의 설치·제거. `--activate`가 없으면 파일만 쓰고 실행할 명령을 안내합니다 |
 | `service print [--os linux\|darwin\|windows] [--exe PATH]` | 정의 미리보기(파일을 쓰지 않음) |
-| `hooks install\|uninstall [--tool claude] [--yes] [--scope user]` | Claude Code 사용자 설정에 Hook 추가·제거. `--yes`가 없으면 미리보기만 출력합니다 |
+| `hooks install\|uninstall [--tool claude\|codex] [--yes] [--scope user]` | 사용자 설정에 Hook 추가·제거(기본 `claude`). `--yes`가 없으면 미리보기만 출력합니다. Codex는 설치 뒤 Codex에서 직접 신뢰해야 실행됩니다 |
 | `hooks status [--tool claude\|codex] [--json]` | Hook 설치 상태와 도구 버전 검증 수준. `--json`은 GUI용으로 도구별 감지 여부·버전·검증 수준·Hook 상태 enum·개수와 읽기 실패 코드만 출력합니다(설정 경로·다른 Hook 명령 원문 없음) |
-| `hooks print [--tool claude\|codex] [--os linux\|darwin\|windows] [--exe PATH]` | Hook 항목 미리보기(파일을 쓰지 않음). Codex는 이 명령만 지원 |
+| `hooks print [--tool claude\|codex] [--os linux\|darwin\|windows] [--exe PATH]` | Hook 항목 미리보기(파일을 쓰지 않음) |
 | `version` | 버전·OS·아키텍처 |
 
 종료 코드: 0 성공, 1 실패, 2 사용법 오류. `hook`은 예외 없이 0입니다.
@@ -88,7 +88,7 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | 도구 | 설정 파일 | 등록 이벤트 | 지원 |
 |---|---|---|---|
 | Claude Code | `$CLAUDE_CONFIG_DIR/settings.json`, 없으면 `~/.claude/settings.json`의 `hooks` | #19에서 반복 관측한 9종: `SessionStart`, `UserPromptSubmit`, `PreToolUse`·`PostToolUse`·`PermissionRequest`(matcher `*`), `SubagentStart`, `SubagentStop`, `Stop`, `SessionEnd` | `install`·`uninstall`·`status`·`print` |
-| Codex CLI·Desktop | 미확정 | #17·#18에서 관측한 9종(위와 같은 이름, matcher 없음) | `print`만. 출력은 #18이 쓴 `hooks.json` 형식입니다. Codex는 Hook 정의를 사용자가 검토·신뢰해야 하므로 직접 등록하세요 |
+| Codex CLI·Desktop | `$CODEX_HOME/hooks.json`, 없으면 `~/.codex/hooks.json`(#170) | #17·#18·#170에서 관측한 9종(위와 같은 이름, matcher 없음). `SessionEnd`는 timeout 3초(Codex 상한) | `install`·`uninstall`·`status`·`print`. 설치 뒤 [Codex 신뢰](#codex-신뢰170)가 필요 |
 
 계획 단계(#38)는 별도 Hook 없이 위 `PreToolUse`·`PostToolUse`(Claude `TodoWrite`, Codex `update_plan`)와 Claude transcript에서 상태만 읽어 `plan.updated`로 보냅니다. Claude `TodoWrite` 입력 형식은 Claude Code 2.1.308 Linux `-p`에서 실측해 `confidence`가 `observed`이고, 다른 런타임과 Codex `update_plan`은 `inferred`입니다([어댑터 문서](../architecture/collector-adapters.md#계획-단계planupdated-38)).
 
@@ -131,10 +131,56 @@ agent-office-collector hooks status
 agent-office-collector hooks install            # 미리보기
 agent-office-collector hooks install --yes      # 백업 후 적용
 agent-office-collector hooks uninstall --yes    # 소유 항목만 제거
-agent-office-collector hooks print --tool codex # Codex hooks.json 형식 미리보기
+agent-office-collector hooks install --tool codex        # Codex 미리보기
+agent-office-collector hooks install --tool codex --yes  # 적용 후 Codex에서 신뢰
+agent-office-collector hooks print --tool codex          # Codex hooks.json 형식 미리보기
 ```
 
 실행 중인 Claude Code 세션은 설정 파일 변경을 바로 반영하지 않거나 `/hooks` 확인을 요구할 수 있습니다(미실측). 새 세션에서 확인하세요.
+
+### Codex 신뢰(#170)
+
+Codex는 사용자가 신뢰하지 않은 Hook을 **실행하지 않습니다**(관리 Hook 제외). Collector는 Codex 신뢰 상태를 쓰지 않으며 `--dangerously-bypass-hook-trust`도 쓰지 않습니다. Codex 0.163.0 Linux 실측 기준:
+
+1. `agent-office-collector hooks install --tool codex`로 미리보기를 보고 `--yes`로 적용합니다. `~/.codex`(또는 `$CODEX_HOME`)가 없으면 만들지 않고 실패합니다(Codex를 한 번 실행한 뒤 다시).
+2. 새 터미널에서 대화형 `codex`를 실행하면 "Hooks need review — N hooks are new or changed" 화면이 나옵니다. `1. Review hooks`로 명령을 확인하고 신뢰하거나 `2. Trust all and continue`를 고릅니다. 이미 실행 중인 세션에서는 `/hooks`에서 신뢰합니다. `codex exec`만 쓰는 경우에도 한 번은 대화형으로 신뢰해야 합니다(신뢰 전 `exec`는 경고 없이 Hook을 건너뜀).
+3. Codex가 `config.toml`에 `[hooks.state."<hooks.json 경로>:<이벤트>:<그룹>:<핸들러>"] trusted_hash`를 기록합니다. 해시는 명령·타임아웃·matcher로 계산되므로 Collector 실행 파일을 옮겨 `install --yes`로 항목이 바뀌면 **다시 신뢰**해야 합니다. 키에 위치 번호가 들어가므로 같은 이벤트에서 앞쪽 다른 Hook을 지워도 다시 신뢰가 필요할 수 있습니다.
+
+- `hooks status --tool codex`는 `hooks.json`의 항목만 확인하고 신뢰 여부는 보지 않습니다(Codex `/hooks`에서 확인).
+- `uninstall`은 `hooks.json`의 소유 항목만 지우고 `config.toml`의 `hooks.state` 기록은 남깁니다(무해, Codex가 관리).
+- `hooks.json` 최상위에는 `description`·`hooks`만 허용되므로(Codex가 파일 전체를 거부) 표시 키를 넣지 않고 명령 서명으로 소유를 판정합니다. `config.toml`의 `[hooks]` TOML 정의는 읽거나 바꾸지 않습니다(둘 다 있으면 Codex가 경고).
+- 이전 `hooks print --tool codex` 출력을 손으로 넣었다면 `SessionEnd` timeout이 5라 `status`가 `modified`로 보이고 `install --yes`가 그 항목을 교체합니다(교체된 1개는 다시 신뢰).
+- `hook codex`는 Codex 버전을 기록하지 않습니다. payload에 버전·실행 모드가 없어 수집 이벤트의 confidence는 `inferred`이고, CLI `PostToolUse`는 `unknown`으로 남습니다([어댑터 문서](../architecture/collector-adapters.md#버전-정책)).
+
+### macOS에서 Codex 연결(소유자 안내, 미검증)
+
+Claude Code가 이미 수집되는 Mac(Collector 등록·`run` 동작 중) 기준입니다. zsh에 그대로 붙여 넣을 수 있게 주석을 줄 끝에 두지 않았습니다.
+
+확인:
+
+```zsh
+command -v agent-office-collector
+agent-office-collector version
+codex --version
+codex features list | grep -w hooks
+ls -l ~/.codex/hooks.json
+```
+
+`hooks`가 `false`면 `codex features enable hooks`를 실행합니다. Collector가 #170을 포함한 버전이면:
+
+```zsh
+agent-office-collector hooks install --tool codex
+agent-office-collector hooks install --tool codex --yes
+agent-office-collector hooks status --tool codex
+```
+
+이전 버전(0.1.0-beta.1)만 있고 `~/.codex/hooks.json`이 **없을 때만** 수동으로 만듭니다(있으면 덮어쓰지 말고 새 버전을 기다립니다).
+
+```zsh
+agent-office-collector hooks print --tool codex > ~/.codex/hooks.json
+```
+
+그다음 새 터미널에서 `codex`를 실행해 "Hooks need review" 화면에서 `2`(Trust all and continue)를 고르고 Enter, 아무 작업이나 한 번 시킨 뒤 웹 사무실에 Codex 세션이 보이는지 확인합니다. 보이지 않으면 `agent-office-collector status`의 `enqueued_hook`과 Codex `/hooks`의 신뢰 상태를 확인합니다.
 
 ## 파일 위치
 
@@ -208,7 +254,7 @@ Linux arm64 Docker `golang:1.24-bookworm`에서 `gofmt -l`, `go vet ./...`(linux
 | `paths_test.go`, `instance_test.go`, `spool_test.go` | OS별 위치 규칙, 단일 실행 잠금, spool 순서·상한·잘못된 파일·오래된 임시 파일 |
 | `service_test.go` | OS별 골든(systemd·launchd·작업 XML), systemd 인용·XML 이스케이프·UTF-16LE BOM·CRLF, 상대 경로·개행 주입 거부, 소유 파일만 교체·제거, 남의 파일·작업은 명령 실행 없이 거부, 활성화 실패 보고 |
 | `cli_test.go` | Hook fail-open 9가지 입력(인자 없음, 미지 제공자, 잘못된 플래그, 미등록, 깨진 JSON, 빈 입력, 세션 없음, 8MiB 초과, 일시중지)과 끝나지 않는 stdin·쓸 수 없는 spool, 실제 하위 프로세스 종료 코드 0·출력 없음, spool에 원문 sentinel 없음, pause/resume, 진단 출력에 토큰·경로·호스트·장치 ID sentinel 없음, service 명령, 두 번째 `run` 거부 |
-| `hooks_test.go`, `cli/hooks_test.go` (#31) | Claude·Codex × linux·darwin·windows 골든, 위험 경로 거부, 소유 판정, 남의 Hook·알 수 없는 키 보존과 백업(0600)·권한 보존, 제거 후 의미상 동일 JSON, 두 번째 설치·제거 무변경, 깨진 JSON 7종 거부(쓰기·백업 없음), 읽기 전용 파일·심볼릭 링크·쓸 수 없는 디렉터리 거부, 실행 파일 이동 교체·`partial` 판정, `--yes` 없는 미리보기, CLI 출력에 토큰·홈 경로 없음, `claude_version` 기록, 버전 문자열 추출·검증 수준 판정 |
+| `hooks_test.go`, `cli/hooks_test.go` (#31) | Claude·Codex × linux·darwin·windows 골든, 위험 경로 거부, 소유 판정, 남의 Hook·알 수 없는 키 보존과 백업(0600)·권한 보존, 제거 후 의미상 동일 JSON, 두 번째 설치·제거 무변경, 깨진 JSON 7종 거부(쓰기·백업 없음), 읽기 전용 파일·심볼릭 링크·쓸 수 없는 디렉터리 거부, 실행 파일 이동 교체·`partial` 판정, `--yes` 없는 미리보기, CLI 출력에 토큰·홈 경로 없음, `claude_version` 기록, 버전 문자열 추출·검증 수준 판정. #170: Codex `$CODEX_HOME/hooks.json` 미리보기·설치·`status`(텍스트·JSON)·멱등·제거 후 원본과 동일, 최상위 키(`description`) 보존·표시 키 없음, 권한 유지·백업 0600, SessionEnd 3초와 이전 print 출력(5초) 교체, Codex 홈 없음·심볼릭 링크·깨진 파일 거부(쓰기·백업 없음), Claude 설정 미변경 |
 | `secret_test.go`, `config/token_test.go` (#41) | 저장소 선택(강제 `file`·알 수 없는 값·세션 버스 없음·OS), 호출 시간 제한·OS 오류 문자열 버림, `token_store` 검증 규칙, 저장 후 재조회 검증·실패 시 항목 정리·파일 대체 경로, `config.json` 쓰기 실패 시 항목 롤백, 파일 토큰 이전(다른 필드 보존·두 번째 실행 무변경) |
 | `cli/logout_test.go` (#41) | register가 `config.json`에 토큰을 쓰지 않음·`status` `os_keyring`, 저장소 없음 → `file_fallback`, `--force`가 이전 항목 삭제, logout 8가지(204·대체 경로·401·500·네트워크 오류·`--local-only`·저장소 잠김·잠김+`--local-only`)에서 서버 호출 Bearer·삭제 여부·출력에 토큰/URL 없음, 손상 설정, `run`의 legacy 토큰 이전과 logout 뒤 heartbeat 중지, 잠긴 저장소 → `token_unavailable` → 풀리면 전송. `AGENT_OFFICE_TEST_REAL_KEYRING=1`이면 실제 저장소로 register→logout→이전 |
 | `e2e_test.go` | `httptest` 서버로 register → run → 기존 transcript 건너뜀 → 새 transcript(#20 합성 fixture `tests/fixtures/collector/claude/dual-source/transcript.jsonl`)와 Hook 이벤트 전송·heartbeat → 일시중지 동안의 줄·Hook 미수집 → 재개 후 새 줄 수집 → 정상 종료(`stopped`, 큐 0) → diagnose `reachable`. 서버 본문·상태 디렉터리에 원문·토큰 sentinel 없음, 같은 event_id 중복 전달 없음 |
@@ -220,4 +266,5 @@ Linux arm64 Docker `golang:1.24-bookworm`에서 `gofmt -l`, `go vet ./...`(linux
 - 큐 기록이 실패하면 그 주기에 정규화한 결정적 중복 제거 키가 메모리에 남아, 같은 Hook·transcript 이벤트가 이번 실행에서 다시 나오지 않을 수 있습니다(디스크 가득 참 등 드문 경우).
 - 장치 토큰 회전(`/devices/token/rotate`) 명령은 아직 없습니다.
 - macOS Keychain(첫 접근 허용 프롬프트, 서명 안 된 바이너리 교체 시 재허용)·Windows Credential Manager·실제 데스크톱 세션의 Secret Service 자동 잠금 해제는 실장비에서 확인해야 합니다.
-- Hook 설치(#31): 실제 Claude Code가 설치된 Hook을 호출하는 종단 확인, macOS·Windows 명령 인용 실기 확인, Codex 사용자 범위 설정 위치 실측(자동 설치 전제)이 남았습니다. 대화형 Claude 모드가 실측되기 전까지 `claude_mode`는 자동으로 채우지 않습니다.
+- Hook 설치(#31): 실제 Claude Code가 설치된 Hook을 호출하는 종단 확인, macOS·Windows 명령 인용 실기 확인이 남았습니다. Codex 사용자 범위 위치는 #170에서 Linux로 실측했고 macOS·Windows·Desktop은 남았습니다.
+- 제거 도우미(`agent-office-collector-uninstall`, `uninstall.ps1`)는 아직 Claude Hook만 제거합니다. Codex Hook은 `hooks uninstall --tool codex --yes`로 따로 제거합니다(#170 후속). 대화형 Claude 모드가 실측되기 전까지 `claude_mode`는 자동으로 채우지 않습니다.

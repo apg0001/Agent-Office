@@ -28,6 +28,8 @@ type Dirs struct {
 	State string
 	// ClaudeProjects는 기본 Claude Code transcript 감시 루트다. 읽기 전용으로만 쓴다.
 	ClaudeProjects string
+	// CodexHome은 Codex 사용자 설정 폴더다(`$CODEX_HOME`, 없으면 `~/.codex`). hooks.json만 다룬다.
+	CodexHome string
 }
 
 // Env는 환경 변수 조회 함수다.
@@ -50,6 +52,7 @@ func Default() (Dirs, error) {
 //   - Windows: 설정 `%APPDATA%\AgentOffice\Collector`, 상태 `%LOCALAPPDATA%\AgentOffice\Collector`
 //   - `AGENT_OFFICE_COLLECTOR_HOME`이 있으면 그 아래 `config`, `state`
 //   - Claude transcript 루트: `$CLAUDE_CONFIG_DIR/projects`, 없으면 `~/.claude/projects`
+//   - Codex 사용자 설정 폴더: `$CODEX_HOME`(절대 경로일 때), 없으면 `~/.codex`
 func Resolve(goos string, env Env, home string) (Dirs, error) {
 	if home == "" {
 		return Dirs{}, ErrUnavailable
@@ -86,6 +89,11 @@ func Resolve(goos string, env Env, home string) (Dirs, error) {
 		d.ClaudeProjects = Join(goos, c, "projects")
 	} else {
 		d.ClaudeProjects = Join(goos, home, ".claude", "projects")
+	}
+	if c := env("CODEX_HOME"); isAbs(goos, c) {
+		d.CodexHome = c
+	} else {
+		d.CodexHome = Join(goos, home, ".codex")
 	}
 	return d, nil
 }

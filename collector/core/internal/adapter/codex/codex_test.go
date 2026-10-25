@@ -113,9 +113,23 @@ func TestPostToolUseIsNotCompletedOutsideDesktop(t *testing.T) {
 			t.Fatalf("%+v: %+v", rt, c)
 		}
 	}
+	linux := adapter.Runtime{Product: ProductCLI, Version: "0.163.0", OS: "linux", Mode: "exec"}
+	c, err := ParseHook(post, linux)
+	if err != nil || c.EventType != adapter.EventToolCompleted || c.ToolUseRef != "call_1" || c.ToolCategory != adapter.ToolShell ||
+		c.Support != adapter.SupportVerified || c.Confidence != adapter.ConfidenceObserved {
+		t.Fatalf("0.163.0 linux exec(#170 관측): %+v %v", c, err)
+	}
+	for _, rt := range []adapter.Runtime{
+		{Product: ProductCLI, Version: "0.163.0", OS: "darwin", Mode: "exec"},
+		{Product: ProductCLI, Version: "0.163.0", OS: "linux"},
+	} {
+		if c, _ := ParseHook(post, rt); c.EventType != adapter.EventUnknown {
+			t.Fatalf("미검증 OS·모드 %+v: %+v", rt, c)
+		}
+	}
 	other := desktopRuntime
 	other.Version = "26.2000.0.0"
-	c, _ := ParseHook(post, other)
+	c, _ = ParseHook(post, other)
 	if c.EventType != adapter.EventToolCompleted || c.Support != adapter.SupportUnverified || c.Confidence != adapter.ConfidenceInferred {
 		t.Fatalf("unverified desktop: %+v", c)
 	}

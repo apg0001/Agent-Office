@@ -129,7 +129,7 @@ func TestRealCoreContract(t *testing.T) {
 	if c.Tool != "claude" || !c.Detected || c.Version != "2.1.308" || c.HookState != "not_installed" || c.Foreign != 1 {
 		t.Errorf("claude tool: %+v", c)
 	}
-	if tools.Tools[1].Detected || tools.Tools[1].HookInstall != "print_only" {
+	if tools.Tools[1].Detected || tools.Tools[1].HookInstall != "auto" { // #170: Codex hooks install 지원
 		t.Errorf("codex tool: %+v", tools.Tools[1])
 	}
 

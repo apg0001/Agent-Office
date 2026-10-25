@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -143,11 +144,6 @@ func cmdHooks(args []string, env Env) int {
 		case "status":
 			c = hooksStatus(env, dirs, spec)
 		case "install", "uninstall":
-			if t == hooks.ToolCodex {
-				fmt.Fprintln(env.Stderr, "Codex Hook 자동 설치는 지원하지 않습니다. 사용자 범위 설정 위치·신뢰 흐름이 실측되지 않았습니다(#17·#18). "+
-					"`hooks print --tool codex` 출력을 검토해 직접 등록하세요.")
-				return ExitError
-			}
 			if sub == "install" && strings.Contains(filepath.ToSlash(exe), "/go-build") {
 				fmt.Fprintln(env.Stderr, "go run 임시 실행 파일로는 설치할 수 없습니다. 빌드한 바이너리를 고정 위치에 두고 실행하세요")
 				return ExitError
@@ -159,6 +155,14 @@ func cmdHooks(args []string, env Env) int {
 		}
 	}
 	return code
+}
+
+// hooksPath는 도구별 사용자 범위 Hook 설정 파일이다.
+func hooksPath(dirs paths.Dirs, tool string) string {
+	if tool == hooks.ToolCodex {
+		return hooks.CodexHooksPath(dirs.CodexHome)
+	}
+	return hooks.ClaudeSettingsPath(dirs.ClaudeProjects)
 }
 
 func toolLabel(t string) string {
@@ -186,18 +190,17 @@ func reportVersion(env Env, t string) string {
 
 func hooksStatus(env Env, dirs paths.Dirs, spec hooks.Spec) int {
 	reportVersion(env, spec.Tool)
-	if spec.Tool == hooks.ToolCodex {
-		fmt.Fprintln(env.Stdout, "Codex Hook: print 전용(자동 설치·상태 확인 미지원)")
-		return ExitOK
-	}
-	path := hooks.ClaudeSettingsPath(dirs.ClaudeProjects)
-	st, err := hooks.Inspect(path, spec)
+	label := toolLabel(spec.Tool)
+	st, err := hooks.Inspect(hooksPath(dirs, spec.Tool), spec)
 	if err != nil {
-		fmt.Fprintf(env.Stdout, "Claude Code Hook: %s (%s)\n", hooks.StateUnreadable, hooksErrText(err))
+		fmt.Fprintf(env.Stdout, "%s Hook: %s (%s)\n", label, hooks.StateUnreadable, hooksErrText(err))
 		return ExitError
 	}
-	fmt.Fprintf(env.Stdout, "Claude Code Hook: %s (이벤트 %d/%d 최신, 누락 %d, 변경됨 %d, 다른 Hook %d개 보존)\n",
-		st.State, st.Current, len(spec.Events), st.Missing, st.Modified, st.Foreign)
+	fmt.Fprintf(env.Stdout, "%s Hook: %s (이벤트 %d/%d 최신, 누락 %d, 변경됨 %d, 다른 Hook %d개 보존)\n",
+		label, st.State, st.Current, len(spec.Events), st.Missing, st.Modified, st.Foreign)
+	if spec.Tool == hooks.ToolCodex && st.State != hooks.StateNotInstalled {
+		fmt.Fprintln(env.Stdout, "Codex 신뢰 여부는 여기서 확인하지 않습니다. Codex에서 /hooks로 확인하세요(신뢰 전·변경 후에는 실행되지 않음).")
+	}
 	return ExitOK
 }
 
@@ -212,7 +215,7 @@ type ToolReport struct {
 	Support string `json:"support"`
 	// VerifiedMode는 실측 모드(print / exec / desktop)다. 일치하지 않으면 비어 있다.
 	VerifiedMode string `json:"verified_mode,omitempty"`
-	// HookInstall은 auto(install 지원) 또는 print_only다.
+	// HookInstall은 auto(install 지원)다. 이전 버전은 Codex에 print_only를 썼다.
 	HookInstall string `json:"hook_install"`
 	// HookState는 installed / partial / modified / not_installed / unreadable / unknown이다.
 	HookState     string `json:"hook_state"`
@@ -242,9 +245,7 @@ func hooksStatusJSON(env Env, dirs paths.Dirs, exe string, tools []string) int {
 			sup := hooks.AssessVersion(t, v, env.GOOS)
 			r.Detected, r.Version, r.Support, r.VerifiedMode = true, v, string(sup.Level), sup.Mode
 		}
-		if t == hooks.ToolCodex {
-			r.HookInstall = "print_only"
-		} else if st, err := hooks.Inspect(hooks.ClaudeSettingsPath(dirs.ClaudeProjects), spec); err != nil {
+		if st, err := hooks.Inspect(hooksPath(dirs, t), spec); err != nil {
 			r.HookState, r.Error = string(hooks.StateUnreadable), hooksErrCode(err)
 			code = ExitError
 		} else {
@@ -277,8 +278,14 @@ func hooksErrCode(err error) string {
 }
 
 func hooksApply(env Env, dirs paths.Dirs, spec hooks.Spec, install, yes bool) int {
-	path := hooks.ClaudeSettingsPath(dirs.ClaudeProjects)
+	path := hooksPath(dirs, spec.Tool)
 	shown := displayPath(path, dirs)
+	if install && spec.Tool == hooks.ToolCodex && !isDir(dirs.CodexHome) {
+		// Codex 홈은 Codex가 만든다. 없으면 설치되지 않았거나 CODEX_HOME이 다르다.
+		fmt.Fprintf(env.Stderr, "Codex 설정 폴더가 없습니다: %s. Codex를 한 번 실행한 뒤 다시 시도하세요(CODEX_HOME을 쓰면 같은 값으로 실행)\n",
+			displayPath(dirs.CodexHome, dirs))
+		return ExitError
+	}
 	version := ""
 	if install {
 		version = reportVersion(env, spec.Tool)
@@ -295,7 +302,10 @@ func hooksApply(env Env, dirs paths.Dirs, spec hooks.Spec, install, yes bool) in
 	if len(res.Changes) == 0 {
 		if install {
 			fmt.Fprintf(env.Stdout, "이미 설치돼 있습니다(변경 없음): %s\n", shown)
-			saveClaudeVersion(env, dirs, version)
+			if spec.Tool == hooks.ToolCodex {
+				printCodexTrustGuide(env)
+			}
+			saveToolVersion(env, dirs, spec.Tool, version)
 		} else {
 			fmt.Fprintf(env.Stdout, "제거할 Agent Office Hook이 없습니다: %s\n", shown)
 		}
@@ -308,6 +318,11 @@ func hooksApply(env Env, dirs paths.Dirs, spec hooks.Spec, install, yes bool) in
 	}
 	if install {
 		fmt.Fprintf(env.Stdout, "추가할 핸들러: {\"type\":\"command\",\"command\":%q,\"timeout\":%d}\n", spec.Command, spec.Timeout)
+		for _, e := range spec.Events {
+			if t := spec.TimeoutFor(e); t != spec.Timeout {
+				fmt.Fprintf(env.Stdout, "  (%s는 timeout %d)\n", e.Name, t)
+			}
+		}
 	}
 	fmt.Fprintln(env.Stdout, "다른 키와 Agent Office 소유가 아닌 Hook은 그대로 둡니다.")
 	if !yes {
@@ -324,19 +339,38 @@ func hooksApply(env Env, dirs paths.Dirs, spec hooks.Spec, install, yes bool) in
 	if res.Backup != "" {
 		fmt.Fprintf(env.Stdout, "백업(0600): %s\n", displayPath(res.Backup, dirs))
 	}
-	if install {
+	if install && spec.Tool == hooks.ToolCodex {
+		fmt.Fprintln(env.Stdout, "Hook을 설치했습니다.")
+		printCodexTrustGuide(env)
+		saveToolVersion(env, dirs, spec.Tool, version)
+	} else if install {
 		fmt.Fprintln(env.Stdout, "Hook을 설치했습니다. 실행 중인 Claude Code 세션은 /hooks 확인 또는 재시작이 필요할 수 있습니다.")
-		saveClaudeVersion(env, dirs, version)
+		saveToolVersion(env, dirs, spec.Tool, version)
 	} else {
 		fmt.Fprintln(env.Stdout, "Agent Office Hook만 제거했습니다.")
 	}
 	return ExitOK
 }
 
-// saveClaudeVersion은 등록된 Collector 설정에 감지한 Claude 버전을 기록한다. 실행 모드는
-// 설치 시점에 알 수 없으므로 claude_mode는 바꾸지 않는다.
-func saveClaudeVersion(env Env, dirs paths.Dirs, version string) {
-	if version == "" {
+// printCodexTrustGuide는 Codex Hook 신뢰 절차를 안내한다. Collector는 Codex 신뢰 상태
+// (`config.toml`의 `[hooks.state]`)를 쓰지 않는다. 사용자가 Codex에서 직접 검토·신뢰한다(#170).
+func printCodexTrustGuide(env Env) {
+	fmt.Fprintln(env.Stdout, "Codex는 신뢰하지 않은 Hook을 실행하지 않습니다. 새 터미널에서 대화형 codex를 실행하면 "+
+		"\"Hooks need review\" 화면이 나옵니다. 1(Review hooks)로 내용을 확인하고 신뢰하거나 2(Trust all and continue)를 고르세요. "+
+		"이미 실행 중이면 /hooks에서 신뢰할 수 있습니다. codex exec만 쓰는 경우에도 한 번은 대화형으로 신뢰해야 합니다. "+
+		"Collector 실행 파일 위치가 바뀌거나 hooks.json이 바뀌면 다시 신뢰해야 합니다.")
+}
+
+func isDir(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.IsDir()
+}
+
+// saveToolVersion은 등록된 Collector 설정에 감지한 Claude 버전을 기록한다. 실행 모드는
+// 설치 시점에 알 수 없으므로 claude_mode는 바꾸지 않는다. Codex Hook은 버전을 기록하지 않는다
+// (실측 대상이 실행 모드까지 일치해야 하는데 payload로 모드를 알 수 없어 confidence가 바뀌지 않음).
+func saveToolVersion(env Env, dirs paths.Dirs, tool, version string) {
+	if version == "" || tool != hooks.ToolClaude {
 		return
 	}
 	cfg, err := config.Load(dirs.ConfigFile())

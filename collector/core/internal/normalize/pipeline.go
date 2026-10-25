@@ -89,11 +89,11 @@ func (p *Pipeline) emit(out []Record, in Input) []Record {
 	return out
 }
 
-// guardCodexCompletion은 Desktop이 아닌 Codex 런타임의 도구 완료를 unknown으로 낮춘다.
+// guardCodexCompletion은 PostToolUse를 관측하지 않은 Codex 런타임의 도구 완료를 unknown으로 낮춘다.
 // codex.ParseHook이 이미 같은 규칙을 적용하지만(#17: CLI PostToolUse 미관측) 어댑터 변경에도
-// tool.completed를 만들지 않도록 한 번 더 막는다.
+// tool.completed를 만들지 않도록 한 번 더 막는다. Desktop과 #170 Linux 0.163.0 exec는 관측했다.
 func guardCodexCompletion(c adapter.Candidate, rt adapter.Runtime) adapter.Candidate {
-	if rt.Product == codex.ProductDesktop {
+	if codex.CompletionObserved(rt) {
 		return c
 	}
 	if c.EventType != adapter.EventToolCompleted && c.EventType != adapter.EventToolFailed {

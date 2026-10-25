@@ -7,7 +7,8 @@
 | Codex CLI | Windows, `codex-cli 0.162.0-alpha.17.2` | 부분 지원 실측 | 합성 exec 4회; 시작·턴 제출·도구 전·Stop·종료 관측, `PostToolUse` 미관측. #17 |
 | Codex Desktop | Windows 11 x64, Store `OpenAI.Codex 26.1007.2314.0`(번들 `codex-cli 0.162.0-alpha.17.2`) | 부분 관측(1회) | 프로젝트 Hook 신뢰 후 `UserPromptSubmit`·`PreToolUse`·`PostToolUse`·`PermissionRequest`·`SubagentStart/Stop`·`Stop`·`SessionEnd` 관측, `SessionStart`·compact·`Interrupt` 미관측/미실행. 반복 실측 전 지원 표시 금지. #18 |
 | Codex Desktop | Raspberry Pi 5, Ubuntu 24.04 arm64 | 미설치 | 실측 불가 |
-| Codex CLI | Raspberry Pi 5, `codex-cli 0.163.0` | 설치 확인, 이벤트 미실측 | 필요 시 #17 프로브로 재실측 |
+| Codex CLI | Raspberry Pi 5, Ubuntu 24.04 arm64, `codex-cli 0.163.0` | 실측(exec, 사용자 범위 Hook) | 임시 `CODEX_HOME/hooks.json` + TUI 신뢰, 합성 모델 서버 exec 4회: 시작·턴 제출·도구 전·`PostToolUse`·Stop·종료 매회 관측. 신뢰 전·변경된 핸들러는 미실행. `hooks install --tool codex` 종단 확인. 대화형 TUI 세션 이벤트·승인·subagent 미실측. #170 [실측](../verification/codex-user-hooks.md) |
+| Codex CLI | macOS, Windows의 사용자 범위 `~/.codex/hooks.json` | 미검증 | 소스상 위치 규칙 동일(`CODEX_HOME`, 기본 `~/.codex`). 실기 확인 전 지원 표시 금지. #170 |
 | Codex lifecycle hooks | CLI 합성 세션, Desktop 합성 세션 | 부분 지원 실측 | CLI inline 4회(#17), Desktop 프로젝트 Hook 1회(#18). 승인 거부·subagent는 Desktop만 관측; interrupt·compact 미실측 |
 | Codex app-server | Pi Linux arm64, `codex-cli 0.163.0`, 비로그인·격리 `CODEX_HOME` | 제한 실측 | 같은 프로세스의 thread만 관측·합류 가능, 다른 프로세스 세션 부착 불가(4/4). CLI·Desktop의 공유 daemon 사용은 미검증. 기본 수집 경로 아님(ADR-0002). #21 |
 | Claude Code CLI | Windows | 실행 파일 미설치 | #19 |
