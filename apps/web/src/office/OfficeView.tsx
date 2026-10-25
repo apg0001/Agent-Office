@@ -111,7 +111,7 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
         import("./OfficeScene"),
         hasSession(),
         // 지도 글자(캔버스)는 글꼴이 준비된 뒤 그려야 픽셀 글꼴로 나온다. 실패해도 대체 글꼴로 계속.
-        document.fonts?.load("16px Galmuri7").catch(() => undefined),
+        document.fonts?.load("12px Galmuri11").catch(() => undefined),
       ]);
       if (disposed) {
         return;
@@ -127,7 +127,6 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: element,
-        // 버퍼는 절반 크기, 화면에는 2배로(픽셀 렌더, #166).
         width: Math.round((element.clientWidth || 960) / RENDER_SCALE),
         height: (compact ? 320 : 560) / RENDER_SCALE,
         zoom: RENDER_SCALE,
