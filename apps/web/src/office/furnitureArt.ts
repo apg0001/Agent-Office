@@ -8,8 +8,8 @@
 
 import type { Furniture } from "./grid";
 
-/** Kenney 바닥 한 칸(약 208px)을 우리 타일(64px)에 맞추는 배율. */
-export const ART_SCALE = 0.3;
+/** Kenney 바닥 한 칸(약 208px)을 우리 타일(64px)에 맞추는 배율. 바닥 기울기도 같다(iso.ts). */
+export const ART_SCALE = 64 / 208;
 export const ART_BASE_URL = "/office/kenney/";
 
 export interface ArtPiece {
@@ -31,38 +31,38 @@ const RACK_TINT = 0x5a6472;
 
 export const FURNITURE_ART: Record<Furniture, ArtPiece[]> = {
   desk: [
-    { image: "desk_SW", dx: 0, dy: 8, layer: 2 },
-    { image: "computerScreen_SW", dx: 2, dy: -14, layer: 3 },
+    { image: "desk_SW", dx: 0, dy: 14, layer: 2 },
+    { image: "computerScreen_SW", dx: 2, dy: -8, layer: 3 },
   ],
-  shelf: [{ image: "bookcaseClosedWide_SW", dx: 0, dy: 6, layer: 2 }],
+  shelf: [{ image: "bookcaseClosedWide_SW", dx: 0, dy: 12, layer: 2 }],
   terminal: [
-    { image: "desk_SW", dx: 0, dy: 8, layer: 2 },
-    { image: "laptop_SW", dx: 0, dy: -14, layer: 3 },
+    { image: "desk_SW", dx: 0, dy: 14, layer: 2 },
+    { image: "laptop_SW", dx: 0, dy: -8, layer: 3 },
   ],
   rack: [
-    { image: "bookcaseClosedDoors_SW", dx: -6, dy: 6, layer: 2, tint: RACK_TINT },
-    { image: "bookcaseClosedDoors_SW", dx: 8, dy: 13, layer: 3, tint: RACK_TINT },
+    { image: "bookcaseClosedDoors_SW", dx: -6, dy: 12, layer: 2, tint: RACK_TINT },
+    { image: "bookcaseClosedDoors_SW", dx: 8, dy: 19, layer: 3, tint: RACK_TINT },
   ],
   whiteboard: [
-    { image: "cabinetTelevision_SW", dx: 0, dy: 8, layer: 2 },
-    { image: "televisionModern_SW", dx: 0, dy: -12, layer: 3 },
+    { image: "cabinetTelevision_SW", dx: 0, dy: 14, layer: 2 },
+    { image: "televisionModern_SW", dx: 0, dy: -6, layer: 3 },
   ],
   // 2칸을 이어 긴 테이블로 보이게 조금 크게 그리고, 앞(y + 1) 칸에 의자를 둔다.
   table: [
-    { image: "table_SW", dx: 0, dy: 12, layer: 2, scale: 0.42 },
-    { image: "chair_NE", dx: 0, dy: 2, layer: 1, cell: { x: 0, y: 1 } },
+    { image: "table_SW", dx: 0, dy: 18, layer: 2, scale: 0.42 },
+    { image: "chair_NE", dx: 0, dy: 8, layer: 1, cell: { x: 0, y: 1 } },
   ],
-  sofa: [{ image: "loungeSofa_SW", dx: 0, dy: 10, layer: 2 }],
+  sofa: [{ image: "loungeSofa_SW", dx: 0, dy: 16, layer: 2 }],
   coffee: [
-    { image: "kitchenBar_SW", dx: 0, dy: 8, layer: 2 },
-    { image: "kitchenCoffeeMachine_SW", dx: 0, dy: -12, layer: 3 },
+    { image: "kitchenBar_SW", dx: 0, dy: 14, layer: 2 },
+    { image: "kitchenCoffeeMachine_SW", dx: 0, dy: -6, layer: 3 },
   ],
-  fridge: [{ image: "kitchenFridgeLarge_SW", dx: 0, dy: 8, layer: 2 }],
-  plant: [{ image: "pottedPlant_SW", dx: 0, dy: 6, layer: 2 }],
+  fridge: [{ image: "kitchenFridgeLarge_SW", dx: 0, dy: 14, layer: 2 }],
+  plant: [{ image: "pottedPlant_SW", dx: 0, dy: 12, layer: 2 }],
 };
 
 /** 업무석 자리(걸을 수 있는 칸)에 그리는 의자. 캐릭터보다 먼저 그린다. */
-export const SEAT_ART: ArtPiece = { image: "chairDesk_NE", dx: 0, dy: 4, layer: 1 };
+export const SEAT_ART: ArtPiece = { image: "chairDesk_NE", dx: 0, dy: 10, layer: 1 };
 
 /** 미리 불러올 그림 이름 전체. */
 export function artImages(): string[] {
