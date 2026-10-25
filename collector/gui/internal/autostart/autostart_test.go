@@ -3,6 +3,7 @@ package autostart
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -217,5 +218,47 @@ func TestInstallUninstallWindowsRegistry(t *testing.T) {
 	}
 	if _, err := Install(def, &Memory{Fail: true}); err == nil {
 		t.Fatal("registry failure not reported")
+	}
+}
+
+// TestRealSystemAutostart는 일회용 환경(CI macOS·Windows 러너)에서 실제 사용자 위치에 쓰고 지운다.
+// macOS는 ~/Library/LaunchAgents의 plist를 plutil로 검사하고, Windows는 실제 HKCU Run 값을 쓴다.
+func TestRealSystemAutostart(t *testing.T) {
+	if os.Getenv("AGENT_OFFICE_TEST_REAL_AUTOSTART") != "1" {
+		t.Skip("AGENT_OFFICE_TEST_REAL_AUTOSTART=1 일 때만 실행")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(t.TempDir(), "agent-office-collector-gui")
+	if runtime.GOOS == "windows" {
+		exe += ".exe"
+	}
+	def, err := Generate(Params{GOOS: runtime.GOOS, Exe: exe, Home: home, Getenv: os.Getenv})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg := SystemRegistry()
+	if s := State(def, reg); s != "absent" {
+		t.Fatalf("state before: %s", s)
+	}
+	if _, err := Install(def, reg); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = Uninstall(def, reg) })
+	if s := State(def, reg); s != "installed" {
+		t.Fatalf("state after install: %s", s)
+	}
+	if runtime.GOOS == "darwin" {
+		if out, err := exec.Command("plutil", "-lint", def.Path).CombinedOutput(); err != nil {
+			t.Fatalf("plutil: %v %s", err, out)
+		}
+	}
+	if err := Uninstall(def, reg); err != nil {
+		t.Fatal(err)
+	}
+	if s := State(def, reg); s != "absent" {
+		t.Fatalf("state after uninstall: %s", s)
 	}
 }
