@@ -288,6 +288,7 @@
 202. #166: 픽셀아트 UI — Galmuri(OFL) 글꼴(웹 Galmuri11, 지도 Galmuri7), 각진 픽셀 테두리·베벨·평면 색, 사무실 캔버스 절반 해상도 2배 확대(가구·벽 픽셀화), 하위 에이전트 이름표 숨김.
 203. #169: Windows 로그온 작업으로 시작한 Collector 콘솔 창이 떠 있음(소유자 실측) → `run`이 혼자 쓰는 콘솔이면 FreeConsole. 0.1.0-beta.1 사용자는 자체 업데이트 불가(#44 수정 미배포)라 다음 Beta를 한 번 수동 설치해야 함. Codex 사용자 Hook 자동 설치는 서브에이전트가 진행 중(맥·윈도우 Codex 미수집 원인).
 204. #166 후속: 사무실 절반 해상도 렌더가 가구·벽·글자를 깨뜨림(소유자 피드백) → 원래 해상도, 가구 그림 선형 필터, 지도 글자 Galmuri11 2배 해상도·선형 필터. Galmuri7 제거. PR #171(#169)·#172 병합.
+205. #170(PR #173, 서브에이전트): `hooks install|uninstall|status --tool codex` — Codex 사용자 Hook 위치 `$CODEX_HOME/hooks.json`(기본 `~/.codex/hooks.json`), Codex는 신뢰(대화형 `codex`의 "Hooks need review"에서 Trust)해야 실행. Pi 실제 Codex CLI 0.163.0 exec + 합성 Responses 서버로 설치→신뢰→수집→서버→제거 실측(`tests/e2e/codex_flow.sh`). 후속: 제거 도우미(uninstall.sh·ps1)에 Codex Hook 제거 추가, GUI의 "Codex 자동 설치 미지원" 문구 교체(#159 영역), macOS·Windows Codex 실기 확인, `hook codex` 버전 기록으로 CLI PostToolUse 승격 여부 결정.
 
 ## 이번 변경 요약(#22)
 
