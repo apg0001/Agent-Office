@@ -66,15 +66,19 @@
           <tbody id="tools-body"></tbody>
         </table>
         <p id="tools-result" class="notice" hidden></p>
-        <h3>Claude Code Hook</h3>
-        <p>설치하면 사용자 설정 <code>~/.claude/settings.json</code>을 먼저 백업하고 Agent Office 항목만 추가합니다. 다른 Hook과 설정은 그대로 둡니다.</p>
+        <h3>Hook 연동</h3>
+        <p>설치하면 도구의 사용자 설정(Claude Code <code>~/.claude/settings.json</code>, Codex <code>~/.codex/hooks.json</code>)을 먼저 백업하고 Agent Office 항목만 추가합니다. 다른 Hook과 설정은 그대로 둡니다. Codex는 설치 뒤 Codex를 실행해 "Hooks need review"에서 신뢰해야 동작합니다.</p>
         <div class="row">
+          <label>도구
+            <select id="hook-tool">
+              <option value="claude">Claude Code</option>
+              <option value="codex">Codex</option>
+            </select>
+          </label>
           <button type="button" id="hook-preview">1) 설치 미리보기</button>
           <button type="button" id="hook-install" disabled>2) 내용을 확인했고 설치에 동의</button>
           <button type="button" id="hook-uninstall" class="secondary">Agent Office Hook 제거</button>
         </div>
-        <h3>Codex</h3>
-        <div class="row"><button type="button" id="codex-print" class="secondary">hooks.json 항목 보기(직접 등록)</button></div>
         <p id="hook-result" class="notice" hidden></p>
         <pre id="hook-output" hidden></pre>
       </section>
