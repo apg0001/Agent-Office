@@ -17,13 +17,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "Galmuri7";
-  src: url("/fonts/galmuri/Galmuri7.woff2") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-
 :root {
   --bg: #12131f;
   --panel: #1e2236;
@@ -75,11 +68,6 @@ h3 {
 
 a {
   color: var(--link);
-}
-
-img,
-canvas {
-  image-rendering: pixelated;
 }
 
 /* ---- 공통 픽셀 상자·버튼·입력 ---- */

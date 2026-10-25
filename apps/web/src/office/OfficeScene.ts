@@ -45,13 +45,12 @@ import type { AgentState, OfficeState } from "./types";
 
 const WALK_TILES_PER_SECOND = 2.5;
 /**
- * 픽셀 렌더(#166): 캔버스 버퍼를 화면의 절반 크기로 만들고 2배로 키워 보인다(OfficeView `zoom: 2`).
- * 그래서 카메라는 기본 0.5배로 세계를 그린다. 캐릭터 2px 블록은 버퍼 1px이 되어 모양이 같고,
- * 가구·벽은 픽셀 모서리가 생긴다. 지도 위 글자는 Galmuri7(버퍼 8px)을 세계 16px로 쓴다.
+ * 지도 렌더 배율. #166에서 버퍼를 절반으로 그려 2배로 키웠더니 가구·벽·글자가 깨져(소유자 피드백)
+ * 다시 1배로 그린다. 지도 글자는 웹 화면과 같은 Galmuri11을 원래 크기(12px)로 써서 또렷하게 한다.
  */
-export const RENDER_SCALE = 2;
+export const RENDER_SCALE = 1;
 const VIEW_SCALE = 1 / RENDER_SCALE;
-const MAP_FONT = "Galmuri7, monospace";
+const MAP_FONT = "Galmuri11, monospace";
 /** 픽셀 하나를 화면 2px로 그린다. */
 const PIXEL = 2;
 
@@ -96,6 +95,12 @@ export class OfficeScene extends Phaser.Scene {
     for (const name of artImages()) {
       this.load.image(artKey(name), `${ART_BASE_URL}${name}.png`);
     }
+    // pixelArt 모드는 모든 텍스처를 nearest로 줄여 0.3배로 줄인 가구 그림이 깨진다. 가구 그림만 선형 필터.
+    this.load.on("filecomplete", (key: string) => {
+      if (key.startsWith("art-")) {
+        this.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
+    });
   }
 
   create(): void {
@@ -344,29 +349,32 @@ export class OfficeScene extends Phaser.Scene {
     const top = -sprite.height;
     // "!"는 관측된 승인 대기.
     const marker = this.add
-      .text(0, top - 10, "!", { fontFamily: MAP_FONT, fontSize: "16px", color: "#ffcd4a" })
+      .text(0, top - 8, "!", { fontFamily: MAP_FONT, fontSize: "12px", color: "#ffcd4a" })
       .setOrigin(0.5)
       .setVisible(false);
     const status = this.add
-      .text(0, top - 28, "", {
+      .text(0, top - 22, "", {
         fontFamily: MAP_FONT,
-        fontSize: "16px",
+        fontSize: "12px",
         color: "#ffffff",
         backgroundColor: "#000000aa",
-        padding: { x: 4, y: 2 },
+        padding: { x: 3, y: 1 },
       })
       .setOrigin(0.5)
       .setVisible(false);
     const label = this.add
       .text(0, 2, labelFor(agent, device), {
         fontFamily: MAP_FONT,
-        fontSize: "16px",
+        fontSize: "12px",
         color: "#ffffff",
         backgroundColor: "#00000066",
       })
       .setOrigin(0.5, 0);
     // 하위 에이전트는 작은 몸과 머리 위 상태로 구분한다. 이름표("하위")까지 달면 겹쳐 보인다.
     label.setVisible(agent.role !== "subagent");
+    for (const text of [label, marker, status]) {
+      crisp(text);
+    }
     container.add([sprite, label, marker, status]);
     sprite.setInteractive({ useHandCursor: true });
     sprite.on("pointerup", (pointer: Phaser.Input.Pointer) => {
@@ -516,14 +524,14 @@ export class OfficeScene extends Phaser.Scene {
     const sign = this.add
       .text(entrance.sx - 24, entrance.sy - 62, "🚪 출입구", {
         fontFamily: MAP_FONT,
-        fontSize: "16px",
+        fontSize: "12px",
         color: "#ffffff",
         backgroundColor: "#2f7d4f",
-        padding: { x: 4, y: 2 },
+        padding: { x: 3, y: 1 },
       })
       .setOrigin(0.5)
       .setDepth(1000);
-    this.scenery.push(sign);
+    this.scenery.push(crisp(sign));
   }
 
   private drawZoneLabels(): void {
@@ -535,15 +543,22 @@ export class OfficeScene extends Phaser.Scene {
       const label = this.add
         .text(screen.sx, screen.sy, ZONE_LABELS[zone], {
           fontFamily: MAP_FONT,
-          fontSize: "16px",
+          fontSize: "12px",
           color: "#333333",
         })
         .setOrigin(0.5)
         .setAlpha(0.6)
         .setDepth(1000);
-      this.scenery.push(label);
+      this.scenery.push(crisp(label));
     }
   }
+}
+
+/** 지도 글자는 2배 해상도로 만들고 선형으로 줄여, 확대·축소해도 픽셀 모드(nearest)처럼 획이 빠지지 않게 한다. */
+function crisp<T extends Phaser.GameObjects.Text>(text: T): T {
+  text.setResolution(2);
+  text.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
+  return text;
 }
 
 function artKey(name: string): string {
