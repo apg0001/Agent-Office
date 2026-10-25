@@ -175,7 +175,7 @@ agent-office-collector hooks print --tool codex # Codex hooks.json 형식 미리
 - 관리자 권한을 쓰지 않는 사용자 수준 정의만 만듭니다.
 - 모든 정의에 소유 표시 `agent-office-collector:managed-service:v1`을 넣습니다. 설치는 같은 위치에 소유 표시 없는 파일이 있으면 **덮어쓰지 않고 실패**하고, 제거는 소유 표시가 있는 파일만 지웁니다. Windows는 같은 이름의 등록된 작업 XML도 조회해 소유 표시가 없으면 `/F` 교체·삭제를 하지 않습니다.
 - `go run` 임시 바이너리로는 설치하지 않습니다. 빌드한 실행 파일을 고정 위치에 둔 뒤 설치하세요(정의에 실행 파일 절대 경로가 들어감).
-- 알려진 미검증 위험: Windows `InteractiveToken` 작업이 콘솔 바이너리를 실행하면 콘솔 창이 보일 수 있습니다. GUI 패키지(#42) 또는 `-H windowsgui` 빌드에서 결정합니다.
+- Windows 로그온 작업이 콘솔 바이너리를 실행하면 콘솔 창이 생깁니다(소유자 실측, #169). `run`은 시작할 때 자기만 붙은 콘솔이면 떼어 내 창을 닫습니다(`FreeConsole`). 로그인 직후 한 번 깜빡일 수 있습니다. 터미널에서 직접 `run`하면 그대로 출력합니다.
 
 ## 진단(`status`·`diagnose`)
 
