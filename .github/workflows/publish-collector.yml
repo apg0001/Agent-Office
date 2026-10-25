@@ -136,7 +136,9 @@ jobs:
         run: |
           cd dist
           # GitHub Release는 파일 이름의 `~`를 `.`으로 바꾼다. 빌드 스크립트가 이미 맞췄는지 확인한다.
-          if ls | grep -q '~'; then echo "파일 이름에 ~가 있습니다" >&2; exit 1; fi
+          for f in *~*; do
+            if [ -e "$f" ]; then echo "파일 이름에 ~가 있습니다" >&2; exit 1; fi
+          done
           sha256sum -- *.tar.gz *.zip *.deb *.rpm *.exe *.pkg >SHA256SUMS
           cat SHA256SUMS
       - name: Set up Go

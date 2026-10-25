@@ -38,7 +38,7 @@ mkdir -p "$BIN"
 build() { # build <goarch> <cgo> <dir> <out> [go build args...]
   local arch=$1 cgo=$2 dir=$3 out=$4
   shift 4
-  (cd "$ROOT/collector/$dir" && GOOS=darwin GOARCH=$arch CGO_ENABLED=$cgo go build -trimpath "$@" -o "$out")
+  (cd "$ROOT/collector/$dir" && GOOS=darwin GOARCH=$arch CGO_ENABLED=$cgo go build -trimpath -o "$out" "$@")
 }
 for arch in arm64 amd64; do
   build "$arch" 0 core "$BIN/core-$arch" \
