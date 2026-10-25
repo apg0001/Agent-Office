@@ -277,6 +277,8 @@
 191. PR #147 병합, PR #148로 `develop` → `main` 병합(`cb48a63`). `publish-images.yml` 실행(run 40169992634)이 `image-publish` 승인 대기 중. 공개 키 변수 `COLLECTOR_UPDATE_PUBLIC_KEYS` 등록 완료.
 192. 0.1.0-beta.1 게시(소유자가 Environment 승인·서명 Secret 등록). GHCR `agent-office-server:0.1.0-beta.1@sha256:c21ef4a49224eb4445281c13572ca1f6d884aacfa478db3963a36753f7604c22`, `agent-office-web:0.1.0-beta.1@sha256:10592a9157fb313b0ec50509c91f24928d0747e9a0b4c6440792eb475ba8c1f5`(익명 pull 가능). 게시 이미지로 `tests/install/compare.sh` 동일(2026-10-25 15:53~15:54 KST, 이 구간은 72시간 실행에 CPU 경합). 태그 `server-v0.1.0-beta.1`(`cb48a63`)·GitHub Release(prerelease) 생성. Collector Release 초안 `collector-v0.1.0-beta.1`: 해시 10개·manifest ed25519 서명·바이너리 공개 키 내장 확인. GitHub가 deb·rpm 파일 이름의 `~`를 `.`으로 바꿔 `SHA256SUMS` 교체, `build.sh` 수정. 초안 공개는 자동 모드에서 거부되어 소유자가 직접 공개.
 193. 소유자가 `collector-v0.1.0-beta.1` 공개. 실제 Release로 자체 업데이트 실측 중 `http_302` 실패 발견 → 업데이트 요청만 https 리다이렉트를 따라가게 수정(#44), `0.1.0-beta.0` 시험 빌드로 확인·적용 성공. 0.1.0-beta.1 바이너리는 자체 업데이트 불가(릴리스 노트 알려진 위험). 채널 Release `collector-beta` 생성은 자동 모드에서 거부되어 소유자 작업.
+194. 실사용 시작: Pi에 0.1.0-beta.1 운영 스택(`docker compose -p agent-office`, `deploy/.env.production` 0600, 사본 `~/agent-office-secrets/env.production.backup`)과 Tailscale Serve(`https://gichan.taild10ecb.ts.net`, tailnet 전용). 소유자 맥북(macOS arm64)과 Pi에 Collector 0.1.0-beta.1 등록. 맥북 실제 Claude Code Hook 이벤트(`session.started`·`turn.*`) 수신, DB에는 enum·ID·해시만. 맥북 첫 `service install --activate` 뒤 run이 멈췄다가 재실행으로 정상화(원인 미확인, #62 후속). 안내 명령의 `#` 주석이 zsh에서 명령으로 해석돼 실패 → 사용자 안내 명령에 줄 끝 주석을 쓰지 않는다.
+195. #153: 사무실 가구·벽을 Kenney Furniture Kit(CC0) 아이소메트릭 그림으로 교체(업무석·도서관·인터넷·서버 랙·회의실·휴게실, 뒤쪽 벽·창문). 가구 종류 `table`·`coffee`·`fridge` 추가.
 
 ## 이번 변경 요약(#22)
 
