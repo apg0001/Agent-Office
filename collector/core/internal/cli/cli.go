@@ -225,6 +225,11 @@ func cmdRun(args []string, env Env) int {
 		fmt.Fprintln(env.Stderr, "사용자 디렉터리를 찾을 수 없습니다")
 		return ExitError
 	}
+	// Windows 로그온 작업으로 시작하면 콘솔 창이 새로 생긴다. 혼자 쓰는 콘솔이면 떼어 내 창을 닫는다(#169).
+	// 그 뒤의 표준 오류 출력은 버려진다(상태는 status·diagnose로 본다).
+	if env.GOOS == "windows" {
+		detachOwnConsole()
+	}
 	logger := log.New(env.Stderr, "agent-office-collector: ", log.LstdFlags)
 	o := runner.Options{Dirs: dirs, Version: env.Version, GOOS: env.GOOS, Now: env.Now, Logf: logger.Printf, Secrets: env.Secrets}
 	if env.RunOptions != nil {
