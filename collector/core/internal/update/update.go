@@ -197,6 +197,27 @@ func (o Options) checkURL(raw string) error {
 	return fail("insecure_url")
 }
 
+// maxRedirects는 업데이트 다운로드가 따라갈 최대 리다이렉트 수다.
+const maxRedirects = 5
+
+// redirectingClient는 o.Client 설정을 쓰되 리다이렉트를 따라가는 복사본이다. GitHub Release
+// 다운로드는 저장소 주소로 302를 돌려준다. 공통 클라이언트는 장치 토큰이 다른 호스트로 새지 않게
+// 리다이렉트를 막지만, 업데이트 요청에는 인증 헤더가 없다. 각 단계 주소도 https(또는 허용한
+// 루프백)인지 다시 검사한다.
+func (o Options) redirectingClient() *http.Client {
+	c := http.Client{}
+	if o.Client != nil {
+		c = *o.Client
+	}
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= maxRedirects {
+			return fail("too_many_redirects")
+		}
+		return o.checkURL(req.URL.String())
+	}
+	return &c
+}
+
 func (o Options) get(ctx context.Context, raw string, limit int64) ([]byte, error) {
 	if err := o.checkURL(raw); err != nil {
 		return nil, err
@@ -205,8 +226,15 @@ func (o Options) get(ctx context.Context, raw string, limit int64) ([]byte, erro
 	if err != nil {
 		return nil, fail("bad_url")
 	}
-	resp, err := o.Client.Do(req)
+	resp, err := o.redirectingClient().Do(req)
 	if err != nil {
+		var uerr *url.Error
+		if errors.As(err, &uerr) {
+			var e *Error
+			if errors.As(uerr.Err, &e) {
+				return nil, e
+			}
+		}
 		return nil, fail("download_failed")
 	}
 	defer resp.Body.Close()

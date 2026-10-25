@@ -46,4 +46,7 @@ go run ./cmd/agent-office-release sign update.key ../../dist/collector-<버전>/
 
 - 단위·통합 테스트(Linux arm64 컨테이너, `go test -race`): SemVer 우선순위, 서명(다른 키·변조·키 없음), 채널·대상·http 거부, SHA-256 불일치, tar.gz·zip 추출·경로 이동 거부, 교체·`.bak`, 재기동 후 비정상 시 되돌림, 패키지 설치 거부, CLI `check`·`apply`(`--yes` 없으면 적용 안 함)·키 없는 빌드 거부.
 - 릴리스 도구 `keygen`·`manifest`·`sign` 실행과 서명 검증.
-- 미검증: 실제 GitHub Release에서 받기, macOS·Windows에서 교체·서비스 재시작, GUI 알림 연결.
+- 실제 GitHub Release 실측(2026-10-25, Pi 5 linux/arm64): 같은 공개 키를 넣은 `0.1.0-beta.0` 시험 빌드가 `collector-v0.1.0-beta.1` Release의 `manifest.json`으로 새 버전을 찾고, `update apply --yes`로 받기·SHA-256 확인·교체·`.bak` 보존까지 성공.
+- 이 실측에서 고친 문제: GitHub Release 다운로드는 저장소 주소로 302를 돌려주는데, 공통 HTTP 클라이언트가 장치 토큰 보호를 위해 리다이렉트를 막아 `http_302`로 실패했습니다. 업데이트 요청만 리다이렉트를 최대 5번 따라가고, 각 단계 주소가 https인지 다시 검사합니다(업데이트 요청에는 인증 헤더가 없음). **0.1.0-beta.1 배포 바이너리에는 이 수정이 없어 자체 업데이트가 실패하므로, 다음 버전으로는 한 번 수동 설치가 필요합니다.**
+- 기본 채널 주소(`collector-beta`·`collector-stable` Release)는 관리자가 채널 Release를 만든 뒤에 동작합니다.
+- 미검증: macOS·Windows에서 교체·서비스 재시작, GUI 알림 연결.

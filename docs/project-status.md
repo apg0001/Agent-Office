@@ -276,6 +276,7 @@
 190. PR #146 병합(`6bd4c15`), #40·#43 종료, Epic #6 갱신(#42 서명만 남음). 2026-10-25 소유자가 0.1.0-beta.1 즉시 릴리스와 게시 Environment 생성을 승인. `image-publish`·`collector-publish` Environment 생성(필수 리뷰어 apg0001). Collector 업데이트 서명 키를 Pi `~/agent-office-secrets/collector-update.key`(0600, 저장소 밖)에 생성. GitHub Secret 등록은 자동 모드에서 거부되어 소유자가 직접 등록해야 함.
 191. PR #147 병합, PR #148로 `develop` → `main` 병합(`cb48a63`). `publish-images.yml` 실행(run 40169992634)이 `image-publish` 승인 대기 중. 공개 키 변수 `COLLECTOR_UPDATE_PUBLIC_KEYS` 등록 완료.
 192. 0.1.0-beta.1 게시(소유자가 Environment 승인·서명 Secret 등록). GHCR `agent-office-server:0.1.0-beta.1@sha256:c21ef4a49224eb4445281c13572ca1f6d884aacfa478db3963a36753f7604c22`, `agent-office-web:0.1.0-beta.1@sha256:10592a9157fb313b0ec50509c91f24928d0747e9a0b4c6440792eb475ba8c1f5`(익명 pull 가능). 게시 이미지로 `tests/install/compare.sh` 동일(2026-10-25 15:53~15:54 KST, 이 구간은 72시간 실행에 CPU 경합). 태그 `server-v0.1.0-beta.1`(`cb48a63`)·GitHub Release(prerelease) 생성. Collector Release 초안 `collector-v0.1.0-beta.1`: 해시 10개·manifest ed25519 서명·바이너리 공개 키 내장 확인. GitHub가 deb·rpm 파일 이름의 `~`를 `.`으로 바꿔 `SHA256SUMS` 교체, `build.sh` 수정. 초안 공개는 자동 모드에서 거부되어 소유자가 직접 공개.
+193. 소유자가 `collector-v0.1.0-beta.1` 공개. 실제 Release로 자체 업데이트 실측 중 `http_302` 실패 발견 → 업데이트 요청만 https 리다이렉트를 따라가게 수정(#44), `0.1.0-beta.0` 시험 빌드로 확인·적용 성공. 0.1.0-beta.1 바이너리는 자체 업데이트 불가(릴리스 노트 알려진 위험). 채널 Release `collector-beta` 생성은 자동 모드에서 거부되어 소유자 작업.
 
 ## 이번 변경 요약(#22)
 
@@ -362,7 +363,7 @@
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
 4. 진행 순서(자율, 2026-10-25 갱신):
-   1. 소유자: GitHub Releases에서 `collector-v0.1.0-beta.1` 초안을 확인하고 공개(Publish release). 공개 뒤 에이전트: `gh release create collector-beta --prerelease --title "Collector beta channel" --notes "자체 업데이트 채널 manifest"`(없으면) → `gh release upload collector-beta <manifest.json> <manifest.json.sig> --clobber`(받은 파일은 `gh release download collector-v0.1.0-beta.1 -p 'manifest.json*'`), 그리고 공개 Release에서 `agent-office-collector update check --channel beta` 실측(#44).
+   1. 소유자: 채널 Release 생성 `gh release download collector-v0.1.0-beta.1 -p 'manifest.json*' -D /tmp/ch && gh release create collector-beta --prerelease --title "Collector beta channel" --notes "Collector 자체 업데이트 Beta 채널 manifest" /tmp/ch/manifest.json /tmp/ch/manifest.json.sig`. 그 뒤 리다이렉트 수정이 들어간 다음 Beta(0.1.0-beta.2)를 같은 절차로 낼지 결정.
    2. 72시간 실행 종료(약 2026-10-27 23시) 후 `cat ~/ao-soak/soak72h.txt` 결과를 `docs/operations/performance.md`·#63에 기록하고 #63 종료. 15:53~15:54 KST 경합 구간 표시. 중단 확인 `docker ps | grep ao-load`.
    3. 남은 Issue: #42 서명·공증(인증서·Apple 계정 필요), #62 macOS·Windows 실제 Claude·Codex 흐름(소유자 장비, `docs/verification/cross-os-checklist.md`), #87(Windows PC).
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
