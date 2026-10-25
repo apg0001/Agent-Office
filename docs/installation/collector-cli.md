@@ -2,7 +2,7 @@
 
 관련 이슈: #34 (`EP-04/ISS-06`, 요구사항 COL-001~003, COL-010), #41(장치 토큰 OS 보안 저장소·`logout`, DEV-004~005). 선행: #29 어댑터, #30 tail, #32 정규화, #33 큐·전송.
 
-GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니다. GUI는 나중에 이 명령들을 감쌉니다. Hook 설치·제거는 #31에서 추가했습니다(아래 [Hook 설치](#hook-설치hooks-31)). 장치 토큰 OS 보안 저장소와 `logout`은 #41에서 추가했습니다(아래 [장치 토큰 보관](#장치-토큰-보관41)). 설치 패키지·서명(#42), 업데이트(#44)는 범위가 아닙니다.
+GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니다. GUI는 나중에 이 명령들을 감쌉니다. Hook 설치·제거는 #31에서 추가했습니다(아래 [Hook 설치](#hook-설치hooks-31)). 장치 토큰 OS 보안 저장소와 `logout`은 #41에서 추가했습니다(아래 [장치 토큰 보관](#장치-토큰-보관41)). 설치 패키지(#42)는 [설치 패키지](collector-packages.md), GUI·트레이 설치 프로그램(#159)은 [Collector GUI](collector-gui.md#설치-프로그램159), 업데이트(#44)는 [업데이트](collector-update.md)에 있습니다.
 
 ## 검증 범위
 

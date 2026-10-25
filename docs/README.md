@@ -31,3 +31,4 @@
 - [ADR-0002 Collector 수집 소스 우선순위](decisions/0002-collector-source-priority.md)
 - [ADR-0003 Collector GUI는 Wails v2.12.0으로 Core를 감싼다](decisions/0003-collector-gui-wails-v2.md)
 - [ADR-0004 장치 토큰 OS 보안 저장소(go-keyring)와 Linux 트레이(fyne.io/systray)](decisions/0004-collector-keychain-tray.md)
+- [ADR-0005 별도 트레이 도우미 프로세스와 서명 없는 OS별 설치 프로그램](decisions/0005-collector-tray-helper-installers.md)

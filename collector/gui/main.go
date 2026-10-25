@@ -5,24 +5,27 @@
 // 계속 수집한다. 시스템 트레이는 별도 프로세스(`agent-office-collector-tray`, ADR-0005)이고, GUI가 뜰 때
 // 옆에 트레이 도우미가 있으면 함께 띄운다(이미 떠 있으면 도우미가 스스로 끝남). 창 닫기는 GUI 종료다.
 //
+// GUI는 사용자별로 하나만 뜬다(internal/guictl: 파일 잠금 + 요청 파일). 두 번째 실행은 Wails를 띄우지 않고
+// 첫 GUI에 "창 보이기"(인자 없음) 또는 "종료"(--quit)를 남기고 끝난다.
+//
 // 빌드(Linux): go build -tags desktop,production[,webkit2_41] -o agent-office-collector-gui .
 // 태그 없이 빌드하면 Wails가 실행 시 오류를 낸다(단위 테스트·vet은 태그 없이 동작).
 //
 // 인자:
 //
 //	--autostart  예전(#43) 로그인 자동 시작 항목으로 실행됨. 트레이 도우미가 있으면 트레이만 띄우고 끝낸다.
-//	--quit       떠 있는 GUI 창 프로세스를 끝낸다(트레이 "종료"). 떠 있지 않으면 창 없이 떴다가 끝난다.
+//	--quit       떠 있는 GUI 창 프로세스를 끝낸다(트레이 "종료"). 떠 있지 않으면 아무것도 하지 않는다.
 package main
 
 import (
 	"context"
 	"embed"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
-	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -32,20 +35,17 @@ import (
 	"github.com/apg0001/Agent-Office/collector/gui/internal/app"
 	"github.com/apg0001/Agent-Office/collector/gui/internal/autostart"
 	"github.com/apg0001/Agent-Office/collector/gui/internal/corecli"
+	"github.com/apg0001/Agent-Office/collector/gui/internal/guictl"
 	"github.com/apg0001/Agent-Office/collector/gui/internal/launch"
+	"github.com/apg0001/Agent-Office/collector/gui/internal/prefs"
+	"github.com/apg0001/Agent-Office/collector/gui/internal/single"
 )
 
 //go:embed all:frontend/assets
 var assets embed.FS
 
-// singleInstanceID는 GUI 중복 실행 방지 식별자다(트레이 "설정" + 수동 실행 시 기존 창을 띄움).
-const singleInstanceID = "io.github.apg0001.agent-office.collector-gui"
-
-// QuitArg는 떠 있는 GUI 창 프로세스에 종료를 알리는 인자다(Wails 단일 실행으로 첫 프로세스에 전달됨).
+// QuitArg는 떠 있는 GUI 창 프로세스에 종료를 알리는 인자다.
 const QuitArg = "--quit"
-
-// quitGrace는 --quit으로 떴는데 떠 있던 GUI가 없을 때 스스로 끝나기까지의 여유다.
-const quitGrace = 5 * time.Second
 
 func hasArg(args []string, want string) bool {
 	for _, a := range args {
@@ -79,6 +79,31 @@ func main() {
 		}
 	}
 
+	// 단일 실행: 잠금을 못 잡으면 첫 GUI에 요청만 남기고 끝낸다. 잠금 폴더를 못 쓰면 단일 실행 없이 뜬다.
+	var primary *guictl.Primary
+	if p, err := prefs.Path(os.Getenv, os.UserConfigDir); err == nil {
+		dir := filepath.Dir(p)
+		pr, err := guictl.Acquire(dir)
+		switch {
+		case errors.Is(err, single.ErrHeld):
+			verb := guictl.Show
+			if quitOnly {
+				verb = guictl.Quit
+			}
+			if err := guictl.Send(dir, verb); err != nil {
+				os.Exit(1)
+			}
+			return
+		case err == nil:
+			primary = pr
+			defer pr.Release()
+		}
+	}
+	if quitOnly {
+		// 떠 있는 GUI가 없다: 할 일이 없다.
+		return
+	}
+
 	a := app.New(app.Options{
 		OpenURL: func(ctx context.Context, url string) { wruntime.BrowserOpenURL(ctx, url) },
 	})
@@ -91,12 +116,6 @@ func main() {
 		defer mu.Unlock()
 		return wctx
 	}
-	showWindow := func() {
-		if c := windowCtx(); c != nil {
-			wruntime.WindowShow(c)
-			wruntime.WindowUnminimise(c)
-		}
-	}
 	startup := app.OnStartup(a)
 
 	err := wails.Run(&options.App{
@@ -105,36 +124,24 @@ func main() {
 		Height:           760,
 		MinWidth:         720,
 		MinHeight:        560,
-		StartHidden:      quitOnly,
 		AssetServer:      &assetserver.Options{Assets: assets},
 		BackgroundColour: &options.RGBA{R: 247, G: 246, B: 242, A: 255},
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: singleInstanceID,
-			OnSecondInstanceLaunch: func(d options.SecondInstanceData) {
-				if hasArg(d.Args, QuitArg) {
-					if c := windowCtx(); c != nil {
-						wruntime.Quit(c)
-					}
-					return
-				}
-				showWindow()
-			},
-		},
 		OnStartup: func(ctx context.Context) {
 			startup(ctx)
 			mu.Lock()
 			wctx = ctx
 			mu.Unlock()
-			if quitOnly {
-				// 떠 있던 GUI가 없었다(있었다면 Wails 단일 실행이 그쪽에 --quit을 넘기고 이 프로세스를 끝냄).
-				// 아무것도 보이지 않고 끝낸다. Linux는 OnStartup이 GTK 메인 루프보다 먼저 돌아 Quit이
-				// 무시될 수 있으므로(gtk_main_quit: main_loops != NULL) 잠시 뒤 프로세스를 직접 끝낸다.
-				go func() {
-					wruntime.Quit(ctx)
-					time.Sleep(quitGrace)
-					os.Exit(0)
-				}()
-				return
+			if primary != nil {
+				go primary.Serve(ctx, func(v guictl.Verb) {
+					c := windowCtx()
+					switch v {
+					case guictl.Quit:
+						wruntime.Quit(c)
+					case guictl.Show:
+						wruntime.WindowShow(c)
+						wruntime.WindowUnminimise(c)
+					}
+				})
 			}
 			if trayOK {
 				// 트레이는 사용자별 단일 실행이라 이미 떠 있으면 곧바로 끝난다. 실패해도 창은 쓸 수 있다.

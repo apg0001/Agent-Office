@@ -11,7 +11,7 @@ agent-office-collector update apply [--channel stable|beta] --yes    # 받아서
 
 - 기본 채널은 `stable`. 업데이트는 **알린 뒤 사용자가 적용**합니다(자동 적용은 하지 않음. GUI가 알림을 보여 주고 같은 명령을 부릅니다).
 - manifest 위치: `https://github.com/apg0001/Agent-Office/releases/download/collector-<채널>/manifest.json`(+ `.sig`). `--manifest-url`로 바꿀 수 있고 https만 받습니다.
-- 패키지(deb·rpm, `/usr/bin`)로 설치했다면 `managed_by_package`로 거부하고 패키지 관리자로 업데이트하라고 안내합니다.
+- 패키지(deb·rpm, `/usr/bin`)나 GUI 설치 프로그램(macOS 앱 번들 안, 또는 트레이 도우미 `agent-office-collector-tray`가 같은 폴더에 있는 Windows 설치본, #159)으로 설치했다면 `managed_by_package`로 거부하고 패키지 관리자·새 설치 프로그램으로 업데이트하라고 안내합니다(GUI·트레이와 버전이 어긋나지 않게).
 
 ## 검증 순서
 

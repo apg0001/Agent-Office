@@ -115,6 +115,11 @@ def win_key_exists(path: str) -> bool:
 
 
 def running(name: str) -> bool:
+    return count(name) > 0
+
+
+def count(name: str) -> int:
+    """이 이름의 실행 중인 프로세스 수(명령줄 원문은 보지 않고 개수만)."""
     if sys.platform == "win32":
         # tasklist 출력은 콘솔 코드 페이지(한국어 등)라 바이트로 받아 ASCII 이름만 찾는다.
         p = subprocess.run(
@@ -124,11 +129,11 @@ def running(name: str) -> bool:
         )
         if p.returncode != 0:
             raise RuntimeError(f"tasklist exit {p.returncode}")
-        return f'"{name}.exe"'.lower().encode() in p.stdout.lower()
+        return p.stdout.lower().count(f'"{name}.exe"'.lower().encode())
     p = subprocess.run(
         ["pgrep", "-f", f"(^|/){name}( |$)"], check=False, capture_output=True
     )
-    return p.returncode == 0
+    return len(p.stdout.split())
 
 
 def wait(cond, timeout=30.0) -> bool:
@@ -172,8 +177,16 @@ def main() -> int:
     def run(
         argv: list[str], timeout: float = 600, check: bool = True, **kw
     ) -> subprocess.CompletedProcess:
+        # Core·도구 출력은 UTF-8(한국어)이다. 콘솔 코드 페이지로 해석하지 않는다.
         p = subprocess.run(
-            argv, check=False, capture_output=True, text=True, timeout=timeout, **kw
+            argv,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            **kw,
         )
         if check and p.returncode != 0:
             # 출력에는 경로가 들어갈 수 있어 단계 이름·종료 코드만 남긴다.
@@ -323,16 +336,20 @@ def main() -> int:
             stderr=subprocess.DEVNULL,
         )
         # 셀프 테스트의 "사무실 열기"(서버 없음 → 설정 창)·"설정 열기"가 GUI 창 프로세스를 실제로 띄우는지 본다.
-        gui_seen, deadline = 0, time.monotonic() + 900
+        gui_seen, gui_max, deadline = 0, 0, time.monotonic() + 900
         while self_test.poll() is None and time.monotonic() < deadline:
-            if running("agent-office-collector-gui"):
-                gui_seen += 1
+            n = count("agent-office-collector-gui")
+            gui_seen += 1 if n else 0
+            gui_max = max(gui_max, n)
             time.sleep(1)
         if self_test.poll() is None:
             self_test.kill()
         st = subprocess.CompletedProcess(self_test.args, self_test.wait())
         results["gui_seen_seconds_during_self_test"] = gui_seen
         record("gui_started_from_tray", gui_seen >= 3)
+        # "사무실 열기"와 "설정 열기"가 GUI를 두 번 띄워도 창 프로세스는 하나여야 한다(단일 실행).
+        results["gui_max_processes_during_self_test"] = gui_max
+        record("gui_single_instance", gui_max == 1)
         report = (
             json.loads(report_path.read_text(encoding="utf-8"))
             if report_path.exists()
