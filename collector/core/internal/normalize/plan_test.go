@@ -52,7 +52,7 @@ func TestPipelineEmitsToolAndPlanEvents(t *testing.T) {
 	if tool.EventType != "tool.started" || tool.PlanSteps != nil {
 		t.Fatalf("tool event %+v", tool)
 	}
-	if plan.EventType != "plan.updated" || plan.Activity != "planning" || plan.Confidence != "inferred" ||
+	if plan.EventType != "plan.updated" || plan.Activity != "planning" || plan.Confidence != "observed" ||
 		!reflect.DeepEqual(plan.PlanSteps, []string{"completed", "in_progress", "pending", "unknown"}) {
 		t.Fatalf("plan event %+v", plan)
 	}
@@ -176,5 +176,18 @@ func TestPipelineCandidateFromSpoolEmitsPlan(t *testing.T) {
 	plans := got["plan.updated"]
 	if len(got["tool.started"]) != 1 || len(plans) != 1 || !reflect.DeepEqual(plans[0].PlanSteps, []string{"in_progress", "pending"}) {
 		t.Fatalf("records %+v", got)
+	}
+}
+
+// TodoWrite 형식은 실측한 런타임에서만 observed다. 다른 버전·모드는 inferred로 남는다.
+func TestPlanConfidenceOnlyObservedOnVerifiedRuntime(t *testing.T) {
+	other := claudeRuntime
+	other.Mode = "interactive"
+	for rt, want := range map[adapter.Runtime]string{claudeRuntime: "observed", other: "inferred"} {
+		p := NewPipeline(newNormalizer(t, Options{}))
+		plans := byType(p.Hook(adapter.ProviderClaude, rt, todoHook("PreToolUse", "tu-r", "pending"), observed))["plan.updated"]
+		if len(plans) != 1 || plans[0].Confidence != want {
+			t.Fatalf("%+v: plans %+v", rt, plans)
+		}
 	}
 }

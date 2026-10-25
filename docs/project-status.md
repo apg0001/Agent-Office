@@ -270,6 +270,7 @@
 184. #41·#43(PR #141): Core 장치 토큰을 OS 보안 저장소(go-keyring, 없으면 0600 파일 대체)에 보관·`logout [--local-only]`, Linux 트레이(fyne systray)·GUI 자동 시작. Linux arm64 Docker에서 실제 Secret Service·D-Bus 트레이 메뉴 검증. macOS Keychain·Windows Credential Manager·실제 데스크톱 패널·로그인 후 자동 시작은 미검증(#43 열어 둠).
 185. PR #141 병합(`36a2f38`), #41 종료, Epic #6 체크리스트 갱신. #43은 실제 데스크톱 확인까지 열어 둠.
 186. #63 72시간 무경합 실행 시작(2026-10-24 23시경 KST, `36a2f38`, 이미지 `ao-release-server:test`·`ao-release-web:test`). 출력 `~/ao-soak/soak72h.txt`, Compose 프로젝트 `ao-load`. 실행 중에는 Pi에서 무거운 빌드·테스트를 피한다.
+187. #38: Claude `TodoWrite` 입력 형식을 Claude Code 2.1.308 Linux `-p`에서 Hook·transcript 양쪽 실측해 그 런타임에 한해 계획 지원 수준을 `verified`(`confidence: observed`)로 올림. 다른 런타임·Codex `update_plan`은 `inferred` 유지. 2026-10-25 15시 기준 72시간 실행 16시간째 정상(서버 메모리 약 94MiB, 오류 로그 0).
 
 ## 이번 변경 요약(#22)
 
