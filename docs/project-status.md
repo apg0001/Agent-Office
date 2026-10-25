@@ -274,6 +274,7 @@
 188. PR #144 병합(`9b464e4`). macOS·Windows 실장비 검증 절차를 `docs/verification/cross-os-checklist.md`에 정리(#40·#41·#42·#43·#62, 기록 규칙 포함).
 189. PR #145 병합(`ecb5ef8`). `.github/workflows/cross-os.yml`(PR #146, `test/#43-cross-os-ci`): GitHub Actions `macos-latest`·`windows-latest` 실제 러너에서 Core·GUI 테스트, 실제 Keychain·Credential Manager, 실제 LaunchAgent·HKCU Run, GUI 데스크톱 빌드·실행, 등록→Hook→수집·전송→서비스→로그아웃→제거 스모크(`tests/cross_os/collector_smoke.py`). 찾아 고친 문제: macOS GUI `UniformTypeIdentifiers` 링크 실패, Windows `uninstall.ps1` BOM·stderr 처리, 제거 도우미가 `service uninstall`에 `--activate`를 빠뜨려 OS 등록·실행 중 Collector가 남던 문제, `hooks`·`service`의 `--os` 명시 판정, Windows CLI 테스트 경로.
 190. PR #146 병합(`6bd4c15`), #40·#43 종료, Epic #6 갱신(#42 서명만 남음). 2026-10-25 소유자가 0.1.0-beta.1 즉시 릴리스와 게시 Environment 생성을 승인. `image-publish`·`collector-publish` Environment 생성(필수 리뷰어 apg0001). Collector 업데이트 서명 키를 Pi `~/agent-office-secrets/collector-update.key`(0600, 저장소 밖)에 생성. GitHub Secret 등록은 자동 모드에서 거부되어 소유자가 직접 등록해야 함.
+191. PR #147 병합, PR #148로 `develop` → `main` 병합(`cb48a63`). `publish-images.yml` 실행(run 40169992634)이 `image-publish` 승인 대기 중. 공개 키 변수 `COLLECTOR_UPDATE_PUBLIC_KEYS` 등록 완료.
 
 ## 이번 변경 요약(#22)
 
@@ -359,7 +360,11 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율, 2026-10-24 갱신): 72시간 실행 진행 중: 끝나면(약 2026-10-27 23시) `cat ~/ao-soak/soak72h.txt`로 결과를 확인해 `docs/operations/performance.md`·#63에 기록하고 #63을 닫는다. 중단 확인은 `docker ps | grep ao-load`. 그 뒤 #65 릴리스 준비(관리자 승인 필요). macOS·Windows 검증은 소유자·Windows PC 에이전트가 `docs/verification/cross-os-checklist.md` 순서대로 실행하고 결과를 해당 Issue에 남긴다. 실제 Claude 흐름 재확인은 `SCENARIO=subagent tests/e2e/claude_flow.sh ao-release-server:test ao-release-web:test <Collector 실행 파일>`. 이전 순서: #63 PR 병합(이슈는 72시간 실행까지 열어 둠) → #65 릴리스 준비 PR(`docs/#65-release-prep` 브랜치에 초안 커밋 있음, 장시간 결과 반영 후 PR) → #41·#43 서브에이전트 PR 병합 → #42 설치 패키지·#44 업데이트 → 72시간 실행(`AGENT_OFFICE_LOAD_PORT=18480 tests/load/run.sh <서버> <웹> --rounds 129600 --interval 2 --timeout 30`, 다른 무거운 작업 없을 때) → #62·#87은 소유자 장비. 서브에이전트 병렬은 최대 1개, PR 생성 후 조정자가 `git merge origin/develop`·추적표 충돌 해결(양쪽 유지)·CI 확인 후 병합. 각 PR은 CI 통과 후 `gh pr merge N --merge`(승인 자동)하고 `gh issue close N`, Epic 체크리스트를 `gh issue edit --body-file`로 갱신한다.
+4. 진행 순서(자율, 2026-10-25 갱신) — 0.1.0-beta.1 릴리스 진행 중:
+   1. 소유자: GitHub Actions run 40169992634에서 `image-publish` 승인. 소유자: `gh secret set COLLECTOR_UPDATE_SIGNING_KEY --env collector-publish < ~/agent-office-secrets/collector-update.key`(비밀 키 백업도 따로 보관).
+   2. 에이전트: 게시 성공 확인 → digest 기록 → `tests/install/compare.sh ghcr.io/apg0001/agent-office-server:0.1.0-beta.1@sha256:… ghcr.io/apg0001/agent-office-web:0.1.0-beta.1@sha256:…` → `gh workflow run publish-collector.yml --ref main -f version=0.1.0-beta.1`(소유자 승인) → Release 초안 확인.
+   3. 에이전트: `git tag -a server-v0.1.0-beta.1 cb48a63`·push, `gh release create server-v0.1.0-beta.1 --prerelease --notes-file docs/releases/0.1.0-beta.1.md`, `main`을 `develop`에 역병합, #65 종료.
+   4. 72시간 실행 종료(약 2026-10-27 23시) 후 `cat ~/ao-soak/soak72h.txt` 결과를 `docs/operations/performance.md`·#63에 기록하고 #63 종료. 중단 확인 `docker ps | grep ao-load`.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
