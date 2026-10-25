@@ -66,6 +66,7 @@ jobs:
           AGENT_OFFICE_TEST_REAL_KEYRING: "1"
         run: go test -count=1 -v -run 'TestRealKeyring' ./internal/secret ./internal/cli
       - name: Build Core
+        if: ${{ !cancelled() }}
         working-directory: collector/core
         run: |
           mkdir -p "$RUNNER_TEMP/ao"
