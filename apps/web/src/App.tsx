@@ -80,24 +80,23 @@ export function App({ pathname }: { pathname?: string }) {
   }
 
   return (
-    <main className="shell">
-      <SessionBar />
-      <section className="hero">
-        <p className="eyebrow">SELF-HOSTED · MULTI-USER · PRIVACY-FIRST</p>
-        <h1>Agent Office</h1>
-        <p className="lede">
-          코딩 에이전트의 안전한 활동 메타데이터를 하나의 아이소메트릭 사무실로
-          연결합니다.
-        </p>
-      </section>
+    <main className="shell office-shell">
+      <header className="topbar">
+        <a className="brand" href="/">
+          Agent Office
+        </a>
+        <SessionBar />
+      </header>
       {typeof window !== "undefined" && scopeFromSearch(window.location.search).kind === "side" ? <SideBySide /> : <OfficeView />}
-      <section className="principles" aria-label="프로젝트 원칙">
-        {principles.map(([title, description]) => (
-          <article key={title}>
-            <h2>{title}</h2>
-            <p>{description}</p>
-          </article>
-        ))}
+      <section className="about" aria-label="소개">
+        <p>코딩 에이전트의 활동 메타데이터를 아이소메트릭 사무실로 보여 줍니다.</p>
+        <ul className="principles">
+          {principles.map(([title, description]) => (
+            <li key={title}>
+              <strong>{title}</strong> {description}
+            </li>
+          ))}
+        </ul>
       </section>
     </main>
   );
