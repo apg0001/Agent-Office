@@ -32,7 +32,15 @@ import { ART_BASE_URL, ART_SCALE, type ArtPiece, FURNITURE_ART, SEAT_ART, artIma
 import type { OfficeMap, Point, ZoneKind } from "./grid";
 import { ZONE_COLORS, ZONE_LABELS } from "./grid";
 import { type ScreenPoint, TILE_HEIGHT, depthOf, gridToScreen, tileDiamond } from "./iso";
-import { WALL_HEIGHT, wallBase, wallQuad, wallSegments } from "./walls";
+import {
+  PARTITION_HEIGHT,
+  WALL_HEIGHT,
+  partitionFront,
+  partitionQuad,
+  wallBase,
+  wallQuad,
+  wallSegments,
+} from "./walls";
 import type { AgentState, OfficeState } from "./types";
 
 const WALK_TILES_PER_SECOND = 2.5;
@@ -164,6 +172,7 @@ export class OfficeScene extends Phaser.Scene {
   private drawScenery(): void {
     this.drawFloor();
     this.drawWalls();
+    this.drawPartitions();
     this.drawFurniture();
     this.drawZoneLabels();
   }
@@ -431,6 +440,19 @@ export class OfficeScene extends Phaser.Scene {
     };
     for (const segment of wallSegments(this.map)) {
       const face = segment.side === "left" ? 0xf1e8d6 : 0xe0d4ba;
+      if (segment.door) {
+        // 출입문: 벽 위쪽만 남기고 문 구멍(어두운 바깥)·문틀을 그린다.
+        fill(wallQuad(segment, 0, 0.12, 0, WALL_HEIGHT), face);
+        fill(wallQuad(segment, 0.88, 1, 0, WALL_HEIGHT), face);
+        fill(wallQuad(segment, 0, 1, 40, WALL_HEIGHT), face);
+        fill(wallQuad(segment, 0.12, 0.88, 0, 40), 0x3a2e24);
+        fill(wallQuad(segment, 0.1, 0.14, 0, 42), 0x8a5a32);
+        fill(wallQuad(segment, 0.86, 0.9, 0, 42), 0x8a5a32);
+        fill(wallQuad(segment, 0.1, 0.9, 40, 43), 0x8a5a32);
+        fill(wallQuad(segment, 0.3, 0.7, 45, 52), 0x2f7d4f);
+        fill(wallQuad(segment, 0, 1, WALL_HEIGHT - 4, WALL_HEIGHT), 0xd9a066);
+        continue;
+      }
       fill(wallQuad(segment, 0, 1, 0, WALL_HEIGHT), face);
       // 걸레받이와 위쪽 몰딩.
       fill(wallQuad(segment, 0, 1, 0, 5), 0xb98a5c);
@@ -445,6 +467,55 @@ export class OfficeScene extends Phaser.Scene {
       graphics.lineStyle(1, 0x7a5a3a, 0.5);
       graphics.lineBetween(a.sx, a.sy - WALL_HEIGHT, b.sx, b.sy - WALL_HEIGHT);
     }
+  }
+
+  /** 구역 칸막이(#164). 앞쪽 칸 바로 뒤 깊이로 그려 뒤 칸 캐릭터는 가리고 앞 칸 캐릭터는 앞에 선다. */
+  private drawPartitions(): void {
+    for (const partition of this.map.partitions) {
+      const front = partitionFront(partition);
+      const graphics = this.add.graphics();
+      graphics.setDepth(depthOf(front, -1));
+      this.scenery.push(graphics);
+      const fill = (points: ScreenPoint[], color: number, alpha = 1) => {
+        graphics.fillStyle(color, alpha);
+        graphics.fillPoints(points.map((p) => new Phaser.Math.Vector2(p.sx, p.sy)), true);
+      };
+      const horizontalEdge = partition.a.x !== partition.b.x;
+      const face = horizontalEdge ? 0xe6dccb : 0xd6c9b1;
+      if (partition.door) {
+        // 문: 양쪽 문설주와 위 가로대만.
+        fill(partitionQuad(partition, 0, 0.1, 0, PARTITION_HEIGHT + 6), 0x8a5a32);
+        fill(partitionQuad(partition, 0.9, 1, 0, PARTITION_HEIGHT + 6), 0x8a5a32);
+        fill(partitionQuad(partition, 0, 1, PARTITION_HEIGHT + 2, PARTITION_HEIGHT + 6), 0x8a5a32);
+        continue;
+      }
+      fill(partitionQuad(partition, 0, 1, 0, PARTITION_HEIGHT), face);
+      fill(partitionQuad(partition, 0, 1, 0, 4), 0xb98a5c);
+      fill(partitionQuad(partition, 0, 1, PARTITION_HEIGHT - 3, PARTITION_HEIGHT), 0xc49060);
+    }
+    // 출입구 바닥 매트와 표지.
+    const entrance = gridToScreen(this.map.entrance);
+    const mat = this.add.graphics().setDepth(-0.9);
+    mat.fillStyle(0x7a4a2a, 1);
+    mat.fillPoints(
+      tileDiamond(this.map.entrance).map(
+        (p) => new Phaser.Math.Vector2(entrance.sx + (p.sx - entrance.sx) * 0.7, entrance.sy + (p.sy - entrance.sy) * 0.7),
+      ),
+      true,
+    );
+    this.scenery.push(mat);
+    const sign = this.add
+      .text(entrance.sx - 24, entrance.sy - 62, "🚪 출입구", {
+        fontFamily: "sans-serif",
+        fontSize: "11px",
+        color: "#ffffff",
+        backgroundColor: "#2f7d4f",
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setResolution(2)
+      .setDepth(1000);
+    this.scenery.push(sign);
   }
 
   private drawZoneLabels(): void {
