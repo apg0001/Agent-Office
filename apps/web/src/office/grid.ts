@@ -13,7 +13,17 @@ export type ZoneKind =
   | "corridor"
   | "entrance";
 
-export type Furniture = "desk" | "shelf" | "terminal" | "whiteboard" | "rack" | "sofa" | "plant";
+export type Furniture =
+  | "desk"
+  | "shelf"
+  | "terminal"
+  | "whiteboard"
+  | "table"
+  | "rack"
+  | "sofa"
+  | "coffee"
+  | "fridge"
+  | "plant";
 
 export interface Point {
   x: number;
@@ -137,8 +147,14 @@ export function createDefaultOffice(deskRows = 2): OfficeMap {
   const testing = zones.testing;
   place({ x: testing.x + testing.width - 1, y: testing.y }, "rack");
   place({ x: testing.x + testing.width - 1, y: testing.y + 1 }, "rack");
-  place({ x: zones.meeting.x + 2, y: zones.meeting.y + 1 }, "whiteboard");
+  // 회의실: 뒤쪽 화면과 그 앞 2칸짜리 테이블.
+  place({ x: zones.meeting.x + 2, y: zones.meeting.y }, "whiteboard");
+  place({ x: zones.meeting.x + 2, y: zones.meeting.y + 1 }, "table");
+  place({ x: zones.meeting.x + 3, y: zones.meeting.y + 1 }, "table");
+  // 휴게실: 소파, 뒤쪽 벽에 커피 바·냉장고·화분.
   place({ x: zones.lounge.x + 1, y: zones.lounge.y + 1 }, "sofa");
+  place({ x: zones.lounge.x + zones.lounge.width - 3, y: zones.lounge.y }, "coffee");
+  place({ x: zones.lounge.x + zones.lounge.width - 2, y: zones.lounge.y }, "fridge");
   place({ x: zones.lounge.x + zones.lounge.width - 1, y: zones.lounge.y }, "plant");
   return map;
 }

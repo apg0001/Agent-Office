@@ -1,6 +1,7 @@
 /**
  * Phaser 사무실 장면. 사실 상태(OfficeState)를 받아 목적지를 정하고, 캐릭터는 매 프레임
- * 그쪽으로 걸어간다. 이동은 순수 연출이며 사실 상태를 바꾸지 않는다. 외부 에셋 없이 그린다.
+ * 그쪽으로 걸어간다. 이동은 순수 연출이며 사실 상태를 바꾸지 않는다. 캐릭터는 코드로 그리고,
+ * 가구·벽은 CC0 그림(furnitureArt.ts)을 쓴다.
  */
 
 import Phaser from "phaser";
@@ -26,9 +27,10 @@ import {
   textureKey,
   walkFrame,
 } from "./sprites";
-import type { Furniture, OfficeMap, Point, ZoneKind } from "./grid";
+import { ART_BASE_URL, ART_SCALE, type ArtPiece, FURNITURE_ART, SEAT_ART, WALL_ART, artImages } from "./furnitureArt";
+import type { OfficeMap, Point, ZoneKind } from "./grid";
 import { ZONE_LABELS } from "./grid";
-import { TILE_HEIGHT, depthOf, gridToScreen, tileDiamond } from "./iso";
+import { TILE_HEIGHT, TILE_WIDTH, depthOf, gridToScreen, tileDiamond } from "./iso";
 import type { AgentState, OfficeState } from "./types";
 
 const ZONE_COLORS: Record<ZoneKind, number> = {
@@ -36,19 +38,10 @@ const ZONE_COLORS: Record<ZoneKind, number> = {
   library: 0xb8c8e0,
   internet: 0xb8e0d0,
   meeting: 0xe0c8e0,
-  testing: 0xe8d0b0,
+  testing: 0xa7b0ba,
   lounge: 0xc8e0b0,
   corridor: 0xcfcfcf,
   entrance: 0xa0a0a0,
-};
-const FURNITURE_COLORS: Record<Furniture, number> = {
-  desk: 0x8b6b4a,
-  shelf: 0x5a6e9a,
-  terminal: 0x3a8a7a,
-  whiteboard: 0xf2f2f2,
-  rack: 0x7a5a3a,
-  sofa: 0x6a9a5a,
-  plant: 0x3f7f3f,
 };
 const WALK_TILES_PER_SECOND = 2.5;
 /** 픽셀 하나를 화면 2px로 그린다. */
@@ -89,6 +82,12 @@ export class OfficeScene extends Phaser.Scene {
     super("office");
     this.map = map;
     this.state = initial;
+  }
+
+  preload(): void {
+    for (const name of artImages()) {
+      this.load.image(artKey(name), `${ART_BASE_URL}${name}.png`);
+    }
   }
 
   create(): void {
@@ -172,6 +171,7 @@ export class OfficeScene extends Phaser.Scene {
 
   private drawScenery(): void {
     this.drawFloor();
+    this.drawWalls();
     this.drawFurniture();
     this.drawZoneLabels();
   }
@@ -393,16 +393,66 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
+  /** 칸 중심 기준으로 그림 하나를 놓는다. 그림을 못 불러왔으면 건너뛴다(화면은 계속 동작). */
+  private placeArt(tile: Point, piece: ArtPiece): void {
+    const key = artKey(piece.image);
+    if (!this.textures.exists(key)) {
+      return;
+    }
+    const at = piece.cell ? { x: tile.x + piece.cell.x, y: tile.y + piece.cell.y } : tile;
+    const screen = gridToScreen(at);
+    const image = this.add
+      .image(screen.sx + piece.dx, screen.sy + piece.dy, key)
+      .setOrigin(0.5, 1)
+      .setScale(piece.scale ?? ART_SCALE)
+      .setDepth(depthOf(at, piece.layer));
+    if (piece.tint !== undefined) {
+      image.setTint(piece.tint);
+    }
+    this.scenery.push(image);
+  }
+
   private drawFurniture(): void {
     for (const tile of this.map.tiles) {
-      if (!tile.furniture) {
-        continue;
+      if (tile.furniture) {
+        for (const piece of FURNITURE_ART[tile.furniture]) {
+          this.placeArt(tile, piece);
+        }
       }
-      const screen = gridToScreen(tile);
-      const block = this.add.rectangle(screen.sx, screen.sy - 8, 26, 16, FURNITURE_COLORS[tile.furniture]);
-      block.setStrokeStyle(1, 0x000000, 0.3);
-      block.setDepth(depthOf(tile, 2));
-      this.scenery.push(block);
+    }
+    for (const seat of this.map.seats) {
+      this.placeArt(seat, SEAT_ART);
+    }
+  }
+
+  /** 뒤쪽 두 변(x = 0, y = 0)에 벽을 세운다. 출입구·복도 끝은 비운다. 벽은 칸의 바깥 변에 붙인다. */
+  private drawWalls(): void {
+    const open = (point: Point) => {
+      const tile = this.map.tiles[point.y * this.map.width + point.x];
+      return tile?.zone === "entrance" || tile?.zone === "corridor";
+    };
+    const put = (point: Point, name: string, originX: number, offsetX: number) => {
+      const key = artKey(name);
+      if (!this.textures.exists(key)) {
+        return;
+      }
+      const screen = gridToScreen(point);
+      const wall = this.add
+        .image(screen.sx + offsetX, screen.sy + 2, key)
+        .setOrigin(originX, 1)
+        .setScale(ART_SCALE)
+        .setDepth(depthOf(point, -5));
+      this.scenery.push(wall);
+    };
+    for (let y = 0; y < this.map.height; y += 1) {
+      if (!open({ x: 0, y })) {
+        put({ x: 0, y }, y % WALL_ART.windowEvery === 1 ? WALL_ART.left.window : WALL_ART.left.plain, 0, -TILE_WIDTH / 2);
+      }
+    }
+    for (let x = 0; x < this.map.width; x += 1) {
+      if (!open({ x, y: 0 })) {
+        put({ x, y: 0 }, x % WALL_ART.windowEvery === 1 ? WALL_ART.right.window : WALL_ART.right.plain, 1, TILE_WIDTH / 2);
+      }
     }
   }
 
@@ -424,4 +474,8 @@ export class OfficeScene extends Phaser.Scene {
       this.scenery.push(label);
     }
   }
+}
+
+function artKey(name: string): string {
+  return `art-${name}`;
 }
