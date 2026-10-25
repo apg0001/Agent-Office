@@ -53,6 +53,11 @@ for arch in amd64 arm64; do
   done
   rm -rf "$stage"
 done
+# 패키지 버전의 `~`(Beta 정렬용)는 GitHub Release가 파일 이름에서 `.`으로 바꿔 SHA256SUMS와 어긋난다.
+# 파일 이름만 `.`으로 맞춘다(패키지 안의 버전은 그대로 `~beta.N`).
+for f in "$OUT"/*~*.deb "$OUT"/*~*.rpm; do
+  if [ -e "$f" ]; then mv -- "$f" "${f//\~/.}"; fi
+done
 
 (cd "$OUT" && sha256sum -- *.tar.gz *.zip *.deb *.rpm >SHA256SUMS)
 echo "$OUT"
