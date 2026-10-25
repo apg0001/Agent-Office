@@ -20,7 +20,8 @@ if [ "$YES" -ne 1 ]; then
 fi
 # 실행 중인 수집을 멈추고, 우리가 표시한 항목만 지운다(남의 Hook·서비스는 그대로).
 "$BIN" hooks uninstall --tool claude --yes >/dev/null 2>&1 || true
-"$BIN" service uninstall >/dev/null 2>&1 || true
+# --activate가 있어야 OS 서비스 관리자 등록 해제·실행 중인 Collector 중지까지 한다(없으면 정의 파일만 지움).
+"$BIN" service uninstall --activate >/dev/null 2>&1 || true
 # GUI(트레이) 자동 시작(#43): 소유 표시가 있는 일반 파일만 지운다.
 for f in "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/agent-office-collector-gui.desktop" \
   "$HOME/Library/LaunchAgents/io.github.apg0001.agent-office.collector-gui.plist"; do

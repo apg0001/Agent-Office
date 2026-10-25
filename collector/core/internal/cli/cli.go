@@ -276,7 +276,7 @@ func cmdService(args []string, env Env) int {
 	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 {
 		return ExitUsage
 	}
-	if sub != "print" && (*goos != env.GOOS || *exeFlag != "") {
+	if sub != "print" && (flagSet(fs, "os") || flagSet(fs, "exe")) {
 		fmt.Fprintln(env.Stderr, "--os, --exe는 service print에서만 쓸 수 있습니다")
 		return ExitUsage
 	}
@@ -387,4 +387,15 @@ func displayPath(p string, dirs paths.Dirs) string {
 		return "~" + p[len(dirs.Home):]
 	}
 	return p
+}
+
+// flagSet은 사용자가 이름의 플래그를 명시했는지다(기본값과 같은 값을 넣어도 명시로 본다).
+func flagSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
 }

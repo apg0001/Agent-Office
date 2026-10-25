@@ -65,11 +65,19 @@ func newTestEnv(t *testing.T, homeName string) *testEnv {
 	te.env = Env{
 		Version: "0.0.0-test", Stdin: strings.NewReader(""), Stdout: te.stdout, Stderr: te.stderr,
 		Getenv: getenv, Dirs: func() (paths.Dirs, error) { return dirs, nil },
-		Executable: func() (string, error) { return "/usr/local/bin/agent-office-collector", nil },
+		Executable: func() (string, error) { return testExecutable(), nil },
 		Command:    func(...string) ([]byte, error) { return nil, nil },
 		Secrets:    te.secrets,
 	}
 	return te
+}
+
+// testExecutable은 이 OS에서 절대 경로인 가짜 설치 위치다(Hook 명령 생성은 절대 경로만 허용).
+func testExecutable() string {
+	if runtime.GOOS == "windows" {
+		return `C:\Program Files\AgentOffice\agent-office-collector.exe`
+	}
+	return "/usr/local/bin/agent-office-collector"
 }
 
 func (te *testEnv) run(stdin string, args ...string) int {
@@ -330,6 +338,7 @@ func TestDiagnoseHasNoSecretsOrPaths(t *testing.T) {
 func TestServiceCommands(t *testing.T) {
 	te := newTestEnv(t, "u")
 	te.env.GOOS = "linux"
+	te.env.Executable = func() (string, error) { return "/usr/local/bin/agent-office-collector", nil }
 	var calls [][]string
 	te.env.Command = func(args ...string) ([]byte, error) { calls = append(calls, args); return nil, nil }
 	if code := te.run("", "service", "print", "--os", "windows", "--exe", `C:\ao\agent-office-collector.exe`); code != ExitOK {

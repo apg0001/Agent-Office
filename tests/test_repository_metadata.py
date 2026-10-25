@@ -141,3 +141,9 @@ def test_production_compose_uses_pinned_images_without_builds() -> None:
         port.startswith("${AGENT_OFFICE_BIND_ADDRESS:-127.0.0.1}:")
         for port in proxy["ports"]
     )
+
+
+def test_windows_powershell_scripts_have_utf8_bom() -> None:
+    # Windows PowerShell 5.1은 BOM 없는 UTF-8을 ANSI로 읽어 한글 문자열이 구문 오류가 된다(#42 러너 실측).
+    for script in ROOT.glob("collector/**/*.ps1"):
+        assert script.read_bytes().startswith(b"\xef\xbb\xbf"), script

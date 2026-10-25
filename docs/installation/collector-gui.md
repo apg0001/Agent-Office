@@ -16,12 +16,12 @@
 | 실제 데스크톱 세션(Wayland·GNOME 등)·`BrowserOpenURL`로 브라우저 열기 | **미실행**: 컨테이너에 데스크톱·브라우저 없음. 브라우저 열기는 단위 테스트에서 호출 주소만 확인 | `app_test.go` |
 | Linux amd64 | **미실행**(CI `Go GUI` 작업은 amd64에서 백엔드 테스트만 실행) | `.github/workflows/ci.yml` |
 | Ubuntu 24.04 등 webkit2gtk 4.1만 있는 배포판 | **미검증**: Wails v2는 `-tags webkit2_41`이 필요할 수 있음 | — |
-| macOS(WKWebView) | **미검증**: 빌드·실행하지 않음. `GOOS=darwin go vet ./internal/...`만 수행 | — |
-| Windows(WebView2) | **미검증**: 빌드·실행하지 않음. `GOOS=windows go vet ./internal/...`만 수행. Core 실행 시 콘솔 창 숨김(`CREATE_NO_WINDOW`)도 미확인 | `hidewindow_windows.go` |
+| macOS(WKWebView) | **검증(러너)**: GitHub Actions `macos-latest`(arm64, macOS 26.6)에서 백엔드 `go vet`·`go test`(실제 Core 계약 테스트 포함), `-tags desktop,production` 빌드, 실행 후 15초 유지. 창 화면·조작은 **미실행** | `.github/workflows/cross-os.yml`, [macOS·Windows](#macoswindowsgithub-actions-러너-검증) |
+| Windows(WebView2) | **검증(러너)**: `windows-latest`(Windows Server 2025, amd64)에서 같은 항목, `-H windowsgui` 빌드 실행 후 15초 유지. 창 화면·조작과 Core 실행 시 콘솔 창 숨김(`CREATE_NO_WINDOW`) 육안 확인은 **미실행** | 같은 워크플로, `hidewindow_windows.go` |
 | 실제 Agent Office 서버에서 웹 코드 발급 → GUI 등록 | **미실행**: 웹 화면은 Vitest·빌드, 등록은 `httptest` 서버로만 확인 | `devices.test.tsx`, `integration_test.go` |
 | 장치 토큰 OS 보안 저장소(#41) — Linux Secret Service | **검증(컨테이너)**: Debian bookworm `gnome-keyring 42.1-1+b2`·`dbus 1.14.10`(`dbus-run-session`, 잠금 해제한 login 모음)에서 저장·읽기·삭제, `register` 뒤 `config.json`에 토큰 없음·`status` `os_keyring`, `logout` 뒤 항목 삭제, 파일 토큰을 `run`이 저장소로 이전 | `tests/poc/collector/desktop/keyring-secret-service.sh`, [Collector CLI](collector-cli.md#장치-토큰-보관41) |
 | 장치 토큰 — 실제 데스크톱 세션(GNOME·KDE 로그인 키링 자동 잠금 해제, KWallet) | **미실행** | — |
-| 장치 토큰 — macOS Keychain·Windows Credential Manager | **미검증**: `GOOS=darwin\|windows go vet`만. go-keyring 소스에서 macOS가 비밀 값을 표준 입력으로 넘기는 것만 확인 | ADR-0004 |
+| 장치 토큰 — macOS Keychain·Windows Credential Manager | **검증(러너)**: 두 러너에서 `AGENT_OFFICE_TEST_REAL_KEYRING=1` 실제 저장소 테스트 통과, 스모크에서 `register` 뒤 `token_storage` `os_keyring`·`config.json`에 토큰 없음, `logout` 뒤 서버 폐기·미등록. 사람이 쓰는 데스크톱의 키체인 잠금·접근 허용 대화상자는 **미실행** | `tests/cross_os/collector_smoke.py`, ADR-0004 |
 | 대체 경로(보안 저장소 없음 → 0600 파일, `file_fallback`) | **검증**: 세션 D-Bus 없는 컨테이너·CI에서 `register`가 파일에 저장하고 상태에 `file_fallback` 표시 | `logout_test.go`, 아래 트레이 검증 로그 |
 | 로그아웃(Core `logout`, GUI 버튼) | **검증**: 서버 `POST /api/v1/devices/revoke` 호출(장치 토큰 Bearer) → 로컬 토큰·`config.json` 삭제 → 실행 중인 Core가 전송·heartbeat 중지. 서버 오류·네트워크 오류면 아무것도 지우지 않음, `--local-only` | `logout_test.go`, `tray/independence_test.go` |
 | 트레이(Linux, StatusNotifierItem) | **검증(컨테이너)**: Xvfb·`dbus-run-session`·최소 `org.kde.StatusNotifierWatcher`(Python)에서 아이콘·툴팁·메뉴 7항목 등록, D-Bus `com.canonical.dbusmenu.Event`로 일시중지·재개·창 열기·GUI 종료 클릭 → Core 상태 반영, Core 강제 종료 시 "Core 실행 중 아님" → 재시작 후 "수집 중" | [트레이 검증](#트레이-검증linux-컨테이너) |
@@ -29,7 +29,7 @@
 | 실제 패널(KDE Plasma, GNOME AppIndicator 확장, XFCE 등)에서 아이콘 표시·클릭 | **미실행**: 컨테이너의 Watcher는 프로토콜 검증용 최소 구현 | — |
 | 트레이 — macOS 메뉴 막대·Windows 알림 영역 | **미구현**: Wails v2에 트레이 API가 없고 systray와 메인 루프가 충돌할 수 있어 넣지 않음. 창 닫기 = GUI 종료(Core는 계속) | ADR-0004 |
 | GUI 자동 시작(Linux XDG autostart) | **검증(파일)**: 생성 `.desktop`이 `desktop-file-validate`(desktop-file-utils 0.26) 통과, 소유 표시 없는 파일 교체·삭제 거부, 심볼릭 링크 거부. 실제 로그인 시 실행은 **미실행** | `autostart_test.go`, `autostart-validate.sh` |
-| GUI 자동 시작(macOS LaunchAgent·Windows HKCU Run) | **미검증**: plist는 `xmllint` 형식만, Windows는 메모리 레지스트리로 소유 판정·교체 거부만 확인 | `autostart_test.go` |
+| GUI 자동 시작(macOS LaunchAgent·Windows HKCU Run) | **검증(러너, 등록까지)**: `AGENT_OFFICE_TEST_REAL_AUTOSTART=1`로 실제 `~/Library/LaunchAgents` plist 설치(`plutil -lint` 통과)·실제 HKCU Run 값 설치 → 상태 `installed` → 제거 → `absent`. 로그인 시 실제 실행은 **미실행** | `autostart_test.go` `TestRealSystemAutostart` |
 | GUI/Core 독립성 | **검증**: 실제 Core `run`을 별도 프로세스로 띄우고 GUI 프로세스를 SIGKILL·트레이 종료로 끝내도 Core가 계속 Hook 이벤트를 전송, Core 강제 종료·재시작 시 트레이 상태 회복 | `tray/independence_test.go`(CI `Go GUI`) |
 | 재부팅 후 자동 수집(Core 서비스 + GUI 자동 시작) | **미실행**: 컨테이너에 systemd 사용자 세션·로그인 세션 없음 | [Collector CLI 자동 시작](collector-cli.md#자동-시작service) |
 
@@ -170,9 +170,18 @@ cd ../gui && go build -tags desktop,production -ldflags "-s -w" -o ../../dist/ag
 
 webkit2gtk 4.1만 있는 배포판은 `libwebkit2gtk-4.1-dev`와 `-tags desktop,production,webkit2_41`을 시도하세요(미검증).
 
-### macOS·Windows(미검증)
+### macOS·Windows(GitHub Actions 러너 검증)
 
-Wails v2 문서 기준으로 macOS는 Xcode 명령줄 도구, Windows는 WebView2 런타임이 필요합니다. 같은 `go build -tags desktop,production` 명령이 동작할 것으로 예상하지만 이 저장소에서 실행하지 않았습니다. Windows는 콘솔 창을 숨기려면 `-ldflags "-H windowsgui"`가 필요할 수 있습니다. 실장비 검증 전까지 지원으로 표시하지 않습니다.
+`.github/workflows/cross-os.yml`이 `macos-latest`(arm64, macOS 26.6, Xcode 26.6)와 `windows-latest`(Windows Server 2025, amd64) 러너에서 아래를 실행합니다. 러너는 실제 OS이지만 사람이 쓰는 데스크톱과는 다르므로, 화면을 눈으로 확인하는 항목(창 모양·브라우저 로그인 클릭)은 실장비 확인으로 남깁니다.
+
+```bash
+cd collector/gui
+go build -tags desktop,production -ldflags "-s -w" -o agent-office-collector-gui .                # macOS
+go build -tags desktop,production -ldflags "-s -w -H windowsgui" -o agent-office-collector-gui.exe .  # Windows
+```
+
+- macOS: Wails v2.12.0이 `UTType`을 쓰지만 `UniformTypeIdentifiers`를 링크하지 않아 최신 SDK에서 링크가 실패했습니다. `link_darwin.go`(`desktop` 태그)에서 프레임워크를 추가해 고쳤습니다.
+- 두 OS 모두 빌드한 GUI가 15초 동안 종료되지 않고 실행되는 것까지 확인합니다.
 
 ## 검증
 
