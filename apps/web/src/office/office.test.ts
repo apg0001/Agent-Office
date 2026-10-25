@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { assignSeats, deskRowsFor, targetTile, zoneForActivity } from "./behavior";
-import { contains, createDefaultOffice, isWalkable, tileAt, walkableTiles } from "./grid";
+import { ZONE_COLORS, ZONE_GUIDE, contains, createDefaultOffice, isWalkable, tileAt, walkableTiles } from "./grid";
 import { depthOf, gridToScreen, screenToGrid, tileDiamond } from "./iso";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
 import type { ZoneKind } from "./grid";
+import type { Activity } from "./types";
 
 describe("isometric projection", () => {
   it("round-trips grid points", () => {
@@ -130,5 +131,22 @@ describe("synthetic adapter", () => {
   it("refuses to advance server data", () => {
     const server = { ...createSyntheticOffice({ sessions: 1, subagentsPerSession: 0 }), source: "server" as const };
     expect(() => advanceSynthetic(server, 1)).toThrow();
+  });
+});
+
+describe("zone guide (#160)", () => {
+  it("explains every zone a character can be sent to, with the map color", () => {
+    const activities: Activity[] = [
+      "reading", "browsing", "coding", "testing", "planning", "delegating",
+      "reporting", "thinking", "waiting_user", "idle", "unknown",
+    ];
+    const reachable = new Set(
+      activities.flatMap((a) => [zoneForActivity(a, "WORKING"), zoneForActivity(a, "IDLE")]),
+    );
+    const explained = new Set(ZONE_GUIDE.map((g) => g.zone));
+    for (const zone of reachable) {
+      expect(explained.has(zone), zone).toBe(true);
+      expect(ZONE_COLORS[zone]).toBeTypeOf("number");
+    }
   });
 });

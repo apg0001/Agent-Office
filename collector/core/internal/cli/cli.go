@@ -9,7 +9,7 @@
 //	agent-office-collector diagnose [--json] [--offline]
 //	agent-office-collector service install|uninstall [--activate]
 //	agent-office-collector service print [--os linux|darwin|windows] [--exe PATH]
-//	agent-office-collector hooks install|uninstall [--tool claude] [--yes] [--scope user]
+//	agent-office-collector hooks install|uninstall [--tool claude|codex] [--yes] [--scope user]
 //	agent-office-collector hooks status [--tool claude|codex] [--json]
 //	agent-office-collector hooks print [--tool claude|codex] [--os linux|darwin|windows] [--exe PATH]
 //	agent-office-collector version
@@ -199,7 +199,7 @@ func usage(w io.Writer) {
   diagnose [--json] [--offline]                                안전한 진단 정보(경로·토큰·내용 없음)
   service install|uninstall [--activate]                       OS 사용자 자동 시작 정의 설치/제거
   service print [--os linux|darwin|windows] [--exe PATH]       자동 시작 정의 미리보기
-  hooks install|uninstall [--tool claude] [--yes] [--scope user]
+  hooks install|uninstall [--tool claude|codex] [--yes] [--scope user]
                                                                Claude Code 사용자 설정에 Hook 추가/제거(미리보기 후 --yes로 적용, 백업)
   hooks status [--tool claude|codex] [--json]                           Hook 설치 상태와 도구 버전 검증 수준
   hooks print [--tool claude|codex] [--os OS] [--exe PATH]     Hook 항목 미리보기(Codex는 print 전용)
@@ -224,6 +224,11 @@ func cmdRun(args []string, env Env) int {
 	if err != nil {
 		fmt.Fprintln(env.Stderr, "사용자 디렉터리를 찾을 수 없습니다")
 		return ExitError
+	}
+	// Windows 로그온 작업으로 시작하면 콘솔 창이 새로 생긴다. 혼자 쓰는 콘솔이면 떼어 내 창을 닫는다(#169).
+	// 그 뒤의 표준 오류 출력은 버려진다(상태는 status·diagnose로 본다).
+	if env.GOOS == "windows" {
+		detachOwnConsole()
 	}
 	logger := log.New(env.Stderr, "agent-office-collector: ", log.LstdFlags)
 	o := runner.Options{Dirs: dirs, Version: env.Version, GOOS: env.GOOS, Now: env.Now, Logf: logger.Printf, Secrets: env.Secrets}

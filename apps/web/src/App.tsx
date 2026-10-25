@@ -11,12 +11,6 @@ import { OfficeView } from "./office/OfficeView";
 import { SideBySide } from "./office/SideBySide";
 import { scopeFromSearch } from "./office/liveSource";
 
-const principles = [
-  ["관측 우선", "실제 이벤트와 추정·연출을 분리합니다."],
-  ["로컬 원문", "프롬프트와 코드, 로그 원문은 개발 PC에만 둡니다."],
-  ["비침습", "Collector 장애가 에이전트 작업을 막지 않습니다."],
-];
-
 function SessionBar() {
   const [session, setSession] = useState<SessionInfo | null | undefined>(undefined);
 
@@ -88,16 +82,6 @@ export function App({ pathname }: { pathname?: string }) {
         <SessionBar />
       </header>
       {typeof window !== "undefined" && scopeFromSearch(window.location.search).kind === "side" ? <SideBySide /> : <OfficeView />}
-      <section className="about" aria-label="소개">
-        <p>코딩 에이전트의 활동 메타데이터를 아이소메트릭 사무실로 보여 줍니다.</p>
-        <ul className="principles">
-          {principles.map(([title, description]) => (
-            <li key={title}>
-              <strong>{title}</strong> {description}
-            </li>
-          ))}
-        </ul>
-      </section>
     </main>
   );
 }

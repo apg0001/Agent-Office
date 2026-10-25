@@ -1,21 +1,31 @@
 import { describe, expect, it } from "vitest";
 
 import { createDefaultOffice } from "./grid";
-import { TILE_HEIGHT, TILE_WIDTH } from "./iso";
-import { WALL_HEIGHT, wallBase, wallPoint, wallSegments } from "./walls";
+import { TILE_HEIGHT, TILE_WIDTH, gridToScreen } from "./iso";
+import { WALL_HEIGHT, partitionBase, partitionFront, wallBase, wallPoint, wallSegments } from "./walls";
 
 describe("back walls (#153)", () => {
   const map = createDefaultOffice(2);
   const segments = wallSegments(map);
 
-  it("runs along both back edges and leaves the corridor and entrance open", () => {
-    const left = segments.filter((s) => s.side === "left");
-    const right = segments.filter((s) => s.side === "right");
-    expect(right).toHaveLength(map.width);
-    expect(left.length).toBeGreaterThan(0);
-    for (const segment of left) {
-      const zone = map.tiles[segment.tile.y * map.width]!.zone;
-      expect(zone === "corridor" || zone === "entrance").toBe(false);
+  it("runs along both back edges with a door at the entrance", () => {
+    expect(segments.filter((s) => s.side === "right")).toHaveLength(map.width);
+    expect(segments.filter((s) => s.side === "left")).toHaveLength(map.height);
+    const doors = segments.filter((s) => s.door);
+    expect(doors).toHaveLength(1);
+    expect(doors[0]!.tile).toEqual(map.entrance);
+    expect(doors[0]!.window).toBe(false);
+  });
+
+  it("puts every partition on the edge shared by its two tiles", () => {
+    for (const partition of map.partitions) {
+      const [p, q] = partitionBase(partition);
+      expect(Math.abs((q.sy - p.sy) / (q.sx - p.sx))).toBeCloseTo(TILE_HEIGHT / TILE_WIDTH);
+      const front = partitionFront(partition);
+      const c = gridToScreen(front);
+      // 앞쪽 칸의 위쪽 두 변 중 하나다.
+      expect(Math.max(p.sy, q.sy)).toBeCloseTo(c.sy);
+      expect(Math.min(p.sy, q.sy)).toBeCloseTo(c.sy - TILE_HEIGHT / 2);
     }
   });
 

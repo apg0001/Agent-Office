@@ -42,7 +42,7 @@ Codex·Claude Hook stdin과 Claude transcript JSONL 한 줄을 제공자 중립 
 | `UserPromptSubmit` | `turn.started`(키 `prompt_id`) | `turn.started`(키 `turn_id`) |
 | `Stop` | `turn.completed`(키 없음) | 같음 |
 | `PreToolUse` | `tool.started` | 같음 |
-| `PostToolUse` | `tool.completed` | Desktop 런타임만 `tool.completed`. CLI·미상 런타임은 `unknown`(CLI exec 미관측, #17) |
+| `PostToolUse` | `tool.completed` | Desktop 런타임과 PostToolUse를 관측한 CLI 실측 대상(#170 `0.163.0` `linux` `exec`)과 정확히 같은 런타임만 `tool.completed`. 그 밖의 CLI·미상 런타임은 `unknown`(#17 Windows `0.162` exec 미관측) |
 | `PostToolUseFailure` | `tool.failed`(미관측이라 `unverified`) | 매핑 없음 → `unknown` |
 | `PermissionRequest` | `approval.requested`(키 없음) | 같음 |
 | `SubagentStart` / `SubagentStop` | `agent.started` / `agent.completed`(키 `agent_id`) | 같음 |
@@ -93,10 +93,12 @@ Hook payload에는 도구 버전이 없으므로 호출자가 로컬에서 감�
 |---|---|---|
 | `claude-code` `2.1.308` `linux` `print`(-p) | `verified` | Session·Prompt·Pre/Post·Subagent·Permission·Stop·End, transcript |
 | `codex-cli` `0.162.0-alpha.17.2` `windows` `exec` | `verified` | SessionStart, UserPromptSubmit, PreToolUse, Stop, SessionEnd |
+| `codex-cli` `0.163.0` `linux` `exec` | `verified`(4회, #170) | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop, SessionEnd. 사용자 범위 `$CODEX_HOME/hooks.json` + TUI 신뢰. [실측](../verification/codex-user-hooks.md) |
 | `codex-desktop` `26.1007.2314.0` `windows` `desktop` | `partial`(1회 실측) | UserPromptSubmit, Pre/PostToolUse, PermissionRequest, Subagent*, Stop, SessionEnd |
 
 - 런타임이 목록과 정확히 일치하지 않거나 그 런타임에서 관측되지 않은 이벤트는 `Support=unverified`입니다. 파싱은 같은 규칙으로 안전하게 하지만 지원으로 주장하지 않습니다.
 - `Confidence`는 `verified`만 `observed`, `partial`·`unverified`는 `inferred`입니다. 대화형 TUI, macOS·Windows Claude, 다른 버전은 모두 `inferred`가 됩니다.
+- `hook codex`는 Codex 버전을 기록하지 않으므로(payload에 버전·실행 모드 없음) 실제 수집 런타임은 버전이 비어 `unverified` → `inferred`이고 CLI `PostToolUse`는 `unknown`입니다. `hooks status`의 버전 판정만 위 표를 씁니다.
 - 새 버전을 지원하려면 실측 보고서를 남긴 뒤 `VerifiedTargets`에 추가하고 호환성 행렬을 갱신합니다.
 
 ## 중복 제거와 참조 구현 일치

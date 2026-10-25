@@ -94,7 +94,7 @@
           {
             "type": "command",
             "command": "\"C:/Program Files/AgentOffice/agent-office-collector.exe\" hook codex",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }

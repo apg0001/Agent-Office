@@ -53,6 +53,7 @@ func TestGenerateGolden(t *testing.T) {
 		{ToolClaude, "windows", `C:\Program Files\AgentOffice\agent-office-collector.exe`, "claude-windows.json.golden"},
 		{ToolCodex, "windows", `C:\Program Files\AgentOffice\agent-office-collector.exe`, "codex-windows.json.golden"},
 		{ToolCodex, "linux", "/usr/local/bin/agent-office-collector", "codex-linux.json.golden"},
+		{ToolCodex, "darwin", "/Users/u/Applications/Agent Office/agent-office-collector", "codex-darwin.json.golden"},
 	}
 	for _, c := range cases {
 		s := mustSpec(t, c.tool, c.goos, c.exe)
@@ -430,7 +431,13 @@ func TestParseVersionAndAssess(t *testing.T) {
 		t.Errorf("codex windows: %+v", s)
 	}
 	if s := AssessVersion(ToolCodex, "0.163.0", "windows"); s.Level != adapter.SupportUnverified {
-		t.Errorf("codex 0.163: %+v", s)
+		t.Errorf("codex 0.163 windows: %+v", s)
+	}
+	if s := AssessVersion(ToolCodex, "0.163.0", "linux"); s.Level != adapter.SupportVerified || s.Mode != "exec" {
+		t.Errorf("codex 0.163 linux(#170): %+v", s)
+	}
+	if s := AssessVersion(ToolCodex, "0.163.0", "darwin"); s.Level != adapter.SupportUnverified {
+		t.Errorf("codex 0.163 darwin: %+v", s)
 	}
 	if s := AssessVersion(ToolClaude, "", "linux"); s.Level != adapter.SupportUnverified {
 		t.Errorf("빈 버전: %+v", s)
@@ -471,5 +478,45 @@ func TestClaudeSettingsPath(t *testing.T) {
 	}
 	if got := ClaudeSettingsPath(`C:\Users\u\.claude\projects`); got != `C:\Users\u\.claude\settings.json` {
 		t.Error(got)
+	}
+}
+
+func TestCodexHooksPath(t *testing.T) {
+	if got := CodexHooksPath(filepath.Join("h", ".codex")); got != filepath.Join("h", ".codex", "hooks.json") {
+		t.Error(got)
+	}
+}
+
+// Codex hooks.json(#170): SessionEnd는 Codex 상한 3초, 이전 print 출력(5초)은 변경됨으로 보고 교체한다.
+func TestCodexInstallSessionEndTimeoutAndReplace(t *testing.T) {
+	s := mustSpec(t, ToolCodex, "linux", "/usr/local/bin/agent-office-collector")
+	if got := s.TimeoutFor(Event{Name: "SessionEnd", Timeout: CodexSessionEndTimeoutSeconds}); got != 3 {
+		t.Fatalf("SessionEnd timeout %d", got)
+	}
+	path := filepath.Join(t.TempDir(), "hooks.json")
+	// 이전 hooks print 출력처럼 모든 이벤트 timeout 5.
+	old := strings.ReplaceAll(string(s.JSON()), `"timeout": 3`, `"timeout": 5`)
+	writeFile(t, path, old, 0o600)
+	st, err := Inspect(path, s)
+	if err != nil || st.State != StateModified || st.Modified != 1 || st.Current != 8 {
+		t.Fatalf("이전 출력 상태: %+v %v", st, err)
+	}
+	res, err := Install(path, s, now, true)
+	if err != nil || !res.Wrote || len(res.Changes) != 1 || res.Changes[0] != (Change{Event: "SessionEnd", Action: ActionReplace}) {
+		t.Fatalf("교체: %+v %v", res, err)
+	}
+	if st, _ := Inspect(path, s); st.State != StateInstalled {
+		t.Fatalf("교체 후: %+v", st)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != string(s.JSON()) {
+		t.Errorf("교체 결과가 생성 결과와 다름:\n%s", got)
+	}
+	res, err = Uninstall(path, s, now, true)
+	if err != nil || len(res.Changes) != 9 {
+		t.Fatalf("제거: %+v %v", res, err)
+	}
+	if got, _ := os.ReadFile(path); strings.TrimSpace(string(got)) != "{}" {
+		t.Errorf("제거 후: %s", got)
 	}
 }
