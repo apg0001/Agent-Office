@@ -16,11 +16,16 @@
 
 ## 승인 후(관리자)
 
-1. GitHub Actions `Publish Images`를 `version=<버전>`으로 실행 → `image-publish` Environment 승인 → GHCR에 amd64·arm64 이미지 게시. 실행 결과의 digest를 기록.
-2. 게시된 `tag@digest`로 `tests/install/compare.sh`를 한 번 더 실행.
-3. 운영 서버에 `deploy/upgrade.sh --server …@sha256:… --web …@sha256:…`.
-4. `develop` → `main` PR을 만들고 관리자가 승인·병합.
-5. `main` 병합 커밋에 `server-v<버전>` 태그, GitHub Release에 `docs/releases/<버전>.md` 내용을 붙임.
+수동 게시 워크플로(`workflow_dispatch`)는 기본 브랜치(`main`)에 있어야 실행할 수 있으므로 `main` 병합을 먼저 합니다(0.1.0-beta.1에서 확인).
+
+1. `develop` → `main` PR(`CI Gate` 필수)을 만들고 병합.
+2. `gh workflow run publish-images.yml --ref main -f version=<버전>` → GitHub에서 `image-publish` Environment 승인(필수 리뷰어) → GHCR에 amd64·arm64 이미지 게시. 실행 결과의 digest를 기록.
+3. 게시된 `tag@digest`로 `tests/install/compare.sh`를 한 번 더 실행.
+4. `collector-publish` Environment에 변수 `COLLECTOR_UPDATE_PUBLIC_KEYS`, 비밀 `COLLECTOR_UPDATE_SIGNING_KEY`가 있는지 확인 → `gh workflow run publish-collector.yml --ref main -f version=<버전>` → 승인 → Release 초안 `collector-v<버전>` 확인 후 공개.
+5. 운영 서버가 있으면 `deploy/upgrade.sh --server …@sha256:… --web …@sha256:…`.
+6. `main` 병합 커밋에 `server-v<버전>` 태그, GitHub Release에 `docs/releases/<버전>.md` 내용을 붙임.
+
+Environment 승인과 GitHub Secret 등록은 관리자가 직접 합니다(에이전트가 대신 승인하거나 비밀을 쓰지 않음).
 
 ## 하지 않는 것
 
