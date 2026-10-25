@@ -16,6 +16,7 @@ import {
   zoomBy,
 } from "./camera";
 import { findPath } from "./pathfinding";
+import { headlineFor } from "./headline";
 import { BADGE_LABELS, idleCycle, presenceOf } from "./presence";
 import { type DisplayedZone, nextDisplayedZone } from "./smoothing";
 import {
@@ -214,10 +215,12 @@ export class OfficeScene extends Phaser.Scene {
       return;
     }
     actor.container.setAlpha(view.alpha);
-    actor.status.setVisible(view.badge !== null);
-    if (view.badge) {
-      actor.status.setText(BADGE_LABELS[view.badge]);
+    // 머리 위 짧은 상태: 연결 끊김 같은 존재 배지가 우선, 아니면 지금 활동(#162).
+    const headline = view.badge ? BADGE_LABELS[view.badge] : headlineFor(actor.agent);
+    if (actor.status.text !== headline) {
+      actor.status.setText(headline);
     }
+    actor.status.setVisible(true);
     actor.displayed = nextDisplayedZone(actor.displayed, actor.agent, now);
     // 유휴면 휴게실 안에서 가끔 자리를 옮긴다(생활 연출).
     const variant = actor.displayed.zone === "lounge" ? idleCycle(now, actor.agent.id) : 0;
@@ -332,9 +335,11 @@ export class OfficeScene extends Phaser.Scene {
         fontFamily: "sans-serif",
         fontSize: "10px",
         color: "#ffffff",
-        backgroundColor: "#00000088",
+        backgroundColor: "#000000aa",
+        padding: { x: 3, y: 1 },
       })
       .setOrigin(0.5)
+      .setResolution(2)
       .setVisible(false);
     const label = this.add
       .text(0, 2, labelFor(agent, device), {
