@@ -143,6 +143,12 @@ func run(args []string) int {
 		fmt.Println("백업(0600): ~/.claude/settings.json.agent-office-backup-x\nHook을 설치했습니다.")
 	case joined == "hooks uninstall --tool claude --yes":
 		fmt.Println("Agent Office Hook만 제거했습니다.")
+	case joined == "hooks install --tool codex":
+		fmt.Println("대상: ~/.codex/hooks.json\n변경 미리보기:\n  + SessionStart\n파일을 바꾸지 않았습니다.")
+	case joined == "hooks install --tool codex --yes":
+		fmt.Println("백업(0600): ~/.codex/hooks.json.agent-office-backup-x\nHook을 설치했습니다.")
+	case joined == "hooks uninstall --tool codex --yes":
+		fmt.Println("Agent Office Hook만 제거했습니다.")
 	case joined == "hooks print --tool codex":
 		fmt.Println(`{"hooks":{}}`)
 	case args[0] == "register":

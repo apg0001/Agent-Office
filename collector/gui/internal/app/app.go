@@ -44,8 +44,8 @@ type App struct {
 	opts Options
 	mu   sync.Mutex
 	ctx  context.Context
-	// hookPreviewed는 이번 실행에서 Hook 설치 미리보기를 보여 줬는지다(명시적 동의 흐름).
-	hookPreviewed bool
+	// hookPreviewed는 이번 실행에서 Hook 설치 미리보기를 보여 준 도구다(명시적 동의 흐름). 없으면 "".
+	hookPreviewed string
 }
 
 // New는 App을 만든다.
@@ -412,21 +412,31 @@ func (a *App) Tools() ToolsView {
 	return ToolsView{OK: true, OS: t.OS, Tools: t.Tools}
 }
 
-// HookPreview는 Claude Code Hook 설치 미리보기(`hooks install`, `--yes` 없음)다. 파일을 바꾸지 않는다.
-func (a *App) HookPreview() Result {
-	res := a.output("hook_preview", "hook_preview_failed", "hooks", "install", "--tool", "claude")
+// hookTools는 Core `hooks install`이 자동 설치를 지원하는 도구다(Codex는 #170부터).
+var hookTools = map[string]bool{"claude": true, "codex": true}
+
+// HookPreview는 도구(claude·codex)의 Hook 설치 미리보기(`hooks install`, `--yes` 없음)다. 파일을 바꾸지 않는다.
+func (a *App) HookPreview(tool string) Result {
+	if !hookTools[tool] {
+		return fail("invalid_tool")
+	}
+	res := a.output("hook_preview", "hook_preview_failed", "hooks", "install", "--tool", tool)
 	if res.OK {
 		a.mu.Lock()
-		a.hookPreviewed = true
+		a.hookPreviewed = tool
 		a.mu.Unlock()
 	}
 	return res
 }
 
-// HookInstall은 미리보기를 본 뒤 사용자가 승인했을 때만 `hooks install --yes`를 실행한다.
-func (a *App) HookInstall(confirmed bool) Result {
+// HookInstall은 같은 도구의 미리보기를 본 뒤 사용자가 승인했을 때만 `hooks install --yes`를 실행한다.
+// Codex는 설치 뒤 Codex 안에서 사용자가 Hook을 신뢰해야 실행된다(Collector는 신뢰 상태를 쓰지 않음).
+func (a *App) HookInstall(tool string, confirmed bool) Result {
+	if !hookTools[tool] {
+		return fail("invalid_tool")
+	}
 	a.mu.Lock()
-	previewed := a.hookPreviewed
+	previewed := a.hookPreviewed == tool
 	a.mu.Unlock()
 	if !confirmed {
 		return fail("confirmation_required")
@@ -434,24 +444,26 @@ func (a *App) HookInstall(confirmed bool) Result {
 	if !previewed {
 		return fail("preview_required")
 	}
-	res := a.output("hook_installed", "hook_install_failed", "hooks", "install", "--tool", "claude", "--yes")
+	done := "hook_installed"
+	if tool == "codex" {
+		done = "codex_hook_installed"
+	}
+	res := a.output(done, "hook_install_failed", "hooks", "install", "--tool", tool, "--yes")
 	a.mu.Lock()
-	a.hookPreviewed = false
+	a.hookPreviewed = ""
 	a.mu.Unlock()
 	return res
 }
 
-// HookUninstall은 승인 시 Agent Office 소유 Hook만 제거한다.
-func (a *App) HookUninstall(confirmed bool) Result {
+// HookUninstall은 승인 시 그 도구의 Agent Office 소유 Hook만 제거한다.
+func (a *App) HookUninstall(tool string, confirmed bool) Result {
+	if !hookTools[tool] {
+		return fail("invalid_tool")
+	}
 	if !confirmed {
 		return fail("confirmation_required")
 	}
-	return a.output("hook_uninstalled", "hook_uninstall_failed", "hooks", "uninstall", "--tool", "claude", "--yes")
-}
-
-// CodexHookPrint는 Codex용 hooks.json 항목 미리보기다(자동 설치 미지원).
-func (a *App) CodexHookPrint() Result {
-	return a.output("codex_hook_print", "hook_preview_failed", "hooks", "print", "--tool", "codex")
+	return a.output("hook_uninstalled", "hook_uninstall_failed", "hooks", "uninstall", "--tool", tool, "--yes")
 }
 
 // --- 자동 시작 ---------------------------------------------------------------------

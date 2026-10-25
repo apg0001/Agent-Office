@@ -39,6 +39,7 @@ if [ "$YES" -ne 1 ]; then
 fi
 # 실행 중인 수집을 멈추고, 우리가 표시한 항목만 지운다(남의 Hook·서비스는 그대로).
 "$BIN" hooks uninstall --tool claude --yes >/dev/null 2>&1 || true
+"$BIN" hooks uninstall --tool codex --yes >/dev/null 2>&1 || true
 # --activate가 있어야 OS 서비스 관리자 등록 해제·실행 중인 Collector 중지까지 한다(없으면 정의 파일만 지움).
 "$BIN" service uninstall --activate >/dev/null 2>&1 || true
 # 트레이 도우미·GUI 창(#159): 이 사용자의 프로세스만 끝낸다(Core는 위에서 멈췄다).

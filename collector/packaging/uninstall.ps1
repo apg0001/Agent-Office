@@ -10,6 +10,7 @@ if (-not $Yes) {
   if ($answer -notin @("y", "Y")) { Write-Output "취소"; exit 1 }
 }
 & $bin hooks uninstall --tool claude --yes *> $null
+& $bin hooks uninstall --tool codex --yes *> $null
 # --activate가 있어야 작업 스케줄러 등록 해제(schtasks /End·/Delete)까지 한다(없으면 정의 파일만 지움).
 & $bin service uninstall --activate *> $null
 # 트레이 도우미·GUI 창(#159): 이 폴더에서 실행 중인 우리 프로세스만 끝낸다(설치 폴더 파일 잠금 해제).

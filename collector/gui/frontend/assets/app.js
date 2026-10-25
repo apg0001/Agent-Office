@@ -152,19 +152,27 @@ async function loadTools() {
 loaders.tools = loadTools;
 $("tools-refresh").addEventListener("click", () => void loadTools());
 
+const hookTool = () => $("hook-tool").value;
+const TOOL_NAMES = { claude: "Claude Code", codex: "Codex" };
+
+$("hook-tool").addEventListener("change", () => {
+  $("hook-install").disabled = true;
+});
+
 $("hook-preview").addEventListener("click", async () => {
-  const r = await call("HookPreview");
+  const r = await call("HookPreview", hookTool());
   show("hook-result", r);
   showOutput("hook-output", r.output);
   $("hook-install").disabled = !r.ok;
 });
 
 $("hook-install").addEventListener("click", async () => {
-  const yes = window.confirm("미리보기의 변경을 Claude Code 사용자 설정에 적용합니다. 원본은 백업됩니다. 계속할까요?");
+  const tool = hookTool();
+  const yes = window.confirm("미리보기의 변경을 " + TOOL_NAMES[tool] + " 사용자 설정에 적용합니다. 원본은 백업됩니다. 계속할까요?");
   if (!yes) {
     return;
   }
-  const r = await call("HookInstall", true);
+  const r = await call("HookInstall", tool, true);
   show("hook-result", r);
   showOutput("hook-output", r.output);
   $("hook-install").disabled = true;
@@ -172,19 +180,14 @@ $("hook-install").addEventListener("click", async () => {
 });
 
 $("hook-uninstall").addEventListener("click", async () => {
-  if (!window.confirm("Agent Office가 추가한 Hook만 제거합니다. 계속할까요?")) {
+  const tool = hookTool();
+  if (!window.confirm(TOOL_NAMES[tool] + "에서 Agent Office가 추가한 Hook만 제거합니다. 계속할까요?")) {
     return;
   }
-  const r = await call("HookUninstall", true);
+  const r = await call("HookUninstall", tool, true);
   show("hook-result", r);
   showOutput("hook-output", r.output);
   void loadTools();
-});
-
-$("codex-print").addEventListener("click", async () => {
-  const r = await call("CodexHookPrint");
-  show("hook-result", r);
-  showOutput("hook-output", r.output);
 });
 
 // --- 자동 시작 ---------------------------------------------------------------------
