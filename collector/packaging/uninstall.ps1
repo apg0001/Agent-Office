@@ -12,18 +12,24 @@ if (-not $Yes) {
 & $bin hooks uninstall --tool claude --yes *> $null
 # --activate가 있어야 작업 스케줄러 등록 해제(schtasks /End·/Delete)까지 한다(없으면 정의 파일만 지움).
 & $bin service uninstall --activate *> $null
-# GUI(트레이) 자동 시작(#43): 우리 형식("...\agent-office-collector-gui.exe" --autostart)인 Run 값만 지운다.
+# 트레이 도우미·GUI 창(#159): 이 폴더에서 실행 중인 우리 프로세스만 끝낸다(설치 폴더 파일 잠금 해제).
+foreach ($name in @("agent-office-collector-tray", "agent-office-collector-gui")) {
+  Get-Process -Name $name -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and ((Split-Path -Parent $_.Path) -eq $PSScriptRoot) } |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+}
+# 트레이(GUI) 자동 시작(#43, #159): 우리 형식("...\agent-office-collector-(tray|gui).exe" --autostart)인 Run 값만 지운다.
 $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $gui = (Get-ItemProperty -Path $run -Name AgentOfficeCollectorGUI -ErrorAction SilentlyContinue).AgentOfficeCollectorGUI
-if ($gui -and $gui -match '^"[A-Za-z]:\\[^"]*\\agent-office-collector-gui\.exe" --autostart$') {
+if ($gui -and $gui -match '^"[A-Za-z]:\\[^"]*\\agent-office-collector-(gui|tray)\.exe" --autostart$') {
   Remove-ItemProperty -Path $run -Name AgentOfficeCollectorGUI -ErrorAction Stop
 }
 if ($Purge) {
   # Credential Manager의 장치 토큰 항목(#41)을 먼저 지운다. 서버 폐기는 하지 않는다(웹 /devices 또는 logout).
   & $bin logout --local-only *> $null
-  # Core의 경로 규칙과 같다(%APPDATA%·%LOCALAPPDATA%\AgentOffice\Collector).
-  foreach ($dir in @((Join-Path $env:APPDATA "AgentOffice\Collector"), (Join-Path $env:LOCALAPPDATA "AgentOffice\Collector"))) {
-    if (-not ($dir.EndsWith("AgentOffice\Collector") -and (Test-Path $dir))) { continue }
+  # Core의 경로 규칙과 같다(%APPDATA%·%LOCALAPPDATA%\AgentOffice\Collector). GUI 설정은 %APPDATA%\AgentOffice\CollectorGUI.
+  foreach ($dir in @((Join-Path $env:APPDATA "AgentOffice\Collector"), (Join-Path $env:LOCALAPPDATA "AgentOffice\Collector"), (Join-Path $env:APPDATA "AgentOffice\CollectorGUI"))) {
+    if (-not (($dir.EndsWith("AgentOffice\Collector") -or $dir.EndsWith("AgentOffice\CollectorGUI")) -and (Test-Path $dir))) { continue }
     # 방금 끝낸 Collector가 잠금 파일을 놓을 때까지 잠시 다시 시도한다.
     for ($i = 1; $i -le 10; $i++) {
       try { Remove-Item -Recurse -Force -LiteralPath $dir -ErrorAction Stop; break }

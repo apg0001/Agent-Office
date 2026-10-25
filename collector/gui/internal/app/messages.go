@@ -43,13 +43,16 @@ var messages = map[string]string{
 	"logged_out":                "로그아웃했습니다. 서버에서 이 PC를 폐기했고 로컬 장치 토큰을 지웠습니다. 실행 중인 Collector는 몇 초 안에 전송을 멈춥니다.",
 	"logged_out_local":          "로컬 장치 토큰만 지웠습니다. 웹 /devices에서 이 PC를 폐기하세요.",
 	"logout_failed":             "로그아웃하지 못했습니다. 로컬 정보는 그대로입니다(서버 연결 실패 시 '로컬만 지우기'를 선택할 수 있습니다).",
-	"gui_autostart_installed":   "로그인 시 GUI(트레이)를 자동으로 띄웁니다. 수집은 Core 자동 시작과 별개로 계속됩니다.",
+	"gui_autostart_installed":   "로그인 시 트레이를 자동으로 띄웁니다(창은 트레이의 '설정'으로 엽니다). 수집은 Core 자동 시작과 별개로 계속됩니다.",
 	"gui_autostart_removed":     "GUI 자동 시작 정의를 지웠습니다(Agent Office 소유 항목만). Core 자동 시작은 그대로입니다.",
 	"gui_autostart_absent":      "설치된 GUI 자동 시작 정의가 없습니다.",
 	"gui_autostart_foreign":     "같은 위치에 Agent Office가 만들지 않은 항목이 있어 건드리지 않았습니다.",
 	"gui_autostart_invalid_exe": "GUI 실행 파일 위치가 임시 경로이거나 올바르지 않아 자동 시작을 설치할 수 없습니다. 고정 위치에 둔 GUI로 실행하세요.",
 	"gui_autostart_unsupported": "이 OS에서는 GUI 자동 시작을 지원하지 않습니다.",
 	"gui_autostart_failed":      "GUI 자동 시작 정의를 처리하지 못했습니다.",
+	"update_latest":             "최신 버전입니다.",
+	"update_available":          "새 버전이 있습니다. 설치 프로그램(또는 패키지 관리자)으로 업데이트하세요.",
+	"update_check_failed":       "업데이트를 확인하지 못했습니다(네트워크 또는 업데이트 서명 키 확인).",
 	"unexpected":                "요청을 처리하지 못했습니다.",
 }
 

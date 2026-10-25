@@ -287,6 +287,16 @@ func TestApplyRefusesBadBinaryAndPackageInstalls(t *testing.T) {
 	if err := Apply("/usr/bin/agent-office-collector", next, "0.2.0", hooks); Code(err) != "managed_by_package" {
 		t.Fatalf("package: %v", err)
 	}
+	if err := Apply("/Applications/Agent Office Collector.app/Contents/MacOS/agent-office-collector", next, "0.2.0", hooks); Code(err) != "managed_by_package" {
+		t.Fatalf("app bundle: %v", err)
+	}
+	// 설치 프로그램 배치(트레이 도우미가 옆에 있음)도 설치 프로그램으로 업데이트한다.
+	if err := os.WriteFile(filepath.Join(filepath.Dir(current), "agent-office-collector-tray.exe"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(current, next, "0.2.0", hooks); Code(err) != "managed_by_package" {
+		t.Fatalf("installer layout: %v", err)
+	}
 }
 
 // GitHub Release 다운로드는 302로 저장소 주소를 돌려준다. CLI 공통 클라이언트처럼 리다이렉트를

@@ -217,6 +217,23 @@ func (a *App) RegistrationPageURL() (string, error) {
 	return u + DevicesPath, nil
 }
 
+// OfficeURL은 웹 사무실(서버 루트) 주소다. 트레이 "사무실 열기"가 쓴다(#159).
+func (a *App) OfficeURL() (string, error) {
+	path, err := a.prefsPath()
+	if err != nil {
+		return "", err
+	}
+	p, _ := prefs.Load(path)
+	if p.ServerURL == "" {
+		return "", errors.New("server_not_set")
+	}
+	u, err := corecli.NormalizeServerURL(p.ServerURL)
+	if err != nil {
+		return "", err
+	}
+	return u + "/", nil
+}
+
 // OpenRegistrationPage는 기본 브라우저에서 웹 로그인 뒤 등록 코드 발급 화면을 연다.
 // 로그인은 브라우저에서만 하며 GUI는 계정 비밀번호를 받지 않는다.
 func (a *App) OpenRegistrationPage() Result {
@@ -327,6 +344,49 @@ func (a *App) simple(okCode, failCode string, args ...string) Result {
 		return out
 	}
 	return okResult(okCode, "")
+}
+
+// updateTimeout은 `update check`(manifest 내려받기·서명 확인) 상한이다. Core 내부 상한(2분)보다 조금 길다.
+const updateTimeout = 150 * time.Second
+
+// UpdateCheck는 Core `update check`로 새 버전이 있는지만 확인한다(적용하지 않음, #159 트레이).
+// 채널은 현재 Core 버전이 SemVer 사전 배포(`-beta.N` 등)면 beta, 아니면 stable이다.
+// Output은 Core가 출력한 첫 줄(버전·채널만 담음)이다.
+func (a *App) UpdateCheck() Result {
+	channel := "stable"
+	if v := a.Status(); v.OK && v.Report != nil && strings.Contains(v.Report.CollectorVersion, "-") {
+		channel = "beta"
+	}
+	r, err := a.runner()
+	if err != nil {
+		return fail(errCode(err))
+	}
+	r.Timeout = updateTimeout
+	res, err := r.Run(a.context(), "", "update", "check", "--channel", channel)
+	if err != nil {
+		return fail(errCode(err))
+	}
+	if res.Exit != 0 {
+		out := fail("update_check_failed")
+		out.Output = firstLine(redact(res.Stderr))
+		return out
+	}
+	line := firstLine(res.Stdout)
+	if strings.Contains(line, "새 버전") {
+		return okResult("update_available", line)
+	}
+	return okResult("update_latest", line)
+}
+
+func firstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i]
+	}
+	if r := []rune(s); len(r) > 120 {
+		s = string(r[:120])
+	}
+	return strings.TrimSpace(s)
 }
 
 // --- 도구 탐지·Hook ---------------------------------------------------------------
@@ -483,10 +543,15 @@ func (a *App) guiExecutable() (string, error) {
 	return filepath.Abs(exe)
 }
 
+// autostartDef는 로그인 시 띄울 실행 파일 정의다. 설치 배치에 트레이 도우미가 있으면 트레이를
+// 띄우고(#159, 창은 트레이 "설정"으로 연다), 없으면(개발 빌드) GUI를 띄운다.
 func (a *App) autostartDef() (autostart.Definition, error) {
 	exe, err := a.guiExecutable()
 	if err != nil {
 		return autostart.Definition{}, autostart.ErrInvalidExecutable
+	}
+	if tray, ok := corecli.FindSibling(exe, a.opts.GOOS, corecli.TrayName); ok {
+		exe = tray
 	}
 	home, _ := a.opts.UserHomeDir()
 	return autostart.Generate(autostart.Params{GOOS: a.opts.GOOS, Exe: exe, Home: home, Getenv: a.opts.Getenv})

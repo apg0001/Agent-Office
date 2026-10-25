@@ -147,3 +147,8 @@ def test_windows_powershell_scripts_have_utf8_bom() -> None:
     # Windows PowerShell 5.1은 BOM 없는 UTF-8을 ANSI로 읽어 한글 문자열이 구문 오류가 된다(#42 러너 실측).
     for script in ROOT.glob("collector/**/*.ps1"):
         assert script.read_bytes().startswith(b"\xef\xbb\xbf"), script
+    # NSIS 설치 스크립트(#159)도 한글 문자열을 makensis가 UTF-8로 읽도록 BOM을 둔다.
+    nsis = list(ROOT.glob("collector/**/*.nsi"))
+    assert nsis
+    for script in nsis:
+        assert script.read_bytes().startswith(b"\xef\xbb\xbf"), script

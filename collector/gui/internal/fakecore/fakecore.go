@@ -165,6 +165,16 @@ func run(args []string) int {
 		}
 		fmt.Println("서버에서 이 장치를 폐기했습니다.\n로컬 장치 토큰과 등록 정보를 지웠습니다. " + SentinelToken)
 	case joined == "pause" || joined == "resume":
+	case strings.HasPrefix(joined, "update check --channel "):
+		switch scenario {
+		case "update_available":
+			fmt.Println("새 버전 0.2.0이 있습니다(현재 0.1.0, " + args[3] + " 채널)")
+		case "update_offline":
+			fmt.Fprintln(os.Stderr, "업데이트 확인 실패: manifest_unreachable")
+			return 1
+		default:
+			fmt.Println("최신 버전입니다(0.1.0, " + args[3] + " 채널)")
+		}
 	case joined == "service print":
 		fmt.Println("[Unit]\nDescription=Agent Office Collector")
 	case strings.HasPrefix(joined, "service install"):

@@ -1,13 +1,17 @@
-// agent-office-collector-gui는 Collector Core를 감싸는 Wails v2 데스크톱 창이다(#40, #41, #43).
+// agent-office-collector-gui는 Collector Core를 감싸는 Wails v2 데스크톱 창이다(#40, #41, #43, #159).
 //
 // GUI는 수집 루프를 품지 않는다. 등록·상태·일시중지·진단·Hook·자동 시작·로그아웃은 모두 Core
 // 실행 파일(`agent-office-collector`) 명령으로 처리하므로, 창을 닫거나 GUI가 죽어도 자동 시작된 Core는
-// 계속 수집한다. Linux에서는 트레이(StatusNotifierItem)를 띄우고, 트레이가 보이면 창 닫기는 숨기기다.
+// 계속 수집한다. 시스템 트레이는 별도 프로세스(`agent-office-collector-tray`, ADR-0005)이고, GUI가 뜰 때
+// 옆에 트레이 도우미가 있으면 함께 띄운다(이미 떠 있으면 도우미가 스스로 끝남). 창 닫기는 GUI 종료다.
 //
-// 빌드(Linux): go build -tags desktop,production -o agent-office-collector-gui .
+// 빌드(Linux): go build -tags desktop,production[,webkit2_41] -o agent-office-collector-gui .
 // 태그 없이 빌드하면 Wails가 실행 시 오류를 낸다(단위 테스트·vet은 태그 없이 동작).
 //
-// 인자: --autostart  로그인 자동 시작(#43)으로 실행됨. 트레이가 보이면 창 없이 시작한다.
+// 인자:
+//
+//	--autostart  예전(#43) 로그인 자동 시작 항목으로 실행됨. 트레이 도우미가 있으면 트레이만 띄우고 끝낸다.
+//	--quit       떠 있는 GUI 창 프로세스를 끝낸다(트레이 "종료"). 떠 있지 않으면 창 없이 떴다가 끝난다.
 package main
 
 import (
@@ -15,33 +19,32 @@ import (
 	"embed"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/apg0001/Agent-Office/collector/gui/internal/app"
 	"github.com/apg0001/Agent-Office/collector/gui/internal/autostart"
-	"github.com/apg0001/Agent-Office/collector/gui/internal/tray"
+	"github.com/apg0001/Agent-Office/collector/gui/internal/corecli"
+	"github.com/apg0001/Agent-Office/collector/gui/internal/launch"
 )
 
 //go:embed all:frontend/assets
 var assets embed.FS
 
-// trayHost는 OS 트레이 구현이다(tray_linux.go, 그 외 OS는 nil).
-type trayHost interface {
-	tray.Host
-	Start(ctrl *tray.Controller)
-	Stop()
-}
-
-// singleInstanceID는 GUI 중복 실행 방지 식별자다(자동 시작 + 수동 실행 시 기존 창을 띄움).
+// singleInstanceID는 GUI 중복 실행 방지 식별자다(트레이 "설정" + 수동 실행 시 기존 창을 띄움).
 const singleInstanceID = "io.github.apg0001.agent-office.collector-gui"
 
+// QuitArg는 떠 있는 GUI 창 프로세스에 종료를 알리는 인자다(Wails 단일 실행으로 첫 프로세스에 전달됨).
+const QuitArg = "--quit"
+
 func hasArg(args []string, want string) bool {
-	for _, a := range args[1:] {
+	for _, a := range args {
 		if a == want {
 			return true
 		}
@@ -49,17 +52,32 @@ func hasArg(args []string, want string) bool {
 	return false
 }
 
-func main() {
-	a := app.New(app.Options{
-		OpenURL: func(ctx context.Context, url string) { runtime.BrowserOpenURL(ctx, url) },
-	})
-	host := newTrayHost()
-	var th tray.Host
-	if host != nil {
-		th = host
+// trayPath는 이 GUI와 함께 설치된 트레이 도우미 위치다(개발 빌드에는 없을 수 있음).
+func trayPath() (string, bool) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", false
 	}
-	ctrl := tray.New(a, th)
+	if r, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = r
+	}
+	return corecli.FindSibling(exe, runtime.GOOS, corecli.TrayName)
+}
 
+func main() {
+	args := os.Args[1:]
+	quitOnly := hasArg(args, QuitArg)
+	tray, trayOK := trayPath()
+	if hasArg(args, autostart.Arg) && !quitOnly && trayOK {
+		// 예전 자동 시작 항목(GUI --autostart): 창 대신 트레이만 띄운다. 새 항목은 트레이를 직접 띄운다.
+		if err := launch.Detached(tray, autostart.Arg); err == nil {
+			return
+		}
+	}
+
+	a := app.New(app.Options{
+		OpenURL: func(ctx context.Context, url string) { wruntime.BrowserOpenURL(ctx, url) },
+	})
 	var (
 		mu   sync.Mutex
 		wctx context.Context
@@ -69,15 +87,10 @@ func main() {
 		defer mu.Unlock()
 		return wctx
 	}
-	ctrl.ShowWindow = func() {
+	showWindow := func() {
 		if c := windowCtx(); c != nil {
-			runtime.WindowShow(c)
-			runtime.WindowUnminimise(c)
-		}
-	}
-	ctrl.QuitGUI = func() {
-		if c := windowCtx(); c != nil {
-			runtime.Quit(c)
+			wruntime.WindowShow(c)
+			wruntime.WindowUnminimise(c)
 		}
 	}
 	startup := app.OnStartup(a)
@@ -88,29 +101,34 @@ func main() {
 		Height:           760,
 		MinWidth:         720,
 		MinHeight:        560,
-		StartHidden:      ctrl.StartHidden(hasArg(os.Args, autostart.Arg)),
+		StartHidden:      quitOnly,
 		AssetServer:      &assetserver.Options{Assets: assets},
 		BackgroundColour: &options.RGBA{R: 247, G: 246, B: 242, A: 255},
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId:               singleInstanceID,
-			OnSecondInstanceLaunch: func(options.SecondInstanceData) { ctrl.ShowWindow() },
+			UniqueId: singleInstanceID,
+			OnSecondInstanceLaunch: func(d options.SecondInstanceData) {
+				if hasArg(d.Args, QuitArg) {
+					if c := windowCtx(); c != nil {
+						wruntime.Quit(c)
+					}
+					return
+				}
+				showWindow()
+			},
 		},
 		OnStartup: func(ctx context.Context) {
 			startup(ctx)
 			mu.Lock()
 			wctx = ctx
 			mu.Unlock()
-			if host != nil {
-				host.Start(ctrl)
-				go ctrl.Run(ctx)
+			if quitOnly {
+				// 떠 있던 GUI가 없었다: 아무것도 보이지 않고 끝낸다.
+				go wruntime.Quit(ctx)
+				return
 			}
-		},
-		OnBeforeClose: func(ctx context.Context) bool {
-			return ctrl.BeforeClose(func() { runtime.WindowHide(ctx) })
-		},
-		OnShutdown: func(context.Context) {
-			if host != nil {
-				host.Stop()
+			if trayOK {
+				// 트레이는 사용자별 단일 실행이라 이미 떠 있으면 곧바로 끝난다. 실패해도 창은 쓸 수 있다.
+				_ = launch.Detached(tray)
 			}
 		},
 		Bind: []interface{}{a},

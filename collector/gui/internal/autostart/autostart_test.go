@@ -102,6 +102,8 @@ func TestPlistEscapes(t *testing.T) {
 func TestOwnedWindows(t *testing.T) {
 	for v, want := range map[string]bool{
 		`"C:\AO\agent-office-collector-gui.exe" --autostart`:           true,
+		`"C:\AO\agent-office-collector-tray.exe" --autostart`:          true,
+		`"C:\AO\agent-office-collector-tray.exe"`:                      false,
 		`"C:\AO\AGENT-OFFICE-COLLECTOR-GUI.EXE" --autostart`:           true,
 		`"C:\AO\agent-office-collector-gui.exe"`:                       false,
 		`"C:\AO\other.exe" --autostart`:                                false,

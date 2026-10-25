@@ -105,7 +105,7 @@ func cmdUpdate(args []string, env Env) int {
 	if err := update.Apply(exe, next, avail.Version, hooks); err != nil {
 		fmt.Fprintln(env.Stderr, "적용 실패:", update.Code(err))
 		if update.Code(err) == "managed_by_package" {
-			fmt.Fprintln(env.Stderr, "패키지로 설치했다면 패키지 관리자(apt·dnf)로 업데이트하세요.")
+			fmt.Fprintln(env.Stderr, "패키지(apt·dnf) 또는 설치 프로그램(.exe·.pkg)으로 설치했다면 새 패키지·설치 프로그램으로 업데이트하세요.")
 		}
 		return ExitError
 	}
