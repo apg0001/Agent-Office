@@ -202,13 +202,13 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
         </>
       )}
       {title && <h3 className="office-title">{title}</h3>}
-      {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
       {!autoFocus && (
         <button type="button" className="focus-button" onClick={() => resume.current()}>
           자동 초점 다시 켜기
         </button>
       )}
       <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
+      {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
       {detail && (
         <AgentPanel detail={detail} source={source} now={Date.now()} onClose={close} onSelect={setSelected} />
       )}
