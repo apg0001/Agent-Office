@@ -14,7 +14,7 @@
 
 - 정적 바이너리(`CGO_ENABLED=0`, `-trimpath`), 버전은 `-ldflags -X main.version`.
 - `SHA256SUMS`에 모든 배포물의 해시. 받은 쪽은 `sha256sum -c SHA256SUMS`(Windows `Get-FileHash`)로 확인합니다.
-- deb·rpm은 nfpm 2.41.1로 만듭니다. 버전의 `-beta.1`은 패키지 규칙상 `~beta.1`로 바뀝니다(정식 버전보다 낮게 정렬).
+- deb·rpm은 nfpm 2.41.1로 만듭니다. 패키지 안의 버전은 `-beta.1`이 패키지 규칙상 `~beta.1`로 바뀝니다(정식 버전보다 낮게 정렬). GitHub Release가 파일 이름의 `~`를 `.`으로 바꾸므로 파일 이름은 처음부터 `.`으로 씁니다(0.1.0-beta.1에서 `SHA256SUMS`와 이름이 어긋나 수동 교체).
 
 ## 설치 뒤
 
