@@ -7,6 +7,7 @@ import { detailFromState, fetchAgentDetail, type AgentDetail } from "./detail";
 import { createDefaultOffice } from "./grid";
 import { type OfficeScope, PERSONAL, connectLive, hasSession, scopeFromSearch, searchFor } from "./liveSource";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
+import { SessionList } from "./SessionList";
 import { ZoneLegend } from "./ZoneLegend";
 import type { DataSource, OfficeState } from "./types";
 
@@ -208,7 +209,10 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
           자동 초점 다시 켜기
         </button>
       )}
-      <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
+      <div className="office-stage">
+        <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
+        {!compact && office && <SessionList state={office} onSelect={setSelected} />}
+      </div>
       {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
       {!compact && <ZoneLegend />}
       {detail && (

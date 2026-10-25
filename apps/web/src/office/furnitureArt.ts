@@ -3,7 +3,8 @@
  * 아이소메트릭 PNG다. 논리 그리드(가구 칸은 걸을 수 없음)는 grid.ts가 정하고, 여기는 칸마다 어떤
  * 그림을 어디에 겹쳐 그릴지만 정하는 순수 데이터다.
  *
- * 방향: 업무석 의자는 책상 아래 왼쪽 칸에 있으므로 책상·모니터는 남서(SW)를, 의자는 북동(NE)을 본다.
+ * 방향: 업무석 의자는 책상 아래 왼쪽 칸에 있으므로 책상·모니터는 SW 그림, 의자는 책상을 보는 NW 그림이다
+ * (Kenney 방향 이름은 바라보는 쪽과 다를 수 있어 스크린샷으로 확인했다).
  */
 
 import type { Furniture } from "./grid";
@@ -50,7 +51,7 @@ export const FURNITURE_ART: Record<Furniture, ArtPiece[]> = {
   // 2칸을 이어 긴 테이블로 보이게 조금 크게 그리고, 앞(y + 1) 칸에 의자를 둔다.
   table: [
     { image: "table_SW", dx: 0, dy: 18, layer: 2, scale: 0.42 },
-    { image: "chair_NE", dx: 0, dy: 8, layer: 1, cell: { x: 0, y: 1 } },
+    { image: "chair_NW", dx: 0, dy: 8, layer: 1, cell: { x: 0, y: 1 } },
   ],
   sofa: [{ image: "loungeSofa_SW", dx: 0, dy: 16, layer: 2 }],
   coffee: [
@@ -61,8 +62,8 @@ export const FURNITURE_ART: Record<Furniture, ArtPiece[]> = {
   plant: [{ image: "pottedPlant_SW", dx: 0, dy: 12, layer: 2 }],
 };
 
-/** 업무석 자리(걸을 수 있는 칸)에 그리는 의자. 캐릭터보다 먼저 그린다. */
-export const SEAT_ART: ArtPiece = { image: "chairDesk_NE", dx: 0, dy: 10, layer: 1 };
+/** 업무석 자리(걸을 수 있는 칸)에 그리는 의자. 등받이가 화면 왼쪽 아래(사람 쪽), 앉는 면이 책상(오른쪽 위)을 본다. 캐릭터보다 먼저 그린다. */
+export const SEAT_ART: ArtPiece = { image: "chairDesk_NW", dx: 0, dy: 10, layer: 1 };
 
 /** 미리 불러올 그림 이름 전체. */
 export function artImages(): string[] {
