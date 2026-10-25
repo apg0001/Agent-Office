@@ -42,7 +42,7 @@ func TestClaudeTodoWriteHookPlan(t *testing.T) {
 		if err != nil || c.Plan == nil {
 			t.Fatalf("%s: %v %+v", ev, err, c)
 		}
-		if !reflect.DeepEqual(c.Plan.Steps, mixedWant) || c.Plan.Support != adapter.SupportUnverified {
+		if !reflect.DeepEqual(c.Plan.Steps, mixedWant) || c.Plan.Support != adapter.SupportVerified {
 			t.Fatalf("%s: plan %+v", ev, c.Plan)
 		}
 		if c.EventType == adapter.EventPlanUpdated || c.ToolCategory != adapter.ToolPlan {
@@ -51,7 +51,7 @@ func TestClaudeTodoWriteHookPlan(t *testing.T) {
 		assertNoSentinel(t, ev, c, err)
 		p, ok := adapter.PlanUpdate(c)
 		if !ok || p.EventType != adapter.EventPlanUpdated || p.Activity != adapter.ActivityPlanning ||
-			p.Confidence != adapter.ConfidenceInferred || p.SessionRef != "s1" || p.ToolUseRef != "tu1" {
+			p.Confidence != adapter.ConfidenceObserved || p.SessionRef != "s1" || p.ToolUseRef != "tu1" {
 			t.Fatalf("%s: plan candidate %+v", ev, p)
 		}
 		if adapter.DedupKey("d", p) != "d|claude|s1|plan.updated|tu1" {

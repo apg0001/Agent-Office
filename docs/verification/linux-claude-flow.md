@@ -45,7 +45,7 @@ SCENARIO=subagent tests/e2e/claude_flow.sh <서버 이미지> <웹 이미지> <C
 | 표식 문자열(DB 전체 덤프) | 0건 |
 | 사용자 설정 | 변경 없음 |
 
-이 실측에서 `hook` → spool → `run` 경로가 계획 상태를 잃는 문제 두 가지를 찾아 고쳤습니다(#38): spool 레코드에 계획 상태 enum이 없었고, `run`의 spool 처리가 Pipeline을 거치지 않아 `plan.updated`를 만들지 않았습니다. 할 일 문장은 spool·서버 어디에도 남지 않습니다. TodoWrite 입력 형식(`tool_input.todos[].status`)은 이 환경에서 실제로 관측했지만 어댑터의 계획 지원 수준은 아직 `unverified`(신뢰도 `inferred`)로 둡니다.
+이 실측에서 `hook` → spool → `run` 경로가 계획 상태를 잃는 문제 두 가지를 찾아 고쳤습니다(#38): spool 레코드에 계획 상태 enum이 없었고, `run`의 spool 처리가 Pipeline을 거치지 않아 `plan.updated`를 만들지 않았습니다. 할 일 문장은 spool·서버 어디에도 남지 않습니다. TodoWrite 입력 형식(Hook `tool_input.todos[].status`, transcript `input.todos[].status`)을 이 환경에서 관측해 어댑터의 계획 지원 수준을 이 런타임에 한해 `verified`(신뢰도 `observed`)로 올렸습니다.
 
 ## 남은 범위(#62)
 

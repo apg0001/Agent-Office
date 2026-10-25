@@ -29,8 +29,8 @@ const (
 	transcriptEvent = "transcript"
 
 	// planInputEvent는 TodoWrite 입력(tool_input.todos / tool_use.input.todos) 형식의 검증 수준을
-	// 조회하는 가상 이벤트 이름이다. 실측(#19, #20)에서 TodoWrite 호출을 보존하지 않았으므로
-	// 어떤 대상에도 없고 계획 후보는 항상 unverified → inferred다.
+	// 조회하는 가상 이벤트 이름이다. #62 실측(2.1.308 Linux print)에서 Hook PreToolUse·PostToolUse와
+	// transcript tool_use 양쪽의 todos[].status를 관측했다. 다른 런타임은 unverified → inferred다.
 	planInputEvent = "plan:TodoWrite"
 	planTool       = "TodoWrite"
 )
@@ -44,7 +44,7 @@ var VerifiedTargets = []adapter.Target{
 		Observed: adapter.Set(
 			hookSessionStart, hookUserPromptSubmit, hookPreToolUse, hookPostToolUse,
 			hookSubagentStart, hookSubagentStop, hookPermissionRequest, hookStop, hookSessionEnd,
-			transcriptEvent,
+			transcriptEvent, planInputEvent,
 		),
 	},
 }

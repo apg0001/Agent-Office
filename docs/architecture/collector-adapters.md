@@ -62,7 +62,7 @@ transcript(Claude)는 `assistant`의 `tool_use` → `tool.started`, `user`의 `t
 - 상태는 정확히 `pending`·`in_progress`·`completed`만 그대로, 그 밖(대소문자 차이, 문자열 아님, 객체 아닌 원소)은 `unknown`입니다. 앞 50개만 남기고, 빈 목록이면 이벤트를 만들지 않습니다. `PostToolUseFailure`는 계획을 만들지 않습니다.
 - 할 일·단계 문장(`content`, `activeForm`, `step`, `explanation`)은 읽지 않습니다. Normalizer는 `plan.updated`에서만 `plan_steps`를 내보내며 상태를 enum으로 다시 거릅니다.
 - 중복 제거 키는 `device|provider|session|plan.updated|tool_use_id`라 Hook Pre/Post와 transcript가 같은 호출을 여러 번 보고해도 한 번만 통과합니다.
-- `TodoWrite`·`update_plan` 입력 형식은 #17~#20 실측에서 보존하지 않았으므로 계획 후보는 항상 `unverified` → `confidence: inferred`입니다(도구 이벤트 자체의 수준은 그대로). Codex Hook에 `update_plan`이 실제로 전달되는지와 `tool_input` 형식은 미실측입니다.
+- Claude `TodoWrite` 입력 형식은 #62 실측(Claude Code 2.1.308, Linux, `-p`)에서 Hook `tool_input.todos[].status`와 transcript `input.todos[].status`(원소 키 `content`·`activeForm`·`status`)를 관측해 그 런타임에서 `verified` → `confidence: observed`입니다. 다른 버전·OS·대화형 모드와 Codex `update_plan`은 `unverified` → `inferred`입니다(도구 이벤트 자체의 수준은 그대로). Codex Hook에 `update_plan`이 실제로 전달되는지와 `tool_input` 형식은 미실측입니다.
 
 ## 활동(activity) 분류
 
