@@ -27,10 +27,11 @@ import {
   textureKey,
   walkFrame,
 } from "./sprites";
-import { ART_BASE_URL, ART_SCALE, type ArtPiece, FURNITURE_ART, SEAT_ART, WALL_ART, artImages } from "./furnitureArt";
+import { ART_BASE_URL, ART_SCALE, type ArtPiece, FURNITURE_ART, SEAT_ART, artImages } from "./furnitureArt";
 import type { OfficeMap, Point, ZoneKind } from "./grid";
 import { ZONE_LABELS } from "./grid";
-import { TILE_HEIGHT, TILE_WIDTH, depthOf, gridToScreen, tileDiamond } from "./iso";
+import { type ScreenPoint, TILE_HEIGHT, depthOf, gridToScreen, tileDiamond } from "./iso";
+import { WALL_HEIGHT, wallBase, wallQuad, wallSegments } from "./walls";
 import type { AgentState, OfficeState } from "./types";
 
 const ZONE_COLORS: Record<ZoneKind, number> = {
@@ -203,7 +204,7 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
-  /** 폭주 병합을 거친 표시 구역으로 목적지를 정하고, 추정 상태를 구분해 표시한다. */
+  /** 폭주 병합을 거친 표시 구역으로 목적지를 정한다. */
   private startLeaving(actor: Actor): void {
     actor.leaving = true;
     const here = { x: Math.round(actor.position.x), y: Math.round(actor.position.y) };
@@ -237,9 +238,8 @@ export class OfficeScene extends Phaser.Scene {
       actor.path = findPath(this.map, here, target);
       actor.target = target;
     }
-    const inferred = actor.agent.confidence === "inferred";
-    actor.marker.setVisible(inferred || actor.agent.turn_state === "WAITING_USER");
-    actor.marker.setText(actor.agent.turn_state === "WAITING_USER" ? "!" : "?");
+    // 머리 위 표시는 관측된 승인 대기("!")만. 추정 여부는 상세 패널에서 보여 준다.
+    actor.marker.setVisible(actor.agent.turn_state === "WAITING_USER");
   }
 
   update(time: number, deltaMs: number): void {
@@ -332,9 +332,9 @@ export class OfficeScene extends Phaser.Scene {
     const shirt = shirtIndex(session?.device_id ?? agent.id);
     const sprite = this.add.image(0, 0, this.texture(agent.role, shirt, 0)).setOrigin(0.5, 1);
     const top = -sprite.height;
-    // "?"는 추정 상태, "!"는 관측된 승인 대기.
+    // "!"는 관측된 승인 대기.
     const marker = this.add
-      .text(0, top - 8, "?", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
+      .text(0, top - 8, "!", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
       .setOrigin(0.5)
       .setVisible(false);
     const status = this.add
@@ -425,34 +425,30 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
-  /** 뒤쪽 두 변(x = 0, y = 0)에 벽을 세운다. 출입구·복도 끝은 비운다. 벽은 칸의 바깥 변에 붙인다. */
+  /** 뒤쪽 두 변에 바닥과 같은 2:1 투영으로 벽·창문을 그린다(walls.ts). 빛은 왼쪽 위에서 온다. */
   private drawWalls(): void {
-    const open = (point: Point) => {
-      const tile = this.map.tiles[point.y * this.map.width + point.x];
-      return tile?.zone === "entrance" || tile?.zone === "corridor";
+    const graphics = this.add.graphics();
+    graphics.setDepth(-0.5);
+    this.scenery.push(graphics);
+    const fill = (points: ScreenPoint[], color: number, alpha = 1) => {
+      graphics.fillStyle(color, alpha);
+      graphics.fillPoints(points.map((p) => new Phaser.Math.Vector2(p.sx, p.sy)), true);
     };
-    const put = (point: Point, name: string, originX: number, offsetX: number) => {
-      const key = artKey(name);
-      if (!this.textures.exists(key)) {
-        return;
+    for (const segment of wallSegments(this.map)) {
+      const face = segment.side === "left" ? 0xf1e8d6 : 0xe0d4ba;
+      fill(wallQuad(segment, 0, 1, 0, WALL_HEIGHT), face);
+      // 걸레받이와 위쪽 몰딩.
+      fill(wallQuad(segment, 0, 1, 0, 5), 0xb98a5c);
+      fill(wallQuad(segment, 0, 1, WALL_HEIGHT - 4, WALL_HEIGHT), 0xd9a066);
+      if (segment.window) {
+        fill(wallQuad(segment, 0.18, 0.82, 16, 44), 0x8a6a4a);
+        fill(wallQuad(segment, 0.24, 0.76, 19, 41), segment.side === "left" ? 0xa9d3ef : 0x93c2e2);
+        fill(wallQuad(segment, 0.49, 0.51, 19, 41), 0x8a6a4a);
       }
-      const screen = gridToScreen(point);
-      const wall = this.add
-        .image(screen.sx + offsetX, screen.sy + 2, key)
-        .setOrigin(originX, 1)
-        .setScale(ART_SCALE)
-        .setDepth(depthOf(point, -5));
-      this.scenery.push(wall);
-    };
-    for (let y = 0; y < this.map.height; y += 1) {
-      if (!open({ x: 0, y })) {
-        put({ x: 0, y }, y % WALL_ART.windowEvery === 1 ? WALL_ART.left.window : WALL_ART.left.plain, 0, -TILE_WIDTH / 2);
-      }
-    }
-    for (let x = 0; x < this.map.width; x += 1) {
-      if (!open({ x, y: 0 })) {
-        put({ x, y: 0 }, x % WALL_ART.windowEvery === 1 ? WALL_ART.right.window : WALL_ART.right.plain, 1, TILE_WIDTH / 2);
-      }
+      // 이음매 선은 그리지 않는다. 위쪽 바깥 모서리만 살짝 어둡게.
+      const [a, b] = wallBase(segment);
+      graphics.lineStyle(1, 0x7a5a3a, 0.5);
+      graphics.lineBetween(a.sx, a.sy - WALL_HEIGHT, b.sx, b.sy - WALL_HEIGHT);
     }
   }
 

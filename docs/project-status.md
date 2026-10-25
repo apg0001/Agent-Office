@@ -279,6 +279,7 @@
 193. 소유자가 `collector-v0.1.0-beta.1` 공개. 실제 Release로 자체 업데이트 실측 중 `http_302` 실패 발견 → 업데이트 요청만 https 리다이렉트를 따라가게 수정(#44), `0.1.0-beta.0` 시험 빌드로 확인·적용 성공. 0.1.0-beta.1 바이너리는 자체 업데이트 불가(릴리스 노트 알려진 위험). 채널 Release `collector-beta` 생성은 자동 모드에서 거부되어 소유자 작업.
 194. 실사용 시작: Pi에 0.1.0-beta.1 운영 스택(`docker compose -p agent-office`, `deploy/.env.production` 0600, 사본 `~/agent-office-secrets/env.production.backup`)과 Tailscale Serve(`https://gichan.taild10ecb.ts.net`, tailnet 전용). 소유자 맥북(macOS arm64)과 Pi에 Collector 0.1.0-beta.1 등록. 맥북 실제 Claude Code Hook 이벤트(`session.started`·`turn.*`) 수신, DB에는 enum·ID·해시만. 맥북 첫 `service install --activate` 뒤 run이 멈췄다가 재실행으로 정상화(원인 미확인, #62 후속). 안내 명령의 `#` 주석이 zsh에서 명령으로 해석돼 실패 → 사용자 안내 명령에 줄 끝 주석을 쓰지 않는다.
 195. #153: 사무실 가구·벽을 Kenney Furniture Kit(CC0) 아이소메트릭 그림으로 교체(업무석·도서관·인터넷·서버 랙·회의실·휴게실, 뒤쪽 벽·창문). 가구 종류 `table`·`coffee`·`fridge` 추가.
+196. #153 후속(소유자 피드백): 벽 그림이 30° 렌더라 2:1 바닥과 이음매가 어긋남 → `walls.ts`로 직접 그림(이어짐 테스트). 추정 상태 캐릭터를 흐리게·"?" 표시하던 것을 없애고 상세 패널에서만 "(추정)" 표시(머리 위는 승인 대기 "!"만). 배경 그라데이션 제거, 홈의 "기반 구축 중" 문구 제거. 실사용에서 거의 모든 이벤트가 추정인 이유: Claude가 자동 업데이트돼(Pi 2.1.310 등) 실측 버전(2.1.308 `-p`)과 달라짐.
 
 ## 이번 변경 요약(#22)
 
