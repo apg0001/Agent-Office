@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -42,6 +43,9 @@ const singleInstanceID = "io.github.apg0001.agent-office.collector-gui"
 
 // QuitArg는 떠 있는 GUI 창 프로세스에 종료를 알리는 인자다(Wails 단일 실행으로 첫 프로세스에 전달됨).
 const QuitArg = "--quit"
+
+// quitGrace는 --quit으로 떴는데 떠 있던 GUI가 없을 때 스스로 끝나기까지의 여유다.
+const quitGrace = 5 * time.Second
 
 func hasArg(args []string, want string) bool {
 	for _, a := range args {
@@ -122,8 +126,14 @@ func main() {
 			wctx = ctx
 			mu.Unlock()
 			if quitOnly {
-				// 떠 있던 GUI가 없었다: 아무것도 보이지 않고 끝낸다.
-				go wruntime.Quit(ctx)
+				// 떠 있던 GUI가 없었다(있었다면 Wails 단일 실행이 그쪽에 --quit을 넘기고 이 프로세스를 끝냄).
+				// 아무것도 보이지 않고 끝낸다. Linux는 OnStartup이 GTK 메인 루프보다 먼저 돌아 Quit이
+				// 무시될 수 있으므로(gtk_main_quit: main_loops != NULL) 잠시 뒤 프로세스를 직접 끝낸다.
+				go func() {
+					wruntime.Quit(ctx)
+					time.Sleep(quitGrace)
+					os.Exit(0)
+				}()
 				return
 			}
 			if trayOK {

@@ -226,14 +226,31 @@ jobs:
           AGENT_OFFICE_SMOKE_DISPOSABLE: "1"
           AGENT_OFFICE_COLLECTOR_TOKEN_STORE: file
         run: |
-          export AO_SNI_ITEMS="$RUNNER_TEMP/sni-items" AO_SNI_CLIENT="$PWD/tests/poc/collector/desktop/sni_client.py"
-          cat >"$RUNNER_TEMP/session.sh" <<'EOS'
-          set -e
-          Xvfb :99 -screen 0 1280x900x24 >/dev/null 2>&1 &
-          export DISPLAY=:99
-          /usr/bin/python3 tests/poc/collector/desktop/sni_watcher.py "$AO_SNI_ITEMS" &
-          sleep 2
-          /usr/bin/python3 tests/cross_os/installer_smoke.py "$VERSION" \
-            "$RUNNER_TEMP"/dist/agent-office-collector_*_amd64.deb "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_amd64.deb
-          EOS
-          dbus-run-session -- bash "$RUNNER_TEMP/session.sh"
+          tests/cross_os/linux_desktop_session.sh "$VERSION" \
+            "$(ls "$RUNNER_TEMP"/dist/agent-office-collector_*_amd64.deb)" "$(ls "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_amd64.deb)"
+
+  installer-linux-arm64:
+    name: Installer (ubuntu-24.04-arm deb)
+    runs-on: ubuntu-24.04-arm
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Linux Core and desktop packages (arm64, Docker)
+        run: |
+          collector/packaging/build.sh "$VERSION" "$RUNNER_TEMP/core" >/dev/null
+          mkdir -p "$RUNNER_TEMP/dist"
+          cp "$RUNNER_TEMP"/core/agent-office-collector_*_arm64.deb "$RUNNER_TEMP/dist/"
+          collector/packaging/build-desktop-linux.sh "$VERSION" "$RUNNER_TEMP/dist"
+      - name: Desktop session tools (Xvfb, D-Bus, minimal StatusNotifierWatcher)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends xvfb dbus dbus-x11 python3-dbus python3-gi
+      - name: Install, tray (D-Bus menu clicks), uninstall (apt)
+        env:
+          AGENT_OFFICE_SMOKE_DISPOSABLE: "1"
+          AGENT_OFFICE_COLLECTOR_TOKEN_STORE: file
+        run: |
+          tests/cross_os/linux_desktop_session.sh "$VERSION" \
+            "$(ls "$RUNNER_TEMP"/dist/agent-office-collector_*_arm64.deb)" "$(ls "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_arm64.deb)"

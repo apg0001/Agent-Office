@@ -313,8 +313,24 @@ def main() -> int:
         wait(lambda: not running("agent-office-collector-tray"), 20)
 
         # --- 트레이 셀프 테스트: 실제 systray 메뉴 항목의 클릭 경로로 모든 메뉴 동작 ------------------
+        record("no_gui_before_self_test", not running("agent-office-collector-gui"))
         report_path = Path(tempfile.mkdtemp()) / "tray-self-test.json"
-        st = run([tray, "--self-test", str(report_path)], check=False, timeout=900)
+        self_test = subprocess.Popen(
+            [tray, "--self-test", str(report_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        # 셀프 테스트의 "사무실 열기"(서버 없음 → 설정 창)·"설정 열기"가 GUI 창 프로세스를 실제로 띄우는지 본다.
+        gui_seen, deadline = 0, time.monotonic() + 900
+        while self_test.poll() is None and time.monotonic() < deadline:
+            if running("agent-office-collector-gui"):
+                gui_seen += 1
+            time.sleep(1)
+        if self_test.poll() is None:
+            self_test.kill()
+        st = subprocess.CompletedProcess(self_test.args, self_test.wait())
+        results["gui_seen_seconds_during_self_test"] = gui_seen
+        record("gui_started_from_tray", gui_seen >= 3)
         report = (
             json.loads(report_path.read_text(encoding="utf-8"))
             if report_path.exists()
@@ -329,6 +345,14 @@ def main() -> int:
             "gui_quit_from_tray",
             wait(lambda: not running("agent-office-collector-gui"), 30),
         )
+        if sys.platform != "win32" and running("agent-office-collector-gui"):
+            # 진단: 남은 GUI가 종료 요청(--quit)으로 뜬 프로세스인지(명령줄 원문은 남기지 않음).
+            p = subprocess.run(
+                ["pgrep", "-f", "agent-office-collector-gui --quit"],
+                check=False,
+                capture_output=True,
+            )
+            results["gui_left_is_quit_request"] = p.returncode == 0
         record(
             "tray_exited_after_quit",
             wait(lambda: not running("agent-office-collector-tray"), 15),
