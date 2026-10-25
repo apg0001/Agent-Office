@@ -62,6 +62,29 @@ export const ZONE_LABELS: Record<ZoneKind, string> = {
   entrance: "출입구",
 };
 
+/** 바닥 색(지도와 범례가 같은 값을 쓴다). */
+export const ZONE_COLORS: Record<ZoneKind, number> = {
+  desk: 0xd8c8a8,
+  library: 0xb8c8e0,
+  internet: 0xb8e0d0,
+  meeting: 0xe0c8e0,
+  testing: 0xa7b0ba,
+  lounge: 0xc8e0b0,
+  corridor: 0xcfcfcf,
+  entrance: 0xa0a0a0,
+};
+
+/** 구역이 뜻하는 것(behavior.ts의 활동 → 구역 규칙과 같다). 화면 범례에 쓴다. */
+export const ZONE_GUIDE: { zone: ZoneKind; meaning: string }[] = [
+  { zone: "desk", meaning: "자기 자리. 코드 편집·생각 중·승인 대기·하위 에이전트 위임·결과 정리, 무엇인지 모를 때" },
+  { zone: "library", meaning: "파일 읽기·코드 검색" },
+  { zone: "internet", meaning: "웹 검색·웹 페이지 가져오기" },
+  { zone: "testing", meaning: "테스트 실행" },
+  { zone: "meeting", meaning: "계획 세우기(할 일 목록·계획 도구)" },
+  { zone: "lounge", meaning: "할 일 없이 쉬는 중(턴이 끝남). 가끔 자리를 옮김" },
+  { zone: "entrance", meaning: "세션이 시작되면 들어오고, 끝나면 여기로 퇴근" },
+];
+
 export function contains(rect: Rect, point: Point): boolean {
   return (
     point.x >= rect.x &&
