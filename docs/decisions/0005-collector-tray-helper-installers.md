@@ -9,7 +9,7 @@
 - 마스터 명세 §10은 Windows·macOS·Linux GUI 설치 패키지, OS별 실제 설치·제거·트레이·자동 시작 검증, 트레이 메뉴(사무실 열기, 설정, 세션 상태, 일시중지/재개, 동기화, 업데이트 확인, 로그아웃, 종료)를 요구합니다.
 - Wails v2.12.0(Go 1.24에서 쓸 수 있는 최신, ADR-0003)에는 트레이 API가 없습니다. ADR-0004는 `fyne.io/systray`를 같은 프로세스에 붙이면 macOS는 NSApplication 메인 루프를, Windows는 메시지 루프 스레드를 Wails와 다투므로 Linux에서만 쓰기로 했습니다.
 - `fyne.io/systray` v1.12.2 소스(2026-10-26 확인): `init()`에서 `runtime.LockOSThread()`, `Run()`은 메인 스레드에서 macOS `[NSApp run]`, Windows `GetMessage` 루프, Linux D-Bus(StatusNotifierItem·dbusmenu, cgo 없음)를 돌립니다. Windows는 `Shell_NotifyIcon(NIM_ADD)`이 성공해야 `onReady`를 부르고, 아이콘은 `LoadImage(IMAGE_ICON)`로 읽어 ICO 형식이 필요합니다. macOS는 `[NSApp stop:]`으로 루프가 돌아옵니다.
-- Wails v2.12.0은 Windows·macOS·Linux 모두 `SingleInstanceLock`을 지원합니다. 두 번째 실행은 인자(`os.Args[1:]`)를 첫 프로세스의 `OnSecondInstanceLaunch`로 보내고 끝납니다.
+- Wails v2.12.0 `SingleInstanceLock`은 macOS(잠금 파일 + 분산 알림)·Linux(D-Bus 이름)에서는 두 번째 실행의 인자를 첫 프로세스로 넘기지만, Windows는 첫 프로세스가 만든 메시지 전용 창(`HWND_MESSAGE`)을 `FindWindowW`로 찾아 찾지 못하고 두 번째 GUI가 그대로 뜹니다(소스 확인, `windows-latest` 러너에서 트레이 "종료" 뒤 GUI가 남는 것으로 실측). Linux는 `OnStartup`이 GTK 메인 루프보다 먼저 돌아 그 안의 `Quit`이 무시됩니다(`gtk_main_quit: main_loops != NULL`, 컨테이너 실측).
 - 소유자는 Apple Developer ID·Authenticode 인증서 비용을 쓰지 않기로 했습니다.
 
 ## 결정
@@ -18,7 +18,7 @@
    - 대안: Wails v3(트레이 API 있음)는 Go 1.25 이상·베타라 ADR-0003 범위를 벗어납니다. 같은 프로세스 `RunWithExternalLoop`는 macOS·Windows에서 검증할 방법이 없습니다.
 2. **메뉴**(명세 §10): 상태(등록·수집·Core 실행 enum), 전송 대기 건수, 사무실 열기(기본 브라우저로 GUI 설정의 서버 주소, 없으면 설정 창), 설정 열기, 수집 일시중지/재개, 업데이트 확인(`update check`, 적용하지 않음), 로그아웃(하위 메뉴의 확인 항목을 한 번 더 골라야 `logout` 실행), 종료(트레이 + GUI 창 종료, Core는 계속). 트레이는 GUI처럼 Core 명령만 씁니다(`status --json`, `pause`, `resume`, `update check --channel`, `logout`).
    - **동기화**는 넣지 않습니다. Core에 즉시 전송 명령이 없고 Core가 주기적으로 전송합니다(전송 대기 건수로 대신 표시). 필요하면 Core에 `flush` 명령을 만든 뒤 추가합니다.
-3. **창 ↔ 트레이**: 트레이 "설정 열기"는 GUI 실행 파일을 인자 없이 띄웁니다(이미 떠 있으면 Wails 단일 실행이 기존 창을 앞으로). "종료"는 GUI를 `--quit`으로 띄워 첫 GUI 프로세스에 종료를 전달하고(떠 있지 않으면 창 없이 떴다 끝남), 트레이도 끝납니다. GUI는 뜰 때 트레이 도우미를 띄웁니다(사용자별 파일 잠금 `tray.lock`으로 두 번째 트레이는 곧바로 종료 코드 3). 창 닫기는 항상 GUI 종료입니다(트레이는 별도 프로세스로 남음).
+3. **창 ↔ 트레이**: GUI 단일 실행은 Wails `SingleInstanceLock` 대신 `internal/guictl`(GUI 설정 폴더의 파일 잠금 `gui.lock` + 요청 파일 `gui.request`, 300ms마다 읽음)로 모든 OS에서 같게 합니다. 두 번째 실행은 Wails를 띄우지 않고 `show`(인자 없음) 또는 `quit`(`--quit`)만 남기고 끝납니다. 트레이 "설정 열기"는 GUI를 인자 없이, "종료"는 `--quit`으로 띄우고 트레이도 끝납니다(떠 있는 GUI가 없으면 `--quit`은 아무것도 하지 않음). GUI는 뜰 때 트레이 도우미를 띄웁니다(사용자별 파일 잠금 `tray.lock`으로 두 번째 트레이는 곧바로 종료 코드 3). 창 닫기는 항상 GUI 종료입니다(트레이는 별도 프로세스로 남음).
 4. **자동 시작**: 기존 GUI 자동 시작 정의(XDG `.desktop`, LaunchAgent, HKCU `Run`의 이름·소유 표시는 그대로)가 트레이 도우미를 `--autostart`로 띄웁니다. 예전 정의(GUI `--autostart`)로 GUI가 뜨면 트레이만 띄우고 끝납니다. Windows 소유 판정은 `agent-office-collector-(gui|tray).exe" --autostart` 형식만 인정합니다.
 5. **설치 배치**: Core·GUI·트레이는 같은 폴더(Linux `/usr/bin`, Windows `%LOCALAPPDATA%\Programs\Agent Office Collector`)에 둡니다. macOS는 `/Applications/Agent Office Collector.app`(GUI가 주 실행 파일, Core도 `Contents/MacOS`)과 그 안의 `Contents/Library/LoginItems/Agent Office Collector Tray.app`(`LSUIElement`, Dock 없음)입니다. 서로의 위치는 `corecli.SiblingCandidates`로 찾습니다.
 6. **설치 프로그램**(모두 서명·공증 없음):

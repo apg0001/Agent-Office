@@ -3,7 +3,7 @@
 // Wails 창(agent-office-collector-gui)과 다른 프로세스에서 fyne.io/systray가 메인 스레드·메시지 루프를
 // 혼자 쓴다. 그래서 macOS(NSApplication)·Windows(메시지 루프)에서도 Wails와 루프를 다투지 않는다.
 // 트레이는 Core 명령(`status --json`, `pause`, `resume`, `update check`, `logout`)만 쓰고, 창이 필요하면
-// GUI 실행 파일을 띄운다(이미 떠 있으면 Wails 단일 실행이 기존 창을 앞으로 가져온다).
+// GUI 실행 파일을 띄운다(이미 떠 있으면 두 번째 GUI가 internal/guictl로 기존 창에 "보이기"를 남기고 끝난다).
 //
 // 사용법:
 //

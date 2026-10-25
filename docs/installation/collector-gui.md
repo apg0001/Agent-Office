@@ -49,7 +49,8 @@ collector/gui
   ├ tray/                 트레이 상태·메뉴 동작(화면 없이 테스트), 상태별 아이콘(PNG·Windows ICO), GUI/Core 독립성 테스트
   ├ autostart/            트레이 자동 시작 정의(XDG .desktop·LaunchAgent·HKCU Run) 생성·설치·제거
   ├ launch/               GUI ↔ 트레이 프로세스 띄우기(부모·자식으로 묶지 않음), 기본 브라우저 열기(http(s)만)
-  ├ single/               트레이 사용자별 단일 실행 잠금(flock·LockFileEx)
+  ├ single/               사용자별 단일 실행 잠금(flock·LockFileEx)
+  ├ guictl/               GUI 단일 실행(gui.lock)과 두 번째 실행의 show/quit 요청(gui.request)
   └ fakecore/             테스트용 가짜 Core
 cmd/agent-office-collector-tray/  트레이 도우미(fyne.io/systray v1.12.2가 프로세스 메인 스레드를 씀, ADR-0005)
 ```
@@ -116,7 +117,7 @@ Core: 장치 토큰을 OS 보안 저장소에 저장(없으면 0600 설정 파�
 | 상태(비활성) | 수집 중 / 일시중지 / Core 실행 중 아님 / 기기 등록 필요 / 장치 폐기됨 / 보안 저장소 잠김 / Core 응답 없음 |
 | 전송 대기(비활성) | Core 로컬 큐 건수("전송 대기 N건") |
 | 사무실 열기 | GUI 설정의 서버 주소(`https://…/`)를 기본 브라우저로 엽니다(macOS `open`, Windows `rundll32 url.dll,FileProtocolHandler`, Linux `xdg-open`, http(s)만). 서버 주소가 없으면 설정 창 |
-| 설정 열기 | GUI 창 실행 파일을 띄웁니다. 이미 떠 있으면 Wails 단일 실행이 기존 창을 앞으로 가져옵니다 |
+| 설정 열기 | GUI 창 실행 파일을 띄웁니다. 이미 떠 있으면 두 번째 실행이 첫 GUI에 "창 보이기"를 남기고 곧바로 끝납니다(아래 단일 실행) |
 | 수집 일시중지·재개 | Core `pause`·`resume` 후 바로 상태 갱신(현재 상태에 맞는 항목만 활성) |
 | 업데이트 확인 | Core `update check`(현재 버전이 `-beta.N` 등이면 beta 채널). 결과를 항목 제목에 표시("최신 버전"·"새 버전 …"·"확인 실패"). 적용은 하지 않습니다 |
 | 로그아웃 ▸ 이 PC 로그아웃(서버에서 장치 폐기) | 하위 메뉴 항목을 한 번 더 골라야 Core `logout`(서버 폐기 + 로컬 토큰 삭제). 등록된 PC에서만 활성 |
@@ -125,7 +126,7 @@ Core: 장치 토큰을 OS 보안 저장소에 저장(없으면 0600 설정 파�
 - 상태는 5초마다 Core `status --json`으로 읽습니다. Core가 멈추면 "Core 실행 중 아님", 다시 시작하면 다음 주기에 "수집 중"으로 돌아옵니다. 트레이·GUI는 Core를 직접 띄우지 않습니다.
 - 명세 §10의 "동기화"는 넣지 않았습니다. Core에 즉시 전송 명령이 없고 Core가 주기적으로 전송합니다(전송 대기 건수로 대신 표시).
 - 아이콘은 상태별 색(수집 중 초록, 일시중지 주황, 오류 빨강, 미등록·Core 정지 회색)이고 Windows는 32×32 ICO, 그 밖은 22×22 PNG입니다. 툴팁·메뉴 문구는 enum에서 만든 고정 한국어와 Core가 낸 버전 문구뿐이고 서버 주소·경로·토큰을 넣지 않습니다.
-- 창 닫기(X)는 항상 GUI 창 프로세스 종료입니다. 트레이는 남아 있으므로 "설정 열기"로 다시 엽니다. GUI는 한 번만 실행됩니다(Wails `SingleInstanceLock`).
+- 창 닫기(X)는 항상 GUI 창 프로세스 종료입니다. 트레이는 남아 있으므로 "설정 열기"로 다시 엽니다. GUI는 한 번만 실행됩니다. Wails v2.12.0 단일 실행은 Windows에서 기존 창을 찾지 못하므로(ADR-0005) GUI 설정 폴더의 `gui.lock`(파일 잠금)과 `gui.request`(`show`/`quit` 한 단어, 0.3초마다 읽음)로 모든 OS에서 같게 처리합니다. 두 번째 실행은 Wails를 띄우지 않습니다.
 - Linux에서 세션 버스에 `org.kde.StatusNotifierWatcher`가 없으면(GNOME 기본 셸 등) 아이콘이 보이지 않습니다. 이때도 트레이 프로세스는 떠 있고 창은 앱 메뉴의 "Agent Office Collector"로 엽니다(GNOME은 AppIndicator 확장 필요, 미검증).
 - macOS 트레이는 `LSUIElement` 번들이라 Dock·앱 전환기에 보이지 않습니다.
 
@@ -195,7 +196,16 @@ agent-office-collector-tray version
 4. `--self-test`: 실제 systray 메뉴 항목의 클릭 채널로 상태 → 일시중지 → 재개 → 업데이트 확인 → 사무실 열기(서버 없음 → 설정 창) → 설정 열기 → 로그아웃 → 종료. 그동안 GUI 창 프로세스가 실제로 뜨는지(초 단위 표본)와 "종료" 뒤 GUI·트레이가 모두 끝나는지 확인합니다. 브라우저는 열지 않고 요청만 셉니다. 업데이트 확인은 CI 빌드에 업데이트 공개 키가 없어 `update_check_failed`가 정상입니다(처리 경로만 확인).
 5. 제거 → 설치 파일·바로 가기·제거 항목 삭제, 트레이 자동 시작 정의 삭제, Core 서비스 등록 해제, 트레이·GUI 프로세스 없음, 우리 Hook 삭제, 남의 Hook 유지.
 
-결과(2026-10-26, PR #168): @@RESULTS@@
+결과(2026-10-26, PR #168): Cross-OS Collector 실행 40213759819에서 네 작업 모두 실패 항목 0개.
+
+| 러너 | 설치 파일(빌드 환경) | 확인한 것 |
+|---|---|---|
+| `windows-latest`(Windows Server 2025 10.0.26100, amd64) | NSIS `.exe`(Docker `golang:1.24-bookworm` + `nsis 3.08-3+deb12u1`로 교차 빌드) | `/S` 설치 → 파일·시작 메뉴·HKCU 제거 항목 → Hook·작업 스케줄러 등록·Run 값(트레이) → 트레이 15초 유지·단일 실행 → 셀프 테스트 8단계(onReady 19ms, GUI 창 프로세스 10초 관측·최대 1개, 종료 뒤 GUI·트레이 없음) → `uninstall.exe /S` → 폴더·바로 가기·제거 항목·Run 값·작업 등록 삭제, 우리 Hook만 삭제·남의 Hook 유지 |
+| `macos-latest`(macOS 26.6.2, arm64) | 유니버설 `.pkg`(같은 러너, Xcode 명령행 도구) | `sudo installer` → pkg 영수증·트레이 `LSUIElement`·`codesign --verify --deep --strict` → Hook·launchd 등록·LaunchAgent(트레이) → 트레이 15초 유지·단일 실행 → 셀프 테스트 8단계(onReady 296ms, GUI 10초 관측·최대 1개) → `--remove-app` → 앱·영수증·LaunchAgent·launchd 등록 삭제, 남의 Hook 유지 |
+| `ubuntu-24.04`(glibc 2.39, amd64) | Core deb + desktop deb(Docker bookworm, `libgtk-3-dev 3.24.38-2~deb12u3`·`libwebkit2gtk-4.1-dev 2.50.6-1~deb12u2`), 의존 `agent-office-collector (= 0.0.0~ci.18), libgtk-3-0 \| libgtk-3-0t64, libwebkit2gtk-4.1-0` | `apt-get install` 의존성 해결 → 파일·`.desktop`·아이콘 → Hook·XDG autostart(트레이) → 트레이 15초 유지·단일 실행 → Watcher 등록·dbusmenu 7항목·D-Bus 클릭 일시중지·재개 → 셀프 테스트 8단계(GUI 최대 1개) → 제거 도우미 + `apt-get remove` → 파일·autostart 삭제, 남의 Hook 유지 |
+| `ubuntu-24.04-arm`(glibc 2.39, arm64) | 같은 스크립트로 그 러너에서 빌드 | amd64와 같은 항목 |
+
+업데이트 확인은 네 러너 모두 `update_check_failed`(CI 빌드에 업데이트 공개 키 없음, 정상), 로그아웃은 미등록 PC라 `logged_out`(Core "등록되어 있지 않습니다", 서버 요청 없음)입니다. 등록된 PC의 로그아웃·서버 폐기는 `tray/independence_test.go`와 `collector_smoke.py`가 확인합니다. Core 서비스 등록 확인은 Linux에서 하지 않았습니다(러너에 systemd 사용자 세션 없음).
 
 ### 이전 기록: GUI 안 트레이(#43, Linux 컨테이너)
 
@@ -203,7 +213,7 @@ agent-office-collector-tray version
 
 ## 프라이버시
 
-- GUI 설정 `gui.json`에는 서버 주소와 PC 이름 초안만 저장합니다(같은 폴더의 `tray.lock`은 빈 잠금 파일)(디렉터리 0700, 파일 0600, 원자적 쓰기, 심볼릭 링크 거부). 위치: `$AGENT_OFFICE_COLLECTOR_HOME/gui/gui.json`, 없으면 OS 사용자 설정 폴더의 `AgentOffice/CollectorGUI/gui.json`.
+- GUI 설정 `gui.json`에는 서버 주소와 PC 이름 초안만 저장합니다(디렉터리 0700, 파일 0600, 원자적 쓰기, 심볼릭 링크 거부). 같은 폴더의 `tray.lock`·`gui.lock`은 빈 잠금 파일, `gui.request`는 `show`/`quit` 한 단어뿐입니다. 위치: `$AGENT_OFFICE_COLLECTOR_HOME/gui/gui.json`, 없으면 OS 사용자 설정 폴더의 `AgentOffice/CollectorGUI/gui.json`.
 - GUI는 Core 설정 파일(`config.json`)과 OS 보안 저장소를 읽지 않고 장치 토큰을 다루지 않습니다. 보관 위치는 Core `status`의 `token_storage`(`os_keyring`·`file_fallback`) 값으로만 표시합니다. 화면에 보내는 Core 출력에서 `aod_` 토큰 형식 문자열을 한 번 더 가립니다.
 - 상태·진단 화면은 Core JSON의 enum·개수·시각·오류 코드만 씁니다. 모르는 enum은 `unknown`, 코드 형식이 아닌 오류·개수 키는 버립니다(경로·URL·OS 오류 문자열 차단).
 - 등록 성공 시 Core 출력(장치 ID 포함)은 화면에 보이지 않습니다.
@@ -278,6 +288,7 @@ GOOS=windows CGO_ENABLED=0 go build -tags desktop,production -o /tmp/ao/gui.exe 
 | `siblings_test.go` | Linux·Windows 같은 폴더, macOS 앱 번들 ↔ 트레이 번들 위치(GUI → 트레이, 트레이 → Core·GUI) |
 | `launch_test.go` | 브라우저 명령(OS별, http(s)만·사용자 정보·`file:`·`javascript:` 거부), 하위 프로세스 기다림·시간 초과 시 종료·실행 파일 없음 |
 | `single_test.go` | 다른 프로세스가 같은 잠금을 못 얻음(ErrHeld), 해제 뒤 다시 얻음 |
+| `guictl_test.go` | 두 번째 프로세스의 show·quit 요청이 첫 GUI에 전달, 이전 실행이 남긴 요청은 무시, 첫 GUI가 없으면 요청 파일을 남기지 않음, 알 수 없는 요청 거부 |
 | `independence_test.go` | 실제 Core: 별도 프로세스 `run` → GUI 도우미 프로세스 SIGKILL·트레이 종료 뒤 Core 생존·Hook 이벤트 전송 → Core SIGKILL 시 `core_stopped` → 재시작 후 `running` → 트레이 일시중지·재개 → GUI 로그아웃(서버 폐기 1회) → 이후 이벤트 미전송·Core 프로세스 유지. 요청 본문·화면 값에 토큰·홈 경로 없음 |
 | `autostart_test.go` | OS별 위치, Desktop Entry `Exec` 인용(공백·`"`·`$`·`%`·`\`·`` ` ``), plist 이스케이프·`KeepAlive` 없음, Windows Run 값 소유 판정 표, 설치·갱신·제거, 남의 파일·심볼릭 링크·남의 Run 값 거부, 임시 파일 미잔류 |
 | Core `register_test.go`·`hooks_test.go` | `--code-stdin`(성공, `--code`와 동시 사용·빈 입력·긴 입력 거부), `hooks status --json` 필드와 경로·다른 Hook 명령 미노출, 읽기 실패 코드 |
