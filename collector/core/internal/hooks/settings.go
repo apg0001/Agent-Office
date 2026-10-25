@@ -168,10 +168,20 @@ func (s Spec) classify(e Event, g group, h json.RawMessage) (owned, current bool
 	if !ok || info.Type != "command" || !IsOwnedCommand(info.Command, s.Tool) {
 		return false, false
 	}
-	return true, info.Command == s.Command && info.Timeout.String() == itoa(s.Timeout) && g.matcher == e.Matcher
+	return true, info.Command == s.Command && info.Timeout.String() == itoa(s.TimeoutFor(s.event(e.Name))) && g.matcher == e.Matcher
 }
 
 func itoa(n int) string { return string(encode(n)) }
+
+// event는 이름이 같은 기대 이벤트다(타임아웃 재정의 조회용). 없으면 이름만 담는다.
+func (s Spec) event(name string) Event {
+	for _, e := range s.Events {
+		if e.Name == name {
+			return e
+		}
+	}
+	return Event{Name: name}
+}
 
 // document는 파싱된 설정 파일이다.
 type document struct {

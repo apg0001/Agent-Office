@@ -1,10 +1,11 @@
 // Package hooks는 Claude Code·Codex Hook 설정 항목을 생성하고, 사용자 설정 파일에
-// 소유 항목만 안전하게 추가·제거한다(#31).
+// 소유 항목만 안전하게 추가·제거한다(#31, Codex 사용자 범위 `$CODEX_HOME/hooks.json`은 #170).
 //
 //   - 생성(Generate)은 순수 함수다. OS별 명령 인용을 골든 테스트로 고정한다.
 //   - 소유 판정은 Hook 핸들러의 명령 서명(실행 파일 이름 `agent-office-collector[.exe]` +
-//     `hook <provider>`)으로 한다. Claude 설정 검증이 모르는 키를 거부할 수 있으므로
-//     핸들러에 별도 표시 키를 넣지 않는다.
+//     `hook <provider>`)으로 한다. Claude 설정 검증이 모르는 키를 거부할 수 있고 Codex
+//     `hooks.json`은 최상위에 `description`·`hooks` 외 키를 거부하므로(0.163.0 소스
+//     `HooksFile` deny_unknown_fields) 핸들러에 별도 표시 키를 넣지 않는다.
 //   - 설치·제거는 기존 키 순서와 남의 Hook을 보존하고, 쓰기 전에 0600 백업을 남기며,
 //     임시 파일 + rename으로 원자적으로 쓴다. 파싱할 수 없는 파일은 건드리지 않는다.
 package hooks
@@ -26,6 +27,10 @@ const (
 // 더하므로(#19 실측) 짧게 명시한다. `hook` 명령은 stdin을 최대 2초만 기다린다.
 const TimeoutSeconds = 5
 
+// CodexSessionEndTimeoutSeconds는 Codex SessionEnd 핸들러 타임아웃이다. Codex 0.163.0은
+// SessionEnd·Interrupt 타임아웃을 최대 3초로 자르고 경고를 남긴다(소스 `normalize_command_hook`).
+const CodexSessionEndTimeoutSeconds = 3
+
 // ExeBase는 소유 판정에 쓰는 실행 파일 이름(확장자 제외)이다.
 const ExeBase = "agent-office-collector"
 
@@ -43,6 +48,8 @@ type Event struct {
 	Name string
 	// Matcher가 비어 있지 않으면 matcher 그룹에 넣는다(Claude 도구 이벤트, #19 하네스와 동일).
 	Matcher string
+	// Timeout이 0보다 크면 Spec.Timeout 대신 쓴다.
+	Timeout int
 }
 
 // claudeEvents는 #19(Claude Code 2.1.308, Linux arm64, -p)에서 반복 관측한 이벤트다.
@@ -59,7 +66,8 @@ var claudeEvents = []Event{
 	{Name: "SessionEnd"},
 }
 
-// codexEvents는 #17(CLI exec)·#18(Desktop, 부분 관측)에서 관측한 이벤트의 합집합이다.
+// codexEvents는 #17(CLI exec)·#18(Desktop, 부분 관측)·#170(CLI 0.163.0 Linux exec)에서 관측한
+// 이벤트의 합집합이다. matcher가 없으면 Codex는 모든 도구에 실행한다(#170 실측).
 var codexEvents = []Event{
 	{Name: "SessionStart"},
 	{Name: "UserPromptSubmit"},
@@ -69,7 +77,7 @@ var codexEvents = []Event{
 	{Name: "SubagentStart"},
 	{Name: "SubagentStop"},
 	{Name: "Stop"},
-	{Name: "SessionEnd"},
+	{Name: "SessionEnd", Timeout: CodexSessionEndTimeoutSeconds},
 }
 
 // Params는 생성 입력이다.
@@ -144,8 +152,16 @@ type handler struct {
 	Timeout int    `json:"timeout"`
 }
 
-func (s Spec) handlerJSON() json.RawMessage {
-	return encode(handler{Type: "command", Command: s.Command, Timeout: s.Timeout})
+// TimeoutFor는 이벤트 하나의 핸들러 타임아웃이다.
+func (s Spec) TimeoutFor(e Event) int {
+	if e.Timeout > 0 {
+		return e.Timeout
+	}
+	return s.Timeout
+}
+
+func (s Spec) handlerJSON(e Event) json.RawMessage {
+	return encode(handler{Type: "command", Command: s.Command, Timeout: s.TimeoutFor(e)})
 }
 
 // groupJSON은 이벤트 하나에 추가할 matcher 그룹이다.
@@ -154,7 +170,7 @@ func (s Spec) groupJSON(e Event) json.RawMessage {
 	if e.Matcher != "" {
 		obj = obj.set("matcher", encode(e.Matcher))
 	}
-	obj = obj.set("hooks", json.RawMessage("["+string(s.handlerJSON())+"]"))
+	obj = obj.set("hooks", json.RawMessage("["+string(s.handlerJSON(e))+"]"))
 	return obj.marshal()
 }
 

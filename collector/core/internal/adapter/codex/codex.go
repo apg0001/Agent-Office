@@ -34,8 +34,11 @@ const (
 )
 
 // VerifiedTargets는 실측 런타임이다.
-//   - CLI exec(#17): 4회 반복 관측, PostToolUse는 4회 모두 미관측.
+//   - CLI exec(#17, Windows 0.162.0-alpha.17.2): 4회 반복 관측, PostToolUse는 4회 모두 미관측.
 //   - Desktop(#18): 1회 관측이라 partial. SessionStart는 미관측.
+//   - CLI exec(#170, Linux arm64 0.163.0): 사용자 범위 `$CODEX_HOME/hooks.json`을 TUI에서 신뢰한 뒤
+//     합성 모델 서버로 4회 반복 관측. PostToolUse(tool_name `Bash`) 포함 6종 매회 1번.
+//     PermissionRequest·SubagentStart·SubagentStop은 시나리오상 발생하지 않아 미관측.
 var VerifiedTargets = []adapter.Target{
 	{
 		Runtime: adapter.Runtime{Product: ProductCLI, Version: "0.162.0-alpha.17.2", OS: "windows", Mode: "exec"},
@@ -52,6 +55,29 @@ var VerifiedTargets = []adapter.Target{
 			hookSubagentStart, hookSubagentStop, hookStop, hookSessionEnd,
 		),
 	},
+	{
+		Runtime: adapter.Runtime{Product: ProductCLI, Version: "0.163.0", OS: "linux", Mode: "exec"},
+		Level:   adapter.SupportVerified,
+		Observed: adapter.Set(
+			hookSessionStart, hookUserPromptSubmit, hookPreToolUse, hookPostToolUse, hookStop, hookSessionEnd,
+		),
+	},
+}
+
+// CompletionObserved는 이 런타임에서 Hook만으로 도구 완료(tool.completed)를 만들 수 있는지다.
+// Desktop은 #18에서 관측했다. CLI는 PostToolUse를 관측한 실측 대상과 런타임이 정확히 같을 때만
+// 허용한다(#17 Windows 0.162에서는 미관측, #170 Linux 0.163.0 exec에서는 관측). 버전·모드를 모르는
+// CLI 런타임은 보수적으로 허용하지 않는다.
+func CompletionObserved(rt adapter.Runtime) bool {
+	if rt.Product == ProductDesktop {
+		return true
+	}
+	for _, t := range VerifiedTargets {
+		if t.Runtime == rt && t.Observed[hookPostToolUse] {
+			return true
+		}
+	}
+	return false
 }
 
 var hookEventTypes = map[string]adapter.EventType{
@@ -68,8 +94,9 @@ var hookEventTypes = map[string]adapter.EventType{
 
 // ParseHook은 Codex Hook stdin payload 한 건을 후보 하나로 바꾼다.
 //
-//   - 알 수 없는 이벤트, 그리고 Desktop이 아닌 런타임(CLI·미상)의 PostToolUse는 EventUnknown
-//     후보다. CLI exec에서 PostToolUse가 관측되지 않았으므로 Hook만으로 tool.completed를 만들지 않는다.
+//   - 알 수 없는 이벤트, 그리고 CompletionObserved가 아닌 런타임(Desktop 외, PostToolUse를 관측한
+//     CLI 실측 대상과 다른 런타임)의 PostToolUse는 EventUnknown 후보다. #17 CLI exec에서
+//     PostToolUse가 관측되지 않았으므로 미상 런타임에서는 Hook만으로 tool.completed를 만들지 않는다.
 //   - session_id가 없으면 ErrMissingSession, 도구·하위 에이전트 이벤트에 식별자가 없으면 ErrMissingRef.
 //
 // 턴 참조는 `turn_id`다. Codex 키는 Hook 단일 소스 멱등용이며 교차 소스 일치는 미검증이다.
@@ -89,7 +116,7 @@ func ParseHook(data []byte, rt adapter.Runtime) (c adapter.Candidate, err error)
 	}
 	name := obj.String("hook_event_name")
 	eventType, known := hookEventTypes[name]
-	if !known || (name == hookPostToolUse && rt.Product != ProductDesktop) {
+	if !known || (name == hookPostToolUse && !CompletionObserved(rt)) {
 		return adapter.Candidate{
 			Provider:   adapter.ProviderCodex,
 			Source:     adapter.SourceHook,

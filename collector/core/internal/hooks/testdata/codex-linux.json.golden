@@ -94,7 +94,7 @@
           {
             "type": "command",
             "command": "'/usr/local/bin/agent-office-collector' hook codex",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }
