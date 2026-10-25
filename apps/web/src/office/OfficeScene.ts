@@ -44,6 +44,14 @@ import {
 import type { AgentState, OfficeState } from "./types";
 
 const WALK_TILES_PER_SECOND = 2.5;
+/**
+ * 픽셀 렌더(#166): 캔버스 버퍼를 화면의 절반 크기로 만들고 2배로 키워 보인다(OfficeView `zoom: 2`).
+ * 그래서 카메라는 기본 0.5배로 세계를 그린다. 캐릭터 2px 블록은 버퍼 1px이 되어 모양이 같고,
+ * 가구·벽은 픽셀 모서리가 생긴다. 지도 위 글자는 Galmuri7(버퍼 8px)을 세계 16px로 쓴다.
+ */
+export const RENDER_SCALE = 2;
+const VIEW_SCALE = 1 / RENDER_SCALE;
+const MAP_FONT = "Galmuri7, monospace";
 /** 픽셀 하나를 화면 2px로 그린다. */
 const PIXEL = 2;
 
@@ -94,7 +102,7 @@ export class OfficeScene extends Phaser.Scene {
     this.drawScenery();
     const center = gridToScreen({ x: this.map.width / 2, y: this.map.height / 2 });
     this.cameras.main.centerOn(center.sx, center.sy);
-    this.cameras.main.setZoom(1);
+    this.cameras.main.setZoom(VIEW_SCALE);
     this.bindCameraInput();
     this.applyState(this.state);
   }
@@ -107,7 +115,7 @@ export class OfficeScene extends Phaser.Scene {
   private setCamera(next: CameraState): void {
     const changed = next.autoFocus !== this.camera.autoFocus;
     this.camera = next;
-    this.cameras.main.setZoom(next.zoom);
+    this.cameras.main.setZoom(next.zoom * VIEW_SCALE);
     if (changed) {
       this.onCameraChange(next);
     }
@@ -336,28 +344,29 @@ export class OfficeScene extends Phaser.Scene {
     const top = -sprite.height;
     // "!"는 관측된 승인 대기.
     const marker = this.add
-      .text(0, top - 8, "!", { fontFamily: "monospace", fontSize: "12px", color: "#ffffff" })
+      .text(0, top - 10, "!", { fontFamily: MAP_FONT, fontSize: "16px", color: "#ffcd4a" })
       .setOrigin(0.5)
       .setVisible(false);
     const status = this.add
-      .text(0, top - 20, "", {
-        fontFamily: "sans-serif",
-        fontSize: "10px",
+      .text(0, top - 28, "", {
+        fontFamily: MAP_FONT,
+        fontSize: "16px",
         color: "#ffffff",
         backgroundColor: "#000000aa",
-        padding: { x: 3, y: 1 },
+        padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5)
-      .setResolution(2)
       .setVisible(false);
     const label = this.add
       .text(0, 2, labelFor(agent, device), {
-        fontFamily: "sans-serif",
-        fontSize: "9px",
+        fontFamily: MAP_FONT,
+        fontSize: "16px",
         color: "#ffffff",
         backgroundColor: "#00000066",
       })
       .setOrigin(0.5, 0);
+    // 하위 에이전트는 작은 몸과 머리 위 상태로 구분한다. 이름표("하위")까지 달면 겹쳐 보인다.
+    label.setVisible(agent.role !== "subagent");
     container.add([sprite, label, marker, status]);
     sprite.setInteractive({ useHandCursor: true });
     sprite.on("pointerup", (pointer: Phaser.Input.Pointer) => {
@@ -506,14 +515,13 @@ export class OfficeScene extends Phaser.Scene {
     this.scenery.push(mat);
     const sign = this.add
       .text(entrance.sx - 24, entrance.sy - 62, "🚪 출입구", {
-        fontFamily: "sans-serif",
-        fontSize: "11px",
+        fontFamily: MAP_FONT,
+        fontSize: "16px",
         color: "#ffffff",
         backgroundColor: "#2f7d4f",
         padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5)
-      .setResolution(2)
       .setDepth(1000);
     this.scenery.push(sign);
   }
@@ -526,8 +534,8 @@ export class OfficeScene extends Phaser.Scene {
       const screen = gridToScreen({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
       const label = this.add
         .text(screen.sx, screen.sy, ZONE_LABELS[zone], {
-          fontFamily: "sans-serif",
-          fontSize: "11px",
+          fontFamily: MAP_FONT,
+          fontSize: "16px",
           color: "#333333",
         })
         .setOrigin(0.5)
