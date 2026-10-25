@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -221,7 +222,7 @@ func TestHooksCodexInstallStatusUninstall(t *testing.T) {
 	}
 	out := te.stdout.String()
 	if !strings.Contains(out, "+ SessionStart") || !strings.Contains(out, "+ PostToolUse") || !strings.Contains(out, "--yes") ||
-		!strings.Contains(out, "hook codex") || !strings.Contains(out, "SessionEnd는 timeout 3") || !strings.Contains(out, "~/.codex/hooks.json") {
+		!strings.Contains(out, "hook codex") || !strings.Contains(out, "SessionEnd는 timeout 3") || !strings.Contains(out, "~"+string(filepath.Separator)+filepath.Join(".codex", "hooks.json")) {
 		t.Errorf("미리보기 출력:\n%s", out)
 	}
 	if b, _ := os.ReadFile(path); string(b) != userCodexHooks {
@@ -235,7 +236,7 @@ func TestHooksCodexInstallStatusUninstall(t *testing.T) {
 	if !strings.Contains(out, "백업") || !strings.Contains(out, "Hooks need review") || strings.Contains(out, te.home) {
 		t.Errorf("설치 출력(신뢰 안내, 홈 경로는 ~):\n%s", out)
 	}
-	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o644 {
+	if fi, err := os.Stat(path); err != nil || (runtime.GOOS != "windows" && fi.Mode().Perm() != 0o644) {
 		t.Errorf("원래 권한 유지: %v %v", fi.Mode(), err)
 	}
 	var doc struct {
@@ -291,7 +292,7 @@ func TestHooksCodexInstallStatusUninstall(t *testing.T) {
 		t.Fatal("백업 없음")
 	}
 	for _, bk := range backups {
-		if fi, err := os.Stat(bk); err != nil || fi.Mode().Perm() != 0o600 {
+		if fi, err := os.Stat(bk); err != nil || (runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600) {
 			t.Errorf("백업 권한: %v %v", fi.Mode(), err)
 		}
 	}
