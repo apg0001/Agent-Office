@@ -1,9 +1,13 @@
-/** 논리 그리드 ↔ 2:1 아이소메트릭 화면 좌표 투영. */
+/**
+ * 논리 그리드 ↔ 아이소메트릭 화면 좌표 투영.
+ * 바닥 마름모 기울기는 가구 그림(Kenney Furniture Kit 렌더)과 같아야 한다. 그 바닥 타일 윗면을
+ * 픽셀로 재면 기울기가 약 0.69~0.71이라 64×44를 쓴다(2:1인 64×32를 쓰면 가구가 약 10° 틀어져 보인다, #153).
+ */
 
 import type { Point } from "./grid";
 
 export const TILE_WIDTH = 64;
-export const TILE_HEIGHT = 32;
+export const TILE_HEIGHT = 44;
 
 export interface ScreenPoint {
   sx: number;

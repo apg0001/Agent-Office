@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createDefaultOffice } from "./grid";
+import { TILE_HEIGHT, TILE_WIDTH } from "./iso";
 import { WALL_HEIGHT, wallBase, wallPoint, wallSegments } from "./walls";
 
 describe("back walls (#153)", () => {
@@ -41,10 +42,10 @@ describe("back walls (#153)", () => {
     );
   });
 
-  it("follows the 2:1 floor slope", () => {
+  it("follows the floor slope", () => {
     for (const segment of segments) {
       const [a, b] = wallBase(segment);
-      expect(Math.abs((b.sy - a.sy) / (b.sx - a.sx))).toBeCloseTo(0.5);
+      expect(Math.abs((b.sy - a.sy) / (b.sx - a.sx))).toBeCloseTo(TILE_HEIGHT / TILE_WIDTH);
       expect(wallPoint(segment, 0, WALL_HEIGHT).sy).toBe(a.sy - WALL_HEIGHT);
     }
   });
