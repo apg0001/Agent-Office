@@ -10,7 +10,8 @@ if (-not $Yes) {
   if ($answer -notin @("y", "Y")) { Write-Output "취소"; exit 1 }
 }
 & $bin hooks uninstall --tool claude --yes *> $null
-& $bin service uninstall *> $null
+# --activate가 있어야 작업 스케줄러 등록 해제(schtasks /End·/Delete)까지 한다(없으면 정의 파일만 지움).
+& $bin service uninstall --activate *> $null
 # GUI(트레이) 자동 시작(#43): 우리 형식("...\agent-office-collector-gui.exe" --autostart)인 Run 값만 지운다.
 $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $gui = (Get-ItemProperty -Path $run -Name AgentOfficeCollectorGUI -ErrorAction SilentlyContinue).AgentOfficeCollectorGUI
@@ -22,7 +23,12 @@ if ($Purge) {
   & $bin logout --local-only *> $null
   # Core의 경로 규칙과 같다(%APPDATA%·%LOCALAPPDATA%\AgentOffice\Collector).
   foreach ($dir in @((Join-Path $env:APPDATA "AgentOffice\Collector"), (Join-Path $env:LOCALAPPDATA "AgentOffice\Collector"))) {
-    if ($dir.EndsWith("AgentOffice\Collector") -and (Test-Path $dir)) { Remove-Item -Recurse -Force -LiteralPath $dir -ErrorAction Stop }
+    if (-not ($dir.EndsWith("AgentOffice\Collector") -and (Test-Path $dir))) { continue }
+    # 방금 끝낸 Collector가 잠금 파일을 놓을 때까지 잠시 다시 시도한다.
+    for ($i = 1; $i -le 10; $i++) {
+      try { Remove-Item -Recurse -Force -LiteralPath $dir -ErrorAction Stop; break }
+      catch { if ($i -eq 10) { throw }; Start-Sleep -Seconds 1 }
+    }
   }
 }
 Write-Output "정리 완료"

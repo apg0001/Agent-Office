@@ -272,6 +272,7 @@
 186. #63 72시간 무경합 실행 시작(2026-10-24 23시경 KST, `36a2f38`, 이미지 `ao-release-server:test`·`ao-release-web:test`). 출력 `~/ao-soak/soak72h.txt`, Compose 프로젝트 `ao-load`. 실행 중에는 Pi에서 무거운 빌드·테스트를 피한다.
 187. #38: Claude `TodoWrite` 입력 형식을 Claude Code 2.1.308 Linux `-p`에서 Hook·transcript 양쪽 실측해 그 런타임에 한해 계획 지원 수준을 `verified`(`confidence: observed`)로 올림. 다른 런타임·Codex `update_plan`은 `inferred` 유지. 2026-10-25 15시 기준 72시간 실행 16시간째 정상(서버 메모리 약 94MiB, 오류 로그 0).
 188. PR #144 병합(`9b464e4`). macOS·Windows 실장비 검증 절차를 `docs/verification/cross-os-checklist.md`에 정리(#40·#41·#42·#43·#62, 기록 규칙 포함).
+189. PR #145 병합(`ecb5ef8`). `.github/workflows/cross-os.yml`(PR #146, `test/#43-cross-os-ci`): GitHub Actions `macos-latest`·`windows-latest` 실제 러너에서 Core·GUI 테스트, 실제 Keychain·Credential Manager, 실제 LaunchAgent·HKCU Run, GUI 데스크톱 빌드·실행, 등록→Hook→수집·전송→서비스→로그아웃→제거 스모크(`tests/cross_os/collector_smoke.py`). 찾아 고친 문제: macOS GUI `UniformTypeIdentifiers` 링크 실패, Windows `uninstall.ps1` BOM·stderr 처리, 제거 도우미가 `service uninstall`에 `--activate`를 빠뜨려 OS 등록·실행 중 Collector가 남던 문제, `hooks`·`service`의 `--os` 명시 판정, Windows CLI 테스트 경로.
 
 ## 이번 변경 요약(#22)
 

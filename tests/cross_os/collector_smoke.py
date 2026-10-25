@@ -193,28 +193,22 @@ def main() -> int:
 
         run("service", "install", "--activate")
         record("service_installed", status().get("service") == "installed")
+        os_query: list[str] = []
         if sys.platform == "win32":
-            q = subprocess.run(
-                ["schtasks", "/Query", "/TN", r"\AgentOffice\Collector"],
-                check=False,
-                capture_output=True,
-            )
-            record("service_registered_in_os", q.returncode == 0)
+            os_query = ["schtasks", "/Query", "/TN", r"\AgentOffice\Collector"]
         elif sys.platform == "darwin":
-            q = subprocess.run(
-                [
-                    "launchctl",
-                    "print",
-                    f"gui/{os.getuid()}/io.github.apg0001.agent-office.collector",
-                ],
-                check=False,
-                capture_output=True,
-            )
+            label = "io.github.apg0001.agent-office.collector"
+            os_query = ["launchctl", "print", f"gui/{os.getuid()}/{label}"]
+        if os_query:
+            q = subprocess.run(os_query, check=False, capture_output=True)
             record("service_registered_in_os", q.returncode == 0)
         before = COUNTS["heartbeat"]
         results["service_heartbeat"] = wait(lambda: COUNTS["heartbeat"] > before, 60)
-        run("service", "uninstall")
+        run("service", "uninstall", "--activate")
         record("service_removed", status().get("service") != "installed")
+        if os_query:
+            q = subprocess.run(os_query, check=False, capture_output=True)
+            record("service_unregistered_in_os", q.returncode != 0)
 
         run("logout")
         record("revoked_on_server", COUNTS["revoke"] == 1)

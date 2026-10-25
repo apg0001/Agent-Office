@@ -55,4 +55,18 @@ Claude·Codex의 원본 기록(`~/.claude/projects` 등)은 어떤 경우에도 
 - Debian 12 컨테이너: deb 설치 → `version` → 제거 도우미 기본(설정 유지)·`--purge`(설정 삭제, Claude 기록 유지) → `dpkg -r`로 바이너리 제거.
 - Fedora 41 컨테이너: rpm 설치 → `version` → `rpm -e`로 제거.
 - Linux tar.gz 실행, Windows zip 구성(PE 실행 파일) 확인.
-- 미검증: amd64 패키지 실행(교차 빌드만), macOS·Windows에서 실행·제거, 서명.
+- 미검증: amd64 Linux 패키지 실행(교차 빌드만), 서명.
+
+## 검증(macOS·Windows 러너, 2026-10-25)
+
+`.github/workflows/cross-os.yml`의 `tests/cross_os/collector_smoke.py`가 `macos-latest`(arm64)와 `windows-latest`(amd64) 러너에서 같은 저장소의 Core와 제거 도우미(`agent-office-collector-uninstall`, `uninstall.ps1`)로 다음을 확인합니다. 러너는 일회용이라 실제 사용자 위치를 씁니다. 서버는 스크립트 안의 가짜 API입니다.
+
+등록 → OS 보안 저장소 보관 → Hook 설치(사용자 Hook 유지) → `run`·`hook claude` 수집·전송(프롬프트 sentinel 서버 미도달) → `service install --activate`(작업 스케줄러·launchd 등록, 서비스로 뜬 Core의 heartbeat) → `service uninstall --activate`(OS 등록 해제) → `logout`(서버 폐기) → 재등록 뒤 제거 도우미 `--purge`(설정·토큰 삭제, 우리 Hook만 제거, 사용자 Hook 유지).
+
+이 검증에서 고친 문제:
+
+- `uninstall.ps1`이 BOM 없는 UTF-8이라 Windows PowerShell 5.1에서 한글 문자열 구문 오류 → UTF-8 BOM 저장, `tests/test_repository_metadata.py`가 BOM을 검사.
+- `$ErrorActionPreference = "Stop"`과 `2>$null`로 네이티브 명령 stderr가 종료 오류가 됨 → 네이티브 명령은 출력만 버리고 cmdlet에만 `-ErrorAction Stop`.
+- 제거 도우미가 `service uninstall`을 `--activate` 없이 불러 정의 파일만 지우고 작업 스케줄러·launchd 등록과 실행 중인 Collector가 남음(Windows는 잠금 파일 때문에 `--purge` 실패) → `--activate`로 등록 해제·중지, Windows는 폴더 삭제를 잠시 재시도.
+
+미실행: 서명하지 않은 실행 파일의 Gatekeeper·SmartScreen 경고, 사람이 쓰는 데스크톱에서 재로그인 후 자동 시작.
