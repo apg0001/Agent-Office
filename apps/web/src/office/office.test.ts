@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assignSeats, deskRowsFor, targetTile, zoneForActivity } from "./behavior";
+import { assignSeats, deskRowsFor, spreadTargets, targetTile, zoneForActivity } from "./behavior";
 import { ZONE_COLORS, ZONE_GUIDE, contains, createDefaultOffice, isWalkable, tileAt, walkableTiles } from "./grid";
 import { depthOf, gridToScreen, screenToGrid, tileDiamond } from "./iso";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
@@ -154,5 +154,31 @@ describe("zone guide (#160)", () => {
       expect(explained.has(zone), zone).toBe(true);
       expect(ZONE_COLORS[zone]).toBeTypeOf("number");
     }
+  });
+});
+
+describe("no overlapping characters (#194)", () => {
+  const map = createDefaultOffice(2);
+
+  it("gives every character its own tile, keeps fixed seats and stays in the wanted zone", () => {
+    const lounge = walkableTiles(map, "lounge")[0]!;
+    const seat = map.seats[0]!;
+    const wants = [
+      ...Array.from({ length: 6 }, (_, i) => ({ id: `idle-${i}`, point: lounge, fixed: false })),
+      { id: "lead", point: seat, fixed: true },
+      { id: "visitor", point: seat, fixed: false },
+    ];
+    const targets = spreadTargets(map, wants);
+    const keys = [...targets.values()].map((p) => `${p.x},${p.y}`);
+    expect(new Set(keys).size).toBe(wants.length);
+    expect(targets.get("lead")).toEqual(seat);
+    for (let i = 0; i < 6; i += 1) {
+      const p = targets.get(`idle-${i}`)!;
+      expect(tileAt(map, p)?.zone).toBe("lounge");
+      expect(isWalkable(map, p)).toBe(true);
+    }
+    expect(targets.get("visitor")).not.toEqual(seat);
+    // 같은 입력이면 같은 결과(매 프레임 흔들리지 않음).
+    expect(spreadTargets(map, [...wants].reverse())).toEqual(targets);
   });
 });
