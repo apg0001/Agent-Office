@@ -44,8 +44,10 @@ const (
 	ItemSettings Item = "settings"
 	ItemPause    Item = "pause"
 	ItemResume   Item = "resume"
-	// ItemUpdate는 Core `update check`(확인만, 적용 안 함)다.
+	// ItemUpdate는 업데이트 확인이다(설치 프로그램 배치면 `update check --installer`, 아니면 `update check`).
 	ItemUpdate Item = "update"
+	// ItemInstall은 새 버전이 있을 때만 보이는 "업데이트 설치 (vX.Y.Z)"다. 누르는 것이 승인이다(#180).
+	ItemInstall Item = "install"
 	// ItemLogout은 "로그아웃" 하위 메뉴의 확인 항목이다(한 번 더 골라야 실행).
 	ItemLogout Item = "logout"
 	// ItemQuit은 트레이와 GUI 창을 끝낸다. Core 수집은 계속된다.
@@ -53,7 +55,7 @@ const (
 )
 
 // Items는 메뉴 순서다(셀프 테스트·문서와 같은 순서).
-var Items = []Item{ItemOffice, ItemSettings, ItemPause, ItemResume, ItemUpdate, ItemLogout, ItemQuit}
+var Items = []Item{ItemOffice, ItemSettings, ItemPause, ItemResume, ItemUpdate, ItemInstall, ItemLogout, ItemQuit}
 
 // View는 트레이 표시 내용이다. 개수·enum·Core가 낸 버전 문구만 담는다(경로·주소·토큰 없음).
 type View struct {
@@ -67,6 +69,8 @@ type View struct {
 	CanLogout bool
 	// Update는 마지막 업데이트 확인 결과 문구다(확인 전 "업데이트 확인").
 	Update string
+	// Install은 "업데이트 설치 (vX.Y.Z)" 항목 문구다. 비어 있으면 항목을 숨긴다.
+	Install string
 }
 
 // Describe는 Core 상태를 트레이 표시로 바꾼다.
@@ -152,9 +156,15 @@ type Controller struct {
 	// Interval은 상태 갱신 주기다(0이면 5초).
 	Interval time.Duration
 
+	// Updates는 설치 파일 기반 자동 업데이트 동작이다(nil이면 예전처럼 확인만, #180).
+	Updates Updater
+	// Notify는 OS 알림이다(nil이면 알리지 않음). 버전·코드만 넘긴다.
+	Notify func(title, body string) error
+
 	mu     sync.Mutex
 	last   View
 	update string
+	upd    updateState
 }
 
 // New는 Controller를 만든다. host가 nil이면 표시 없이 동작한다(테스트·도우미).
@@ -167,6 +177,7 @@ func (c *Controller) Refresh() View {
 	v := Describe(c.actions.Status())
 	c.mu.Lock()
 	v.Update = c.update
+	v.Install = c.upd.label()
 	c.last = v
 	c.mu.Unlock()
 	if c.host != nil {
@@ -212,7 +223,20 @@ func (c *Controller) Handle(it Item) string {
 		r := c.actions.Resume()
 		c.Refresh()
 		return r.Code
+	case ItemInstall:
+		return c.InstallUpdate()
 	case ItemUpdate:
+		if c.Updates != nil {
+			return c.CheckForUpdates(true)
+		}
+		return c.legacyCheck()
+	}
+	return c.handleRest(it)
+}
+
+// legacyCheck는 Core `update check`(확인만)다. 설치 프로그램 배치가 아니면 이 경로를 쓴다.
+func (c *Controller) legacyCheck() string {
+	{
 		r := c.actions.UpdateCheck()
 		label := "업데이트: 확인 실패"
 		switch r.Code {
@@ -229,6 +253,11 @@ func (c *Controller) Handle(it Item) string {
 		c.mu.Unlock()
 		c.Refresh()
 		return r.Code
+	}
+}
+
+func (c *Controller) handleRest(it Item) string {
+	switch it {
 	case ItemLogout:
 		r := c.actions.Logout(false, true)
 		c.Refresh()

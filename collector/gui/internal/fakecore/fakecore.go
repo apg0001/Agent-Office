@@ -171,6 +171,29 @@ func run(args []string) int {
 		}
 		fmt.Println("서버에서 이 장치를 폐기했습니다.\n로컬 장치 토큰과 등록 정보를 지웠습니다. " + SentinelToken)
 	case joined == "pause" || joined == "resume":
+	case strings.HasPrefix(joined, "update check --installer") || strings.HasPrefix(joined, "update download --installer") ||
+		strings.HasPrefix(joined, "update install --installer"):
+		status := map[string]string{"check": "available", "download": "downloaded", "install": "installer_started"}[args[1]]
+		switch scenario {
+		case "update_latest":
+			status = "latest"
+		case "update_cli":
+			fmt.Println(`{"status":"error","code":"not_installer_install","current":"0.1.0","channel":"beta"}`)
+			return 1
+		case "update_leak":
+			fmt.Println(`{"status":"available","version":"/home/user/secret","current":"0.1.0","channel":"beta","code":"Bad Code ` + SentinelToken + `"}`)
+			return 0
+		}
+		if args[1] == "install" && !strings.Contains(joined, "--yes") {
+			fmt.Println(`{"status":"error","code":"confirmation_required","current":"0.1.0","channel":"beta"}`)
+			return 1
+		}
+		fmt.Println(`{"status":"` + status + `","version":"0.2.0","current":"0.1.0","channel":"beta","kind":"deb"}`)
+	case joined == "update post-install --json":
+		fmt.Println(`{"status":"attention","version":"0.2.0","hooks":[{"tool":"claude","action":"reapplied"},{"tool":"codex","action":"reapplied"}],"service":"reinstalled","health":"healthy","codex_retrust":true,"legacy_files":2}`)
+		return 1
+	case strings.HasPrefix(joined, "legacy "):
+		fmt.Println(`{"eligible":true,"files":[{"kind":"binary","name":"agent-office-collector","location":"~/.local/bin","state":""},{"kind":"readme","name":"../../etc","location":"~","state":""}],"removed":0,"failed":0}`)
 	case strings.HasPrefix(joined, "update check --channel "):
 		switch scenario {
 		case "update_available":

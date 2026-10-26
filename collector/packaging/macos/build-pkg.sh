@@ -111,8 +111,9 @@ codesign --verify --deep --strict "$APP"
 COMP="$WORK/component.plist"
 pkgbuild --analyze --root "$ROOTDIR" "$COMP" >/dev/null
 plutil -replace 0.BundleIsRelocatable -bool NO "$COMP"
+# postinstall(#180): 대화형 설치 뒤 사용자 세션에서 트레이를 띄운다(명령행 installer는 띄우지 않음).
 pkgbuild --root "$ROOTDIR" --component-plist "$COMP" --identifier "$PKG_ID" --version "$VERSION" \
-  --install-location /Applications "$WORK/component.pkg" >/dev/null
+  --scripts "$ROOT/collector/packaging/macos/scripts" --install-location /Applications "$WORK/component.pkg" >/dev/null
 
 cat >"$WORK/distribution.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>

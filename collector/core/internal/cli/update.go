@@ -25,6 +25,22 @@ const DefaultManifestBase = "https://github.com/apg0001/Agent-Office/releases/do
 // cmdUpdate: `update check|apply [--channel stable|beta] [--manifest-url URL] [--yes]`.
 // 업데이트는 알린 뒤 사용자가 apply로 적용한다(자동 적용은 하지 않음).
 func cmdUpdate(args []string, env Env) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "download", "install":
+			return cmdUpdateInstaller(args[0], args[1:], env)
+		case "check":
+			for _, a := range args[1:] {
+				if a == "--installer" || a == "-installer" {
+					return cmdUpdateInstaller("check", args[1:], env)
+				}
+			}
+		case "run-plan":
+			return cmdRunPlan(args[1:], env)
+		case "post-install":
+			return cmdPostInstall(args[1:], env)
+		}
+	}
 	if len(args) == 0 || (args[0] != "check" && args[0] != "apply") {
 		fmt.Fprintln(env.Stderr, "사용법: agent-office-collector update check|apply [--channel stable|beta] [--manifest-url URL] [--yes]")
 		return ExitUsage
@@ -38,14 +54,7 @@ func cmdUpdate(args []string, env Env) int {
 	if err := fs.Parse(args[1:]); err != nil || (*channel != "stable" && *channel != "beta") {
 		return ExitUsage
 	}
-	if *manifestURL == "" {
-		*manifestURL = DefaultManifestBase + *channel + "/manifest.json"
-	}
-	o := update.Options{
-		ManifestURL: *manifestURL, Channel: *channel, Current: env.Version,
-		GOOS: env.GOOS, GOARCH: runtime.GOARCH, Keys: update.ParseKeys(update.TrustedKeys),
-		Client: env.HTTP,
-	}
+	o := updateOptions(env, *channel, *manifestURL)
 	ctx, cancel := context.WithTimeout(env.Context, 2*time.Minute)
 	defer cancel()
 	avail, err := update.Check(ctx, o)
@@ -111,6 +120,30 @@ func cmdUpdate(args []string, env Env) int {
 	}
 	fmt.Fprintf(env.Stdout, "%s으로 업데이트했습니다. 이전 실행 파일은 %s.bak에 있습니다.\n", avail.Version, filepath.Base(exe))
 	return ExitOK
+}
+
+// 업데이트 테스트·사설 미러용 환경 변수(#180). 서명 검증은 그대로 필수다.
+const (
+	// EnvManifestURL은 --manifest-url이 없을 때 쓸 manifest 주소다.
+	EnvManifestURL = "AGENT_OFFICE_UPDATE_MANIFEST_URL"
+	// EnvAllowLoopbackHTTP=1이면 127.0.0.1의 http manifest·설치 파일을 허용한다(로컬 테스트 서버).
+	EnvAllowLoopbackHTTP = "AGENT_OFFICE_UPDATE_ALLOW_LOOPBACK_HTTP"
+	// EnvElevate=sudo-n이면 macOS·Linux 설치를 OS 승인 창 대신 암호 없는 sudo로 한다(테스트 러너 전용).
+	EnvElevate = "AGENT_OFFICE_UPDATE_ELEVATE"
+)
+
+func updateOptions(env Env, channel, manifestURL string) update.Options {
+	if manifestURL == "" {
+		manifestURL = env.Getenv(EnvManifestURL)
+	}
+	if manifestURL == "" {
+		manifestURL = DefaultManifestBase + channel + "/manifest.json"
+	}
+	return update.Options{
+		ManifestURL: manifestURL, Channel: channel, Current: env.Version,
+		GOOS: env.GOOS, GOARCH: runtime.GOARCH, Keys: update.ParseKeys(update.TrustedKeys),
+		Client: env.HTTP, AllowLoopbackHTTP: env.Getenv(EnvAllowLoopbackHTTP) == "1",
+	}
 }
 
 // restartService는 자동 시작 서비스가 설치돼 있을 때만 다시 시작한다. 큐는 SQLite에 남아 있어

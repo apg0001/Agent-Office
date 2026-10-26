@@ -13,6 +13,13 @@
 //	                                             로그인 시 트레이 자동 시작 정의(소유 항목만 변경)
 //	agent-office-collector-tray --self-test FILE 설치 검증용: 실제 트레이를 띄우고 메뉴 항목을 차례로
 //	                                             눌러(브라우저 열기만 기록) 결과 JSON을 FILE에 쓰고 끝남
+//	agent-office-collector-tray --update-self-test FILE
+//	                                             업데이트 검증용(#180): 곧바로 업데이트를 확인하고 새 버전이 보이면
+//	                                             "업데이트 설치" 항목 클릭 채널로 승인한다(설치가 시작되면 트레이가 끝남)
+//
+// 인자 없이 뜨면(설치 프로그램·업데이트 도우미·메뉴에서 실행) 첫 실행 마법사가 끝나지 않았을 때 설정 창을 띄운다.
+// 로그인 자동 시작(--autostart)은 창을 띄우지 않는다. 시작할 때마다 업데이트 결과·버전 변경을 보고 후처리한다.
+//
 //	agent-office-collector-tray version
 //
 // 종료 코드: 0 정상, 2 사용법, 3 이미 실행 중, 1 그 밖의 실패(셀프 테스트 실패 포함).
@@ -39,7 +46,7 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	selfTest := ""
+	selfTest, updateTest, interactive := "", "", len(args) == 0
 	switch {
 	case len(args) == 0, len(args) == 1 && args[0] == "--autostart":
 	case len(args) == 1 && (args[0] == "version" || args[0] == "--version"):
@@ -49,8 +56,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return autostartCmd(args[1], stdout, stderr)
 	case len(args) == 2 && args[0] == "--self-test" && args[1] != "":
 		selfTest = args[1]
+	case len(args) == 2 && args[0] == "--update-self-test" && args[1] != "":
+		updateTest = args[1]
 	default:
-		fmt.Fprintln(stderr, "사용법: agent-office-collector-tray [--autostart | --self-test 결과.json | autostart install|uninstall|status | version]")
+		fmt.Fprintln(stderr, "사용법: agent-office-collector-tray [--autostart | --self-test 결과.json | --update-self-test 결과.json | autostart install|uninstall|status | version]")
 		return 2
 	}
 	// systray는 오류를 log로 남긴다. 로컬 표준 오류에만 나가고 경로·토큰을 쓰지 않는다.
@@ -60,7 +69,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	lock, err := acquire()
 	if err != nil {
 		if err == single.ErrHeld {
-			if selfTest != "" {
+			if selfTest != "" || updateTest != "" {
 				fmt.Fprintln(stderr, "이미 트레이가 실행 중입니다")
 			}
 			return 3
@@ -69,7 +78,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer lock.Release()
-	return runTray(selfTest)
+	return runTray(selfTest, updateTest, interactive)
 }
 
 // acquire는 GUI 설정과 같은 폴더의 tray.lock을 잡는다.

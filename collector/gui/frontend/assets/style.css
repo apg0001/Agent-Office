@@ -82,3 +82,11 @@ dt { color: var(--muted); }
 dd { margin: 0; }
 ul.counters { columns: 2; }
 code { font-size: 13px; }
+
+.wizard-progress { display: flex; flex-wrap: wrap; gap: 12px; padding: 0; list-style: none; color: var(--muted); }
+.wizard-progress li { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); }
+.wizard-progress li.current { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.wizard-progress li.done { color: var(--fg); }
+.wizard-tool { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
+fieldset.modes { border: 1px solid var(--line); border-radius: 6px; }
+select { font: inherit; padding: 4px 6px; }

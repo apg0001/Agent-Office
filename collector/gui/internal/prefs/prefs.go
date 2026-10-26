@@ -1,4 +1,5 @@
-// Package prefs는 GUI 자체 설정(gui.json)이다. 서버 주소와 PC 이름 초안만 담는다.
+// Package prefs는 GUI 자체 설정(gui.json)이다. 서버 주소·PC 이름 초안, 첫 실행 마법사 상태, 업데이트
+// 설정(#180)만 담는다.
 // 장치 토큰·등록 코드·계정 비밀번호는 저장하지 않는다(토큰은 Core 설정 파일 소관).
 package prefs
 
@@ -21,7 +22,40 @@ type Prefs struct {
 	SchemaVersion int    `json:"schema_version"`
 	ServerURL     string `json:"server_url,omitempty"`
 	DeviceName    string `json:"device_name,omitempty"`
+	// Setup은 첫 실행 마법사 상태다: ""(아직) / done / dismissed(나중에).
+	Setup string `json:"setup,omitempty"`
+	// UpdateMode는 notify(기본, 알림 후 승인) / download(자동 다운로드 후 승인) / auto(자동 적용) / manual(수동 확인만)이다.
+	UpdateMode string `json:"update_mode,omitempty"`
+	// UpdateChannel은 ""(Core 버전으로 자동: 사전 배포면 beta) / stable / beta다.
+	UpdateChannel string `json:"update_channel,omitempty"`
+	// LastVersion은 트레이가 마지막으로 후처리를 마친 Core 버전이다(설치·업데이트 감지).
+	LastVersion string `json:"last_version,omitempty"`
 }
+
+// 업데이트 모드(명세 §10: 기본은 알림 후 업데이트 버튼).
+const (
+	UpdateNotify   = "notify"
+	UpdateDownload = "download"
+	UpdateAuto     = "auto"
+	UpdateManual   = "manual"
+)
+
+// Mode는 저장된 업데이트 모드다. 비었거나 모르는 값이면 기본(notify).
+func (p Prefs) Mode() string {
+	switch p.UpdateMode {
+	case UpdateNotify, UpdateDownload, UpdateAuto, UpdateManual:
+		return p.UpdateMode
+	}
+	return UpdateNotify
+}
+
+// ValidMode는 저장할 수 있는 모드인지다.
+func ValidMode(m string) bool {
+	return m == UpdateNotify || m == UpdateDownload || m == UpdateAuto || m == UpdateManual
+}
+
+// ValidChannel은 저장할 수 있는 채널 값인지다(""은 자동).
+func ValidChannel(c string) bool { return c == "" || c == "stable" || c == "beta" }
 
 // ErrInvalid: 파일을 읽었지만 형식이 틀렸다.
 var ErrInvalid = errors.New("prefs: invalid file")

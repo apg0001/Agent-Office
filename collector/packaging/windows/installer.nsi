@@ -4,7 +4,11 @@
 ;
 ; - 사용자별 설치(%LOCALAPPDATA%\Programs\Agent Office Collector), 관리자 권한을 요구하지 않는다.
 ; - 서명하지 않는다. 처음 실행 때 SmartScreen 경고가 나올 수 있다(docs/installation/collector-gui.md).
-; - 설치는 Hook·Core 자동 시작·트레이 자동 시작을 켜지 않는다. 사용자가 GUI에서 미리보기 후 승인한다.
+; - 설치는 Hook·Core 자동 시작·트레이 자동 시작을 켜지 않는다. 마침 화면의 "열기"(기본 체크)가 GUI를 띄우고,
+;   GUI는 첫 실행 마법사(서버 → 로그인·등록 → 한 화면 동의 → 연결 확인)를 연다(#180).
+; - 업데이트(#180): 트레이 승인 뒤 Core 업데이트 도우미가 `/S`로 무인 실행한다. 설치 폴더는 HKCU InstallLocation을
+;   그대로 써서 바뀌지 않으므로 Hook 명령 문자열도 그대로다(Codex 재신뢰 불필요). 끝나면 도우미가 트레이를 다시 띄우고
+;   트레이가 후처리(update post-install)를 한다.
 ; - 제거는 uninstall.ps1 -Yes로 이 도구가 만든 Hook·Core 로그온 작업·트레이 Run 값만 지운 뒤 파일을 지운다.
 ;   다른 사용자·다른 도구의 Claude/Codex 설정은 건드리지 않는다. 설정·장치 토큰·큐는 남긴다(-Purge는 수동).
 
@@ -130,6 +134,8 @@ Section "Uninstall"
 
   Delete "$INSTDIR\${CORE}"
   Delete "$INSTDIR\${CORE}.bak"
+  ; 업데이트 준비 파일(설치 파일·도우미)은 사용자 상태 폴더(%LOCALAPPDATA%\AgentOffice\Collector\updates)에 있다.
+  RMDir /r "$LOCALAPPDATA\AgentOffice\Collector\updates"
   Delete "$INSTDIR\${GUI}"
   Delete "$INSTDIR\${TRAY}"
   Delete "$INSTDIR\uninstall.ps1"

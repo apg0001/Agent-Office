@@ -44,8 +44,8 @@ type App struct {
 	opts Options
 	mu   sync.Mutex
 	ctx  context.Context
-	// hookPreviewed는 이번 실행에서 Hook 설치 미리보기를 보여 준 도구다(명시적 동의 흐름). 없으면 "".
-	hookPreviewed string
+	// hookPreviewed는 이번 실행에서 Hook 설치 미리보기를 보여 준 도구다(명시적 동의 흐름).
+	hookPreviewed map[string]bool
 }
 
 // New는 App을 만든다.
@@ -71,7 +71,7 @@ func New(o Options) *App {
 	if o.Registry == nil {
 		o.Registry = autostart.SystemRegistry()
 	}
-	return &App{opts: o, ctx: context.Background()}
+	return &App{opts: o, ctx: context.Background(), hookPreviewed: map[string]bool{}}
 }
 
 // OnStartup은 Wails OnStartup 콜백을 돌려준다(메서드가 아니어서 프런트엔드에 바인딩되지 않음).
@@ -353,10 +353,7 @@ const updateTimeout = 150 * time.Second
 // 채널은 현재 Core 버전이 SemVer 사전 배포(`-beta.N` 등)면 beta, 아니면 stable이다.
 // Output은 Core가 출력한 첫 줄(버전·채널만 담음)이다.
 func (a *App) UpdateCheck() Result {
-	channel := "stable"
-	if v := a.Status(); v.OK && v.Report != nil && strings.Contains(v.Report.CollectorVersion, "-") {
-		channel = "beta"
-	}
+	channel := a.updateChannel()
 	r, err := a.runner()
 	if err != nil {
 		return fail(errCode(err))
@@ -423,7 +420,7 @@ func (a *App) HookPreview(tool string) Result {
 	res := a.output("hook_preview", "hook_preview_failed", "hooks", "install", "--tool", tool)
 	if res.OK {
 		a.mu.Lock()
-		a.hookPreviewed = tool
+		a.hookPreviewed[tool] = true
 		a.mu.Unlock()
 	}
 	return res
@@ -436,7 +433,7 @@ func (a *App) HookInstall(tool string, confirmed bool) Result {
 		return fail("invalid_tool")
 	}
 	a.mu.Lock()
-	previewed := a.hookPreviewed == tool
+	previewed := a.hookPreviewed[tool]
 	a.mu.Unlock()
 	if !confirmed {
 		return fail("confirmation_required")
@@ -450,7 +447,7 @@ func (a *App) HookInstall(tool string, confirmed bool) Result {
 	}
 	res := a.output(done, "hook_install_failed", "hooks", "install", "--tool", tool, "--yes")
 	a.mu.Lock()
-	a.hookPreviewed = ""
+	delete(a.hookPreviewed, tool)
 	a.mu.Unlock()
 	return res
 }

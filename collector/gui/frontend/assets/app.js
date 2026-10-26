@@ -35,17 +35,18 @@ function showOutput(id, text) {
 
 // --- 페이지 전환 ---------------------------------------------------------------
 const loaders = {};
-document.querySelectorAll("nav button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b === btn));
-    document.querySelectorAll(".page").forEach((p) => {
-      p.hidden = p.id !== "page-" + btn.dataset.page;
-    });
-    const load = loaders[btn.dataset.page];
-    if (load) {
-      void load();
-    }
+function openPage(page) {
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
+  document.querySelectorAll(".page").forEach((p) => {
+    p.hidden = p.id !== "page-" + page;
   });
+  const load = loaders[page];
+  if (load) {
+    void load();
+  }
+}
+document.querySelectorAll("nav button").forEach((btn) => {
+  btn.addEventListener("click", () => openPage(btn.dataset.page));
 });
 
 // --- 계정·서버 --------------------------------------------------------------------
