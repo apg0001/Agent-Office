@@ -261,7 +261,7 @@ Pi 같은 헤드리스 Linux(Core deb만, `/usr/bin`)는 설치 위치가 같아
 
 | 배포판 | 아키텍처 | 상태 | 근거 |
 |---|---|---|---|
-| Ubuntu 22.04.5 LTS(glibc 2.35) | amd64·arm64 | **검증(러너)**: Core deb + desktop deb `apt-get install`(의존성 해결) → 트레이 15초·단일 실행 → 최소 Watcher 등록·dbusmenu 클릭 → 셀프 테스트(GUI 창 실행·종료) → 승인형 업데이트(아래) → 제거 | GitHub `ubuntu-22.04`·`ubuntu-22.04-arm`, Cross-OS Collector 40263681542 |
+| Ubuntu 22.04.5 LTS(glibc 2.35) | amd64·arm64 | **검증(러너)**: Core deb + desktop deb `apt-get install`(의존성 해결) → 트레이 15초·단일 실행 → 최소 Watcher 등록·dbusmenu 클릭 → 셀프 테스트(GUI 창 실행·종료) → 승인형 업데이트(아래) → 제거 | GitHub `ubuntu-22.04`·`ubuntu-22.04-arm`, Cross-OS Collector 40268027171 |
 | Ubuntu 24.04.5 LTS(glibc 2.39) | amd64·arm64 | **검증(러너)**: 같은 항목 | `ubuntu-24.04`·`ubuntu-24.04-arm`, 같은 실행 |
 | Ubuntu 22.04 컨테이너(arm64) | arm64 | **검증(컨테이너)**: `libwebkit2gtk-4.1-0 2.50.4-0ubuntu0.22.04.1`·`libgtk-3-0 3.24.33-1ubuntu2.2`만 설치한 `ubuntu:22.04`에서 `ldd`가 GUI의 모든 라이브러리를 찾고, Xvfb에서 GUI가 10초 넘게 떠 있음, 트레이는 `not a dynamic executable` | Raspberry Pi 5, 2026-10-26 |
 | Debian 12 bookworm | amd64·arm64 | **미실행**(#159까지는 bookworm에서 빌드했고 #180부터 jammy 빌드라 다시 확인 필요, glibc 2.36 ≥ 2.35라 실행 조건은 충족) | — |
@@ -277,7 +277,7 @@ Pi 같은 헤드리스 Linux(Core deb만, `/usr/bin`)는 설치 위치가 같아
 - `tests/cross_os/migration_smoke.py`(Windows·macOS): 명령행 Core를 예전 위치에 두고 Hook(Claude·Codex)·자동 시작·일시중지 → 설치 프로그램 → 트레이 첫 실행 → Hook·서비스 정의가 새 경로만 가리킴, 남의 Hook 유지, Codex `hooks.json` 다시 씀(재신뢰 필요), Core 프로세스가 새 실행 파일 하나뿐, 일시중지 상태 유지(같은 설정 폴더) → `legacy status`가 3개 파일 → `legacy remove --yes`로 모두 삭제.
 - 사람이 없는 러너에서 자동화하지 못하는 것: macOS 관리자 암호 대화상자와 Linux polkit 인증 창(러너는 `AGENT_OFFICE_UPDATE_ELEVATE=sudo-n`으로 같은 `installer`·`apt-get` 명령을 암호 없는 sudo로 실행), OS 알림이 화면에 뜨는지(요청 횟수만 셈), Installer.app 대화형 설치 뒤 postinstall이 트레이를 여는 것(러너는 명령행 `installer`라 postinstall이 띄우지 않는 경로만 확인), NSIS 마침 화면 "열기", 사람이 마법사를 눌러 진행하는 것(마법사 백엔드는 `app` 단위 테스트, 화면은 JS 구문 확인만).
 
-결과(2026-10-26, PR #185, Cross-OS Collector 실행 40263681542): 설치 실측·업데이트 실측·이전 실측 모두 실패 항목 0개.
+결과(2026-10-26, PR #185, Cross-OS Collector 실행 40268027171): 설치 실측·업데이트 실측·이전 실측 모두 실패 항목 0개.
 
 | 러너 | 업데이트(`update_smoke.py`) | 이전(`migration_smoke.py`) |
 |---|---|---|
