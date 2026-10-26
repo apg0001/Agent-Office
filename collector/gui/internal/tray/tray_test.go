@@ -187,7 +187,7 @@ func TestControllerMenu(t *testing.T) {
 	if c.Handle(ItemSettings) != "gui_unavailable" || c.Handle(ItemOffice) != "browser_unavailable" || c.Handle("x") != "unexpected" {
 		t.Fatal("failure codes")
 	}
-	if len(Items) != 7 {
+	if len(Items) != 8 { // #180: 업데이트 설치
 		t.Fatal("menu items")
 	}
 }

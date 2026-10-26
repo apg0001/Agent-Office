@@ -63,12 +63,15 @@ type Artifact struct {
 	Format string `json:"format"`
 }
 
+// Manifest는 채널 manifest다. schema 1에 설치 파일 목록(installers, #180)을 더했다. 이전 Core는 모르는 키를
+// 무시하므로 같은 schema를 쓴다(서명은 manifest 바이트 전체에 대한 것이라 installers도 함께 보호된다).
 type Manifest struct {
-	Schema      int        `json:"schema"`
-	Channel     string     `json:"channel"`
-	Version     string     `json:"version"`
-	PublishedAt time.Time  `json:"published_at"`
-	Artifacts   []Artifact `json:"artifacts"`
+	Schema      int         `json:"schema"`
+	Channel     string      `json:"channel"`
+	Version     string      `json:"version"`
+	PublishedAt time.Time   `json:"published_at"`
+	Artifacts   []Artifact  `json:"artifacts"`
+	Installers  []Installer `json:"installers,omitempty"`
 }
 
 // ParseKeys는 쉼표로 구분한 base64 공개 키를 읽는다. 잘못된 키는 버린다.
@@ -251,29 +254,43 @@ func (o Options) get(ctx context.Context, raw string, limit int64) ([]byte, erro
 	return data, nil
 }
 
-// Check는 manifest와 `.sig`를 받아 검증하고, 현재보다 새 버전이 있으면 돌려준다(없으면 nil).
-func Check(ctx context.Context, o Options) (*Available, error) {
+// Fetch는 manifest와 `.sig`를 받아 서명·형식·채널을 검증한다.
+func Fetch(ctx context.Context, o Options) (Manifest, error) {
 	manifest, err := o.get(ctx, o.ManifestURL, MaxManifestBytes)
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
 	sig, err := o.get(ctx, o.ManifestURL+".sig", 1024)
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
 	m, err := Verify(manifest, string(sig), o.Keys)
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
 	if m.Channel != o.Channel {
-		return nil, fail("channel_mismatch")
+		return Manifest{}, fail("channel_mismatch")
 	}
+	return m, nil
+}
+
+// Newer는 manifest 버전이 현재보다 높은지다.
+func (o Options) Newer(m Manifest) (bool, error) {
 	cmp, ok := CompareSemver(m.Version, o.Current)
 	if !ok {
-		return nil, fail("bad_version")
+		return false, fail("bad_version")
 	}
-	if cmp <= 0 {
-		return nil, nil
+	return cmp > 0, nil
+}
+
+// Check는 manifest와 `.sig`를 받아 검증하고, 현재보다 새 버전이 있으면 돌려준다(없으면 nil).
+func Check(ctx context.Context, o Options) (*Available, error) {
+	m, err := Fetch(ctx, o)
+	if err != nil {
+		return nil, err
+	}
+	if newer, err := o.Newer(m); err != nil || !newer {
+		return nil, err
 	}
 	for _, a := range m.Artifacts {
 		if a.OS == o.GOOS && a.Arch == o.GOARCH {
