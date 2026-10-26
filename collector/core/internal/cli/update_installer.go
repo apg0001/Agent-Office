@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/apg0001/Agent-Office/collector/core/internal/hooks"
+	"github.com/apg0001/Agent-Office/collector/core/internal/instance"
 	"github.com/apg0001/Agent-Office/collector/core/internal/paths"
 	"github.com/apg0001/Agent-Office/collector/core/internal/service"
 	"github.com/apg0001/Agent-Office/collector/core/internal/update"
@@ -36,7 +37,21 @@ const installerTimeout = 30 * time.Minute
 
 // helperSettle은 도우미가 설치 프로그램을 실행하기 전 기다리는 시간이다. 승인한 트레이가 끝나 트레이 잠금을
 // 놓을 시간을 준다(그래야 설치 뒤 다시 띄운 새 트레이가 곧바로 뜬다). 테스트는 0으로 둔다.
-var helperSettle = 3 * time.Second
+var helperSettle = 2 * time.Second
+
+// trayWait는 트레이 잠금이 풀리기를 기다리는 상한이다.
+var trayWait = 60 * time.Second
+
+// waitUnlocked는 다른 프로세스가 path 잠금을 놓을 때까지 최대 limit 기다린다(GUI 트레이 잠금, internal/single).
+func waitUnlocked(path string, limit time.Duration) {
+	if path == "" {
+		return
+	}
+	deadline := time.Now().Add(limit)
+	for instance.Held(path) && time.Now().Before(deadline) {
+		time.Sleep(250 * time.Millisecond)
+	}
+}
 
 // installerReport는 update check|download|install --installer --json 출력이다. 버전·enum만 담는다.
 type installerReport struct {
@@ -188,6 +203,10 @@ func cmdRunPlan(args []string, env Env) int {
 	if err := update.ReadJSON(args[0], &plan); err != nil || plan.Validate() != nil || plan.GOOS != env.GOOS {
 		return ExitError
 	}
+	trayLock := ""
+	if plan.Result != "" {
+		trayLock = filepath.Join(filepath.Dir(plan.Result), "tray.lock")
+	}
 	out := update.Outcome{Schema: update.PlanSchema, From: plan.From, To: plan.To}
 	finish := func(code string) int {
 		out.Code, out.FinishedAt = code, env.Now().UTC()
@@ -196,6 +215,7 @@ func cmdRunPlan(args []string, env Env) int {
 			dest = filepath.Join(filepath.Dir(args[0]), "outcome.json")
 		}
 		_ = update.WriteJSON(dest, out)
+		waitUnlocked(trayLock, trayWait)
 		if plan.Relaunch != "" {
 			if fi, err := os.Stat(plan.Relaunch); err == nil && fi.Mode().IsRegular() {
 				_ = env.Spawn(plan.Relaunch)
@@ -206,6 +226,9 @@ func cmdRunPlan(args []string, env Env) int {
 		}
 		return ExitError
 	}
+	// 승인한 트레이가 끝날 때까지(트레이 잠금이 풀릴 때까지) 기다린다. Windows 설치 프로그램이 파일을 바꿀 수 있고,
+	// 설치 뒤 다시 띄운 트레이가 단일 실행 잠금에 막히지 않는다.
+	waitUnlocked(trayLock, trayWait)
 	time.Sleep(helperSettle)
 	var files []string
 	for _, f := range plan.Files {

@@ -24,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -181,6 +182,8 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         c.failed.append("exception")
         c.note("exception", str(exc)[:200])
+        # 경로 원문 없이 실패한 줄 번호만 남긴다.
+        c.note("exception_line", traceback.extract_tb(exc.__traceback__)[-1].lineno)
     finally:
         if srv is not None:
             srv.shutdown()

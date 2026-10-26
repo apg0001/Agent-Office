@@ -1,8 +1,8 @@
 # Collector GUI(Wails)·브라우저 로그인 기기 등록·트레이·설치 프로그램
 
-관련 이슈: #40 (`EP-06/ISS-01`, 요구사항 COL-001~002, USER-002), #41 (`EP-06/ISS-02`, DEV-001~005, COL-003), #43 (`EP-06/ISS-04`, COL-001~002, COL-010, DIST-007), #159(모든 OS 트레이·설치 프로그램, 명세 §10). 결정 근거: [ADR-0003](../decisions/0003-collector-gui-wails-v2.md), [ADR-0004](../decisions/0004-collector-keychain-tray.md), [ADR-0005](../decisions/0005-collector-tray-helper-installers.md).
+관련 이슈: #40 (`EP-06/ISS-01`, 요구사항 COL-001~002, USER-002), #41 (`EP-06/ISS-02`, DEV-001~005, COL-003), #43 (`EP-06/ISS-04`, COL-001~002, COL-010, DIST-007), #159(모든 OS 트레이·설치 프로그램, 명세 §10). 결정 근거: [ADR-0003](../decisions/0003-collector-gui-wails-v2.md), [ADR-0004](../decisions/0004-collector-keychain-tray.md), [ADR-0005](../decisions/0005-collector-tray-helper-installers.md), [ADR-0006](../decisions/0006-collector-installer-auto-update.md)(#180).
 
-`collector/gui`는 [Collector CLI](collector-cli.md)(`agent-office-collector`, 이하 Core)를 감싸는 데스크톱 창입니다. OS 알림과 업데이트 적용(#44)은 범위가 아닙니다. 트레이·자동 시작·GUI/Core 독립성은 #43에서, 모든 OS 트레이 도우미(`agent-office-collector-tray`)와 OS별 설치 프로그램은 #159에서 추가했습니다.
+`collector/gui`는 [Collector CLI](collector-cli.md)(`agent-office-collector`, 이하 Core)를 감싸는 데스크톱 창입니다. 첫 실행 마법사·OS 알림·승인형 업데이트는 #180([아래](#설치-직후-자동-설정과-승인형-업데이트180), ADR-0006)에서 추가했습니다. 트레이·자동 시작·GUI/Core 독립성은 #43에서, 모든 OS 트레이 도우미(`agent-office-collector-tray`)와 OS별 설치 프로그램은 #159에서 추가했습니다.
 
 ## 검증 범위
 
@@ -152,18 +152,18 @@ agent-office-collector-tray version
 
 ## 설치 프로그램(#159)
 
-모든 설치 프로그램은 **코드 서명·공증을 하지 않습니다**(인증서 비용). 설치는 Hook·Core 자동 시작·트레이 자동 시작을 켜지 않습니다. 설치 뒤 "Agent Office Collector"를 열어 서버 주소 → 브라우저 로그인·등록 → Hook 미리보기·승인 → 자동 시작을 차례로 승인합니다(트레이 아이콘은 창과 함께 뜹니다).
+모든 설치 프로그램은 **코드 서명·공증을 하지 않습니다**(인증서 비용). 설치 프로그램 자체는 Hook·Core 자동 시작·트레이 자동 시작을 켜지 않습니다. 설치가 끝나면 첫 실행 마법사(서버 주소 → 브라우저 로그인·등록 → 한 화면 동의 → 연결 확인)가 뜨고, 사용자가 승인한 것만 켭니다([설치 직후 자동 설정](#설치-직후-자동-설정과-승인형-업데이트180)).
 
 | OS | 파일 | 설치 위치 | 관리자 권한 |
 |---|---|---|---|
 | Windows 10/11 x64 | `agent-office-collector-setup-<버전>-windows-amd64.exe`(NSIS 3) | `%LOCALAPPDATA%\Programs\Agent Office Collector`(Core·GUI·트레이·`uninstall.ps1`), 시작 메뉴 "Agent Office Collector"·"… 제거", HKCU 제거 항목 | 필요 없음(사용자별) |
 | macOS 11+ (Apple Silicon·Intel) | `agent-office-collector-<버전>-macos-universal.pkg` | `/Applications/Agent Office Collector.app`(GUI·Core), 그 안 `Contents/Library/LoginItems/Agent Office Collector Tray.app`(메뉴 막대 트레이) | 필요(설치 프로그램이 관리자 암호를 물음) |
-| Debian 12+·Ubuntu 24.04+ (amd64·arm64) | `agent-office-collector_<버전>_<arch>.deb` + `agent-office-collector-desktop_<버전>_<arch>.deb` | `/usr/bin/agent-office-collector{,-gui,-tray,-uninstall}`, 앱 메뉴 항목, 아이콘 | `sudo apt install ./…deb ./…deb` |
+| Ubuntu 22.04+·Debian 12+ (amd64·arm64) | `agent-office-collector_<버전>_<arch>.deb` + `agent-office-collector-desktop_<버전>_<arch>.deb` | `/usr/bin/agent-office-collector{,-gui,-tray,-uninstall}`, 앱 메뉴 항목, 아이콘 | `sudo apt install ./…deb ./…deb` |
 | Fedora 등(rpm) | `agent-office-collector-<버전>.<arch>.rpm` + `agent-office-collector-desktop-…rpm` | 같음(의존 `gtk3`·`webkit2gtk4.1`, **미검증**) | `sudo dnf install` |
 
 - Windows는 WebView2 런타임이 필요합니다(Windows 11·최신 Windows 10에는 기본 포함). 없으면 GUI 창이 뜨지 않고 Microsoft의 Evergreen 런타임을 설치해야 합니다. 무인 설치는 `setup.exe /S`, 무인 제거는 `uninstall.exe /S`입니다. 업그레이드는 새 설치 프로그램을 실행합니다(실행 중인 트레이·GUI·Core 작업을 멈추고 바꾼 뒤 Core 로그온 작업이 있으면 다시 시작).
-- Linux 데스크톱 패키지는 GTK3·webkit2gtk-4.1에 의존합니다(GUI는 `-tags webkit2_41`, Debian bookworm에서 빌드해 glibc 2.36 이상 필요). 헤드리스 서버는 Core 패키지만 설치합니다.
-- 설치 프로그램으로 설치한 Core는 자체 업데이트(`update apply`)를 하지 않고 `managed_by_package`로 거절합니다. 새 설치 프로그램·패키지로 업데이트하세요(GUI·트레이와 버전이 어긋나지 않게).
+- Linux 데스크톱 패키지는 GTK3·webkit2gtk-4.1에 의존합니다(GUI는 `-tags webkit2_41`, #180부터 `ubuntu:22.04`에서 빌드해 glibc 2.35 이상이면 됨, [지원 배포판](#지원-linux-배포판데스크톱-패키지)). 헤드리스 서버는 Core 패키지만 설치합니다.
+- 설치 프로그램으로 설치한 Core는 Core만 바꾸는 자체 업데이트(`update apply`)를 `managed_by_package`로 거절합니다. 대신 트레이가 설치 파일 기반 승인형 업데이트를 합니다([승인형 자동 업데이트](#승인형-자동-업데이트)).
 
 ### 제거
 
@@ -206,6 +206,70 @@ agent-office-collector-tray version
 | `ubuntu-24.04-arm`(glibc 2.39, arm64) | 같은 스크립트로 그 러너에서 빌드 | amd64와 같은 항목 |
 
 업데이트 확인은 네 러너 모두 `update_check_failed`(CI 빌드에 업데이트 공개 키 없음, 정상), 로그아웃은 미등록 PC라 `logged_out`(Core "등록되어 있지 않습니다", 서버 요청 없음)입니다. 등록된 PC의 로그아웃·서버 폐기는 `tray/independence_test.go`와 `collector_smoke.py`가 확인합니다. Core 서비스 등록 확인은 Linux에서 하지 않았습니다(러너에 systemd 사용자 세션 없음).
+
+## 설치 직후 자동 설정과 승인형 업데이트(#180)
+
+결정 근거: [ADR-0006](../decisions/0006-collector-installer-auto-update.md). 설치 파일로 설치하면 필요한 설정은 마법사가 차례로 하고, 사용자는 승인 버튼만 누릅니다. 업데이트도 트레이가 알아서 확인·알림하고, 승인하면 받기·서명/해시 확인·설치·후처리까지 끝냅니다.
+
+### 사용자가 직접 하는 일
+
+| 언제 | 할 일 |
+|---|---|
+| 처음 설치 파일을 열 때 | 서명하지 않은 설치 파일 경고 우회([아래](#서명하지-않은-설치-프로그램)), macOS는 설치 프로그램의 관리자 암호 |
+| 첫 실행 마법사 | 서버 주소 입력, 브라우저에서 로그인 후 등록 코드 붙여 넣기, 한 화면 동의 버튼("위 내용을 확인했고 설치에 동의") |
+| Codex Hook을 설치했을 때(처음 한 번, 그리고 Collector 위치가 바뀌었을 때) | Codex를 열어 "Hooks need review"에서 내용을 확인하고 신뢰. Collector는 Codex 신뢰 상태를 쓰지 않고 우회 플래그도 쓰지 않습니다 |
+| 새 버전 알림을 받았을 때 | 트레이 메뉴 "업데이트 설치 (vX.Y.Z)" 클릭(승인). macOS는 관리자 암호 창, Linux는 polkit 인증 창에 암호 입력. Windows는 추가 입력 없음 |
+| 명령행 설치에서 옮겨 왔을 때(선택) | 설정 창 "업데이트" → "이전 명령행 설치 정리"의 동의 버튼 |
+
+### 첫 실행 마법사
+
+- 언제 뜨나: Windows는 설치 마침 화면 "열기"(기본 체크) → GUI. macOS는 Installer.app으로 설치를 마치면 postinstall이 로그인한 사용자 세션에서 트레이를 열고, 트레이가 설정 창을 엽니다(명령행 `installer`로 설치하면 띄우지 않음). Linux는 앱 메뉴에서 "Agent Office Collector"를 처음 열 때(패키지는 root로 설치돼 사용자 세션을 모름). 그 뒤로도 마법사를 끝내거나 "나중에 하기"를 누르기 전까지 GUI·트레이를 인자 없이 열면 마법사가 먼저 뜹니다(로그인 자동 시작은 창을 띄우지 않음).
+- 단계: 1) 서버 주소 → 2) 브라우저 로그인·PC 등록(이미 등록된 PC면 건너뜀: 이전 설치의 등록·장치 토큰·큐를 그대로 씀) → 3) Claude·Codex 탐지 결과와 도구별 변경 미리보기, 탐지된 도구 Hook·Core 자동 시작·트레이 자동 시작(모두 기본 켬)을 **한 번의 동의**로 설치 → 4) 연결 확인(등록, Core 프로세스, 서버 도달, 마지막 heartbeat).
+- 동의 화면의 각 항목은 기존 동작과 같습니다: Hook은 설정 파일 백업 뒤 Agent Office 항목만 추가(다른 Hook 보존, 원자적 쓰기), Core 자동 시작은 `service install --activate`(관리자 권한 없음), 트레이 자동 시작은 소유 항목만 씁니다. 미리보기를 만들지 못한 도구는 설치하지 않습니다.
+
+### 승인형 자동 업데이트
+
+| 설정(GUI "업데이트") | 동작 |
+|---|---|
+| 알림 후 승인하면 설치(기본) | 새 버전이면 OS 알림 + 트레이 "업데이트 설치 (vX.Y.Z)". 누르면 설치 |
+| 미리 받아 두고 알림 | 설치 파일을 받아 서명·해시를 확인해 두고 알림. 누르면 바로 설치 |
+| 자동으로 받아서 설치 | 받아서 바로 설치(macOS·Linux는 OS 승인 창이 그대로 뜸) |
+| 자동 확인 안 함 | 주기 확인을 하지 않음. 트레이 "업데이트 확인"을 누를 때만 확인 |
+
+- 확인 시점: 트레이 시작 약 45초 뒤(± 50%)와 그 뒤 약 6시간마다(± 10%, 여러 PC가 한꺼번에 몰리지 않게). 채널은 기본 자동(지금 버전이 `-beta.N` 같은 사전 배포면 beta, 아니면 stable)이고 설정에서 Stable·Beta로 고정할 수 있습니다. 확인 주소는 `https://github.com/apg0001/Agent-Office/releases/download/collector-<채널>/manifest.json`(+ `.sig`).
+- 검증: manifest의 ed25519 서명(빌드에 넣은 공개 키), 채널, SemVer로 현재보다 새 버전인지, OS·아키텍처·설치 종류(Windows `nsis`, macOS `pkg` 유니버설, Linux `deb`/`rpm` Core·데스크톱 두 패키지)와 https 주소, 받은 파일 크기·SHA-256. 하나라도 틀리면 설치하지 않습니다([Collector 자체 업데이트](collector-update.md#설치-파일-기반-업데이트180)).
+- 설치: 트레이·GUI 창이 닫히고 업데이트 도우미가 설치 프로그램을 실행합니다. Windows `setup.exe /S`(같은 사용자별 폴더), macOS `installer -pkg`(관리자 승인 창), Linux `pkexec … apt-get install`(또는 `dnf install`). 끝나면 도우미가 트레이를 다시 띄우고, 새 트레이가 결과를 알리고 후처리를 합니다.
+- 후처리: 이전에 설치돼 있던 것만 다시 적용합니다. 우리 Hook 항목이 있던 도구만 현재 Core 경로로 다시 쓰고(같은 위치면 바뀌는 것 없음 → Codex 재신뢰 불필요), 우리 자동 시작 정의가 있으면 다시 쓰고 Core를 재시작한 뒤 새 버전이 상태를 쓰는지 30초 확인합니다. 명령 경로가 바뀌어 Codex Hook을 다시 썼으면 "Codex에서 다시 신뢰" 알림을 띄웁니다.
+- 실패: 서명·해시 불일치, 설치 취소(OS 승인 창에서 취소), 설치 프로그램 실패, 설치 뒤 Core 버전이 오르지 않음은 모두 이전 버전을 그대로 둔 채 트레이가 결과 코드와 "지금 버전을 계속 씁니다"를 알립니다. 설치 프로그램이 파일을 일부만 바꾸고 실패한 경우는 되돌리지 않으므로 같은 설치 파일을 다시 실행하세요(받은 파일은 상태 폴더 `updates/<버전>`에 남아 있음).
+- 알림: macOS `osascript display notification`, Windows PowerShell 토스트, Linux `notify-send`. 알림 수단이 없거나 실패해도 트레이 메뉴 표시는 그대로입니다. 알림에는 버전·결과 코드만 넣습니다.
+
+### 명령행 설치에서 설치 프로그램으로 옮기기
+
+예전 명령행 설치(macOS `~/.local/bin/agent-office-collector`, Windows `%LOCALAPPDATA%\AgentOffice\bin\agent-office-collector.exe`, LaunchAgent `io.github.apg0001.agent-office.collector`·작업 스케줄러 `\AgentOffice\Collector`·Claude Hook이 그 경로를 가리킴, `hooks print`로 만든 `~/.codex/hooks.json` 포함)가 있는 PC에 설치 프로그램을 설치하고 트레이를 처음 띄우면:
+
+1. 등록·장치 토큰·큐·일시중지 상태는 그대로 씁니다(설정·상태 폴더와 OS 보안 저장소가 설치 방식과 무관하게 같음). 마법사는 등록 단계를 건너뜁니다.
+2. Claude·Codex 설정의 **우리 소유 항목**(명령 서명 `… hook claude|codex`로 식별)만 새 설치 위치로 바꿉니다. 다른 Hook·설정은 그대로이고 바꾸기 전에 백업합니다.
+3. 우리 자동 시작 정의(LaunchAgent·작업 XML, 소유 표시가 있는 것)를 새 위치로 다시 쓰고 다시 등록합니다. 같은 이름·라벨이라 이전 Core는 멈추고 새 Core 하나만 돕니다.
+4. Codex Hook 명령 경로가 바뀌었으므로 Codex가 한 번 더 신뢰를 묻습니다(트레이 알림으로 안내).
+5. 설정 창 "업데이트"의 **이전 명령행 설치 정리**가 이 도구 파일로 확인된 것(Core 실행 파일은 Go 빌드 정보의 메인 패키지 경로, `uninstall.ps1`·`agent-office-collector-uninstall`·`README.txt`는 내용)만 보여 주고, 동의하면 지웁니다. 지금 Core가 설치 프로그램 배치일 때만, 자동 시작·Hook이 더는 그 파일을 가리키지 않을 때만 지웁니다. 명령행에서는 `agent-office-collector legacy status`·`legacy remove --yes`.
+
+Pi 같은 헤드리스 Linux(Core deb만, `/usr/bin`)는 설치 위치가 같아 옮길 것이 없습니다. 데스크톱 패키지를 더 설치하면 같은 Core를 그대로 씁니다.
+
+### 지원 Linux 배포판(데스크톱 패키지)
+
+데스크톱 GUI는 `ubuntu:22.04`(glibc 2.35)에서 `libwebkit2gtk-4.1-dev`로 빌드하고, 빌드 스크립트가 GUI의 GLIBC 심볼 최고 요구 버전이 2.35 이하인지 확인합니다. Core·트레이는 `CGO_ENABLED=0` 정적 실행 파일이라 glibc 버전과 무관합니다. 의존성은 `agent-office-collector (= 같은 버전)`, `libgtk-3-0 | libgtk-3-0t64`, `libwebkit2gtk-4.1-0`(버전 하한 없음, Ubuntu 22.04는 jammy-updates에 있음)입니다.
+
+@@DISTRO_TABLE@@
+
+### 업데이트·이전 실측(Cross-OS Collector)
+
+`.github/workflows/cross-os.yml`이 작업마다 **일회용 테스트 서명 키**를 만들어(실제 배포 키 아님, 서명 직후 비밀 키 삭제) 이전 빌드(`0.0.0-ci.N`)와 새 빌드(`0.0.1-ci.N`)를 만들고, 새 빌드 설치 파일로 서명 manifest를 만듭니다. 각 러너에서 127.0.0.1:8765 테스트 서버로 내놓고 `AGENT_OFFICE_UPDATE_MANIFEST_URL`·`AGENT_OFFICE_UPDATE_ALLOW_LOOPBACK_HTTP=1`로 가리킵니다(서명 검증은 그대로).
+
+- `tests/cross_os/update_smoke.py`: 이전 빌드 설치 → Claude·Codex Hook·Core 자동 시작 승인 상태 → 트레이 `--update-self-test`(곧바로 확인 → "업데이트 설치 (v…)" 항목 클릭 채널로 승인 → 트레이 종료) → 도우미가 설치 프로그램 실행 → 새 트레이가 후처리 → Core·트레이 버전 상승, 결과 파일 소비, `last_version` 기록, 우리 Hook·남의 Hook 유지, Codex `hooks.json` 바이트 그대로(재신뢰 불필요), 서비스 등록·Core 실행 유지.
+- `tests/cross_os/migration_smoke.py`(Windows·macOS): 명령행 Core를 예전 위치에 두고 Hook(Claude·Codex)·자동 시작·일시중지 → 설치 프로그램 → 트레이 첫 실행 → Hook·서비스 정의가 새 경로만 가리킴, 남의 Hook 유지, Codex `hooks.json` 다시 씀(재신뢰 필요), Core 프로세스가 새 실행 파일 하나뿐, 일시중지 상태 유지(같은 설정 폴더) → `legacy status`가 3개 파일 → `legacy remove --yes`로 모두 삭제.
+- 사람이 없는 러너에서 자동화하지 못하는 것: macOS 관리자 암호 대화상자와 Linux polkit 인증 창(러너는 `AGENT_OFFICE_UPDATE_ELEVATE=sudo-n`으로 같은 `installer`·`apt-get` 명령을 암호 없는 sudo로 실행), OS 알림이 화면에 뜨는지(요청 횟수만 셈), Installer.app 대화형 설치 뒤 postinstall이 트레이를 여는 것(러너는 명령행 `installer`라 postinstall이 띄우지 않는 경로만 확인), NSIS 마침 화면 "열기", 사람이 마법사를 눌러 진행하는 것(마법사 백엔드는 `app` 단위 테스트, 화면은 JS 구문 확인만).
+
+@@CI_RESULT@@
 
 ### 이전 기록: GUI 안 트레이(#43, Linux 컨테이너)
 
@@ -302,5 +366,5 @@ GOOS=windows CGO_ENABLED=0 go build -tags desktop,production -o /tmp/ao/gui.exe 
 - 토큰 회전 명령(`/devices/token/rotate`)은 아직 없습니다.
 - 등록 후 자동으로 연결 확인(heartbeat 성공 대기)을 하지 않습니다. 수집 상태 화면의 "마지막 heartbeat"로 확인합니다.
 - 트레이 아이콘이 실제 패널·메뉴 막대·알림 영역에 그려지는지와 사람의 클릭, Gatekeeper·SmartScreen 대화상자, 재로그인 뒤 자동 시작은 러너에서 자동화할 수 없어 실장비 확인이 남아 있습니다.
-- 명세 §10 트레이 "동기화"(즉시 전송)는 Core 명령이 생긴 뒤 추가합니다. 새 버전 OS 알림과 주기적 업데이트 확인, 업데이트 적용 버튼은 업데이트(#44) 후속입니다.
+- 명세 §10 트레이 "동기화"(즉시 전송)는 Core 명령이 생긴 뒤 추가합니다. 새 버전 OS 알림·주기적 확인·승인형 설치는 #180에서 추가했습니다(macOS·Linux OS 승인 창, OS 알림 표시는 실장비 확인이 남음).
 - 코드 서명·공증(Apple Developer ID, Authenticode)은 비용 결정 뒤 별도 Issue입니다. Windows arm64 설치 프로그램과 Linux rpm 데스크톱 패키지 설치는 미검증입니다.

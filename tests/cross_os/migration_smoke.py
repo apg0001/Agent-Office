@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -33,7 +34,6 @@ from smoke_common import (
     count,
     gui_prefs_path,
     install,
-    json_escaped,
     layout,
     legacy_dir,
     run,
@@ -67,6 +67,18 @@ def read_text_any(p: Path) -> str:
     if data[:2] == b"\xff\xfe":
         return data.decode("utf-16")
     return data.decode("utf-8", errors="replace")
+
+
+def hook_form(p: str) -> str:
+    """Hook 명령 안의 실행 파일 표기(Windows는 슬래시, 대소문자 무시 비교)."""
+    if sys.platform == "win32":
+        return p.replace("\\", "/").lower()
+    return p
+
+
+def hook_text(s: str) -> str:
+    """JSON 문자열을 풀어 비교한다(Windows는 소문자)."""
+    return s.lower() if sys.platform == "win32" else s
 
 
 def core_process_paths() -> list[str]:
@@ -185,8 +197,8 @@ def main() -> int:
         c.record("post_install_done", wait(migrated, 240))
 
         s = claude.read_text(encoding="utf-8")
-        c.record("claude_hooks_point_to_new_core", json_escaped(new_core) in s)
-        c.record("claude_hooks_no_legacy_path", json_escaped(old) not in s)
+        c.record("claude_hooks_point_to_new_core", hook_form(new_core) in hook_text(s))
+        c.record("claude_hooks_no_legacy_path", hook_form(old) not in hook_text(s))
         stop = [
             h
             for g in json.loads(s)["hooks"].get("Stop", [])
@@ -237,6 +249,8 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         c.failed.append("exception")
         c.note("exception", str(exc)[:200])
+        # 경로 원문 없이 실패한 줄 번호만 남긴다.
+        c.note("exception_line", traceback.extract_tb(exc.__traceback__)[-1].lineno)
     finally:
         if tray_proc is not None and tray_proc.poll() is None:
             tray_proc.kill()

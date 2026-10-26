@@ -134,8 +134,8 @@ func referenced(env Env, dirs paths.Dirs, path string) bool {
 	}
 	needles := []string{path}
 	if env.GOOS == "windows" {
-		// JSON 안의 Windows 경로는 역슬래시가 두 번 쓰인다.
-		needles = append(needles, strings.ReplaceAll(path, `\`, `\\`))
+		// JSON 안의 Windows 경로는 역슬래시가 두 번 쓰이고, Hook 명령은 슬래시로 쓴다(hooks.Command).
+		needles = append(needles, strings.ReplaceAll(path, `\`, `\\`), strings.ReplaceAll(path, `\`, "/"))
 	}
 	for _, f := range files {
 		data, err := os.ReadFile(f)
