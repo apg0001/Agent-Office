@@ -4,7 +4,7 @@
  */
 
 import type { OfficeMap, Point, ZoneKind } from "./grid";
-import { walkableTiles } from "./grid";
+import { isWalkable, walkableTiles } from "./grid";
 import { mixHash } from "./presence";
 import type { Activity, AgentState, OfficeState, TurnState } from "./types";
 
@@ -57,18 +57,54 @@ export function targetTile(
   seats: Map<string, Point>,
   zone: ZoneKind = zoneForActivity(agent.activity, agent.turn_state),
   variant = 0,
+  /** 같은 세션 하위 에이전트 중 몇 번째인지(subagentIndexOf). */
+  subagentIndex = 0,
 ): Point {
   const seat = seats.get(agent.session_id);
   if (zone === "desk" && seat) {
     if (agent.role === "lead") {
       return seat;
     }
-    // 하위 에이전트는 대장 옆 임시 작업 공간(같은 줄 바로 옆 칸)에 선다.
-    return { x: seat.x + 1, y: seat.y };
+    // 하위 에이전트는 대장 주변 칸에 하나씩 나눠 선다(같은 칸에 겹쳐 하나로 보이지 않게, #182).
+    return subagentSpot(map, seat, subagentIndex);
   }
   const tiles = walkableTiles(map, zone === "desk" ? "corridor" : zone);
   if (tiles.length === 0) {
     return map.entrance;
   }
   return tiles[(mixHash(agent.id) + variant) % tiles.length] ?? map.entrance;
+}
+
+/** 대장 자리 주변에서 하위 에이전트가 설 칸 후보(가까운 순). 책상 칸은 걸을 수 없어 거른다. */
+const SUBAGENT_OFFSETS: ReadonlyArray<Point> = [
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 1, y: 1 },
+  { x: -1, y: 1 },
+  { x: -1, y: 0 },
+  { x: 2, y: 1 },
+  { x: -2, y: 1 },
+  { x: 0, y: 2 },
+];
+
+export function subagentSpot(map: OfficeMap, seat: Point, index: number): Point {
+  const spots = SUBAGENT_OFFSETS.map((o) => ({ x: seat.x + o.x, y: seat.y + o.y })).filter((p) =>
+    isWalkable(map, p),
+  );
+  if (spots.length === 0) {
+    return seat;
+  }
+  return spots[index % spots.length]!;
+}
+
+/** 같은 세션의 살아 있는 하위 에이전트 중 이 에이전트의 순번(ID 순이라 매 프레임 같다). */
+export function subagentIndexOf(state: OfficeState, agent: AgentState): number {
+  if (agent.role !== "subagent") {
+    return 0;
+  }
+  const siblings = state.agents
+    .filter((a) => a.session_id === agent.session_id && a.role === "subagent" && a.ended_at === null)
+    .map((a) => a.id)
+    .sort();
+  return Math.max(0, siblings.indexOf(agent.id));
 }

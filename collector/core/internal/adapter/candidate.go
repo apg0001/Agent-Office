@@ -1,8 +1,9 @@
 // Package adapter는 Codex·Claude 입력 어댑터가 공통으로 만드는 제공자 중립 후보(Candidate)와
 // 교차 소스 중복 제거 규칙(#20 참조 구현 이식)을 정의한다.
 //
-// 후보는 화이트리스트 식별자와 enum만 담는다. 프롬프트, 도구 입력·출력, 명령, cwd,
-// transcript 경로 같은 원문 값은 어떤 필드에도 들어가지 않는다. 이벤트 v1 최종 정규화
+// 후보는 화이트리스트 식별자와 enum만 담는다. 프롬프트, 도구 입력·출력, 명령, cwd 전체 경로,
+// transcript 경로 같은 원문 값은 어떤 필드에도 들어가지 않는다. 예외는 사용자가 PC별로 켠 경우의
+// 작업 폴더 마지막 이름(WorkspaceName, #181)뿐이다. 이벤트 v1 최종 정규화
 // (device_id·agent_id UUID 매핑, occurred_at, sequence)는 #32 범위다.
 package adapter
 
@@ -110,6 +111,9 @@ type Candidate struct {
 	Support      SupportLevel
 	// Plan은 계획 도구 호출의 단계 상태다(#38). 도구 후보에 붙고 PlanUpdate가 plan.updated 후보를 만든다.
 	Plan *Plan
+	// WorkspaceName은 작업 폴더의 마지막 이름이다(#181). HookOptions.WorkspaceName(PC별 동의)이 켜진
+	// Hook 후보에만 있고 WorkspaceName 함수로 정리한 값이다. 상위 폴더·전체 경로는 담지 않는다.
+	WorkspaceName string
 }
 
 // DedupKind는 교차 소스 키의 종류다. 완료와 실패는 같은 호출의 끝이므로 합친다.

@@ -37,6 +37,11 @@ export interface SessionState {
   desk_slot: number | null;
   /** 사용자가 지정한 프로젝트. 팀에 공유된 프로젝트의 세션만 팀 사무실에 나온다(#54). */
   project_id?: string | null;
+  /**
+   * 세션 이름: 작업 폴더의 마지막 이름(#181). 사용자가 그 PC에서 켰을 때만 오고, 본인 장치 세션에만 있다.
+   * 이전 서버는 보내지 않는다(없음 = null).
+   */
+  workspace_name?: string | null;
   change_seq: number;
 }
 

@@ -40,8 +40,10 @@ type Report struct {
 	// TokenStorage는 장치 토큰 보관 위치다(#41): os_keyring(OS 보안 저장소) / file_fallback(0600 설정 파일,
 	// 보안 저장소를 쓸 수 없거나 강제 파일 모드). 미등록이면 비어 있다. 저장소 항목 존재는 확인하지 않는다.
 	TokenStorage string `json:"token_storage,omitempty"`
-	Paused       bool   `json:"paused"`
-	PauseState   string `json:"pause_state"`
+	// WorkspaceNameSharing은 작업 폴더 마지막 이름 전송 동의(#181)다. 미등록이면 false다.
+	WorkspaceNameSharing bool   `json:"workspace_name_sharing"`
+	Paused               bool   `json:"paused"`
+	PauseState           string `json:"pause_state"`
 	// ProcessRunning은 run 프로세스가 실행 잠금을 갖고 있는지다.
 	ProcessRunning bool `json:"process_running"`
 	// Run은 마지막 status.json 내용이다(없으면 nil).
@@ -117,6 +119,7 @@ func buildReport(env Env, dirs paths.Dirs, diagnose bool) (Report, *config.Confi
 		if cfg.InKeyring() {
 			rep.TokenStorage = "os_keyring"
 		}
+		rep.WorkspaceNameSharing = cfg.ShareWorkspaceName
 		cfgOut = &cfg
 	case errors.Is(err, config.ErrNotRegistered):
 		rep.Registration = "not_registered"
@@ -237,6 +240,13 @@ func printReport(w io.Writer, r Report, diagnose bool) {
 		fmt.Fprintln(w, "장치 토큰 보관: OS 보안 저장소")
 	case "file_fallback":
 		fmt.Fprintln(w, "장치 토큰 보관: 설정 파일(0600, 대체 경로: OS 보안 저장소를 쓸 수 없음)")
+	}
+	if r.Registration == "registered" {
+		share := "꺼짐(기본)"
+		if r.WorkspaceNameSharing {
+			share = "켜짐(마지막 폴더 이름만)"
+		}
+		fmt.Fprintf(w, "작업 폴더 이름 보내기: %s\n", share)
 	}
 	pause := "수집 중"
 	if r.Paused {

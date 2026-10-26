@@ -738,3 +738,16 @@ textarea.domains {
   font-size: 24px;
   letter-spacing: 0.15em;
 }
+
+/* 세션 이름(작업 폴더의 마지막 이름, #181). 작고 흐리게, 길면 줄인다. */
+.session-list .workspace {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.85em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-panel dd.workspace {
+  overflow-wrap: anywhere;
+}

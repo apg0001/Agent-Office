@@ -75,6 +75,7 @@ def _session_rows(connection: Connection, device_ids: list[uuid.UUID], extra: An
                 sessions.c.last_event_at,
                 sessions.c.change_seq,
                 sessions.c.project_id,
+                sessions.c.workspace_name,
             )
             .select_from(sessions.outerjoin(slots, slots.c.session_id == sessions.c.id))
             .where(sessions.c.device_id.in_(device_ids), extra)
@@ -116,7 +117,11 @@ def _device_json(row: Row[Any], now: dt.datetime) -> dict[str, Any]:
 
 
 def _session_json(
-    row: Row[Any], connection_of: dict[uuid.UUID, str], now: dt.datetime
+    row: Row[Any],
+    connection_of: dict[uuid.UUID, str],
+    now: dt.datetime,
+    *,
+    show_workspace: bool = True,
 ) -> dict[str, Any]:
     return {
         "id": str(row.id),
@@ -132,6 +137,8 @@ def _session_json(
         "desk_slot": row.desk_slot,
         # 사용자가 지정한 프로젝트(서버 ID). 팀 공유 범위를 정한다(#54).
         "project_id": str(row.project_id) if row.project_id else None,
+        # 작업 폴더의 마지막 이름(#181). 장치 소유자에게만 보인다(팀 화면은 null).
+        "workspace_name": row.workspace_name if show_workspace else None,
         "change_seq": row.change_seq,
     }
 
@@ -539,6 +546,7 @@ def _scoped_snapshot(
                 sessions.c.last_event_at,
                 sessions.c.change_seq,
                 sessions.c.project_id,
+                sessions.c.workspace_name,
             )
             .where(sessions.c.id.in_(visible))
             .order_by(sessions.c.started_at, sessions.c.id)
@@ -563,11 +571,18 @@ def _scoped_snapshot(
         else []
     )
     connection_of = {d.id: connection_state(d.last_seen_at, now) for d in device_rows}
+    owner_of = {d.id: d.owner_user_id for d in device_rows}
     agent_rows = _agent_rows(connection, [s.id for s in session_rows], true())
     session_json = []
     desk = 0
     for row in session_rows:
-        item = _session_json(row, connection_of, now)
+        # 작업 폴더 이름(#181)은 장치 소유자 본인에게만 보인다(팀 화면은 viewer_id가 없음).
+        item = _session_json(
+            row,
+            connection_of,
+            now,
+            show_workspace=viewer_id is not None and owner_of.get(row.device_id) == viewer_id,
+        )
         if item["lifecycle"] != "ENDED":
             item["desk_slot"] = desk
             desk += 1
@@ -667,6 +682,8 @@ def team_agent_detail(
     detail = build_agent_detail(connection, owner, agent_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="not_found")
+    # 작업 폴더 이름(#181)은 팀 화면에 보이지 않는다(팀 스냅샷과 같게 소유자 본인에게도 null).
+    detail["session"]["workspace_name"] = None
     # 팀원에게는 PC 이름 대신 소유자 표시 이름을 보여 준다.
     detail["device"]["name"] = connection.execute(
         select(schema.users.c.display_name).where(schema.users.c.id == owner)

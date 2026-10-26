@@ -39,7 +39,7 @@ erDiagram
     users |o--o{ audit_logs : "행위자(SET NULL)"
 ```
 
-실시간 전달(#37)을 위해 마이그레이션 `0003`이 전역 시퀀스 `state_change_seq`와 `agent_sessions.change_seq·changed_at`, `agent_current_states.change_seq`를 추가했습니다. 화면에 보이는 값이 바뀔 때만 증가합니다. 마이그레이션 `0004`는 현재 활동의 관측·추정 구분 `agent_current_states.confidence`를 추가했습니다(#47).
+실시간 전달(#37)을 위해 마이그레이션 `0003`이 전역 시퀀스 `state_change_seq`와 `agent_sessions.change_seq·changed_at`, `agent_current_states.change_seq`를 추가했습니다. 화면에 보이는 값이 바뀔 때만 증가합니다. 마이그레이션 `0004`는 현재 활동의 관측·추정 구분 `agent_current_states.confidence`를 추가했습니다(#47). 마이그레이션 `0008`은 세션 작업 폴더 이름 `agent_sessions.workspace_name`을 추가했습니다(#181).
 
 `instance_settings`와 `notification_channels`는 인스턴스 전역 테이블입니다. 마스터 사양의 `schema_migrations`는 Alembic의 `alembic_version` 테이블이 맡습니다.
 
@@ -71,6 +71,7 @@ erDiagram
 - 자유 형식 `TEXT` 컬럼이 없습니다. 모든 문자열은 길이 상한(최대 500)이 있고, `prompt`·`command`·`content`·`path`·`output`·`transcript`·`message` 같은 이름의 컬럼이 없음을 테스트로 확인합니다.
 - `activity_events` 컬럼은 이벤트 v1 허용 필드와 서버 전용 `received_at`·`payload_digest`뿐입니다.
 - `plan_steps`는 순서와 상태만 저장하고 계획 문장은 저장하지 않습니다.
+- `agent_sessions.workspace_name`(마이그레이션 `0008`, #181)은 사용자가 PC별로 켠 경우의 작업 폴더 **마지막 이름**만 담습니다(`varchar(64)`, NULL 허용). `ck_agent_sessions_workspace_name`이 1~64자와 `/`·`\`·제어 문자 없음을 강제합니다. 전체 경로·상위 폴더는 저장하지 않습니다.
 - `project_sources`는 Collector가 만든 장치별 HMAC 지문만 저장합니다. 경로·원격 URL은 저장하지 않습니다.
 - `notification_channels`의 Webhook URL·토큰·SMTP 암호는 `secret_ciphertext`에 암호화해 둡니다(암호화 키 관리는 #67·#70). `instance_settings`에는 비밀을 두지 않습니다. 인스턴스 비밀(SMTP 암호, OAuth client secret)은 `instance_secrets`에 AES-256-GCM 암호문으로 둡니다(#67, 마이그레이션 `0005`).
 - `audit_logs.details`는 허용 목록 키만 담는 요약입니다(#28).

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from helpers import sign_in
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from agent_office import backup
 
@@ -134,12 +134,29 @@ def test_backup_verify_and_restore_test(
     backup.verify(path)
 
     result = backup.restore_test(path)
-    assert result["migration"] == "0007" and result["tables"] > 20 and result["users"] == 1
+    assert result["migration"] == "0008" and result["tables"] > 20 and result["users"] == 1
 
     path.write_bytes(path.read_bytes()[:-1] + b"\0")
     with pytest.raises(backup.BackupError) as error:
         backup.verify(path)
     assert error.value.code == "checksum_mismatch"
+
+
+@pytest.mark.skipif(not _pg_tools_17(), reason=NO_PG17)
+def test_backup_of_dump_larger_than_pipe_buffer(
+    engine: Engine, database: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """pg_restore --list가 목차만 읽고 먼저 끝나도(BrokenPipe) 덤프가 크면 실패하던 문제(#187)."""
+    monkeypatch.setenv("AGENT_OFFICE_DATABASE_URL", database)
+    monkeypatch.setenv(backup.BACKUP_KEY_ENV, base64.urlsafe_b64encode(KEY).decode())
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE bulk_187 (v text)"))
+        connection.execute(
+            text("INSERT INTO bulk_187 SELECT md5(g::text) FROM generate_series(1, 200000) g")
+        )
+    info = backup.create_backup(tmp_path / "local")
+    assert info.size_bytes > 1_000_000
+    backup.verify(tmp_path / "local" / info.name)
 
 
 @pytest.mark.skipif(not _pg_tools_17(), reason=NO_PG17)
@@ -163,8 +180,6 @@ def test_migrate_check_upgrades_a_restored_older_backup(
     assert result["migration"] == expected_revision()
     # 운영 DB는 그대로다.
     with engine.connect() as connection:
-        from sqlalchemy import text
-
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0005"
         )

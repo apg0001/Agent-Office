@@ -41,6 +41,12 @@ NAMING_CONVENTION = {
 
 metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
+# 세션 작업 폴더 이름(#181): 1..64자, 경로 구분자·제어 문자 없음. 마이그레이션 0008과 같아야 한다.
+WORKSPACE_NAME_CHECK = (
+    "workspace_name IS NULL OR (char_length(workspace_name) BETWEEN 1 AND 64"
+    " AND workspace_name !~ '[/\\\\[:cntrl:]]')"
+)
+
 # 상태 변경마다 증가하는 전역 값. 실시간 전달(#37)에서 행별 최신 판정에 쓴다.
 state_change_seq = Sequence("state_change_seq", metadata=metadata)
 
@@ -385,6 +391,8 @@ agent_sessions = Table(
     Column("started_at", DateTime(timezone=True), nullable=True),
     Column("ended_at", DateTime(timezone=True), nullable=True),
     Column("last_event_at", DateTime(timezone=True), nullable=True),
+    # 작업 폴더의 마지막 이름(#181). PC별 동의 시에만 온다. 전체 경로는 받지 않는다.
+    Column("workspace_name", String(64), nullable=True),
     _created_at(),
     Column(
         "change_seq",
@@ -399,6 +407,7 @@ agent_sessions = Table(
     CheckConstraint(_in("provider", PROVIDERS), name="provider"),
     CheckConstraint(_in("lifecycle", SESSION_LIFECYCLES), name="lifecycle"),
     CheckConstraint("ended_at IS NULL OR lifecycle = 'ENDED'", name="ended_at_requires_ended"),
+    CheckConstraint(WORKSPACE_NAME_CHECK, name="workspace_name"),
 )
 Index("ix_agent_sessions_project_id", agent_sessions.c.project_id)
 Index("ix_agent_sessions_changed_at", agent_sessions.c.changed_at)

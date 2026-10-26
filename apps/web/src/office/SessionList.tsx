@@ -1,5 +1,6 @@
 import { headlineFor } from "./headline";
 import type { OfficeState, SessionState } from "./types";
+import { shortWorkspace, workspaceName } from "./workspace";
 
 const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
   claude: "Claude",
@@ -45,19 +46,27 @@ export function SessionList({ state, onSelect }: { state: OfficeState; onSelect:
         <p className="empty">지금 작업 중인 세션이 없습니다</p>
       ) : (
         <ul>
-          {sessions.map(({ session, deviceName, leadId, headline, subagents }) => (
-            <li key={session.id}>
-              <button type="button" disabled={!leadId} onClick={() => leadId && onSelect(leadId)}>
-                <span className="who">
-                  {deviceName} · {PROVIDER_LABELS[session.provider]}
-                </span>
-                <span className="what">
-                  {headline}
-                  {subagents > 0 && ` · 하위 ${subagents}`}
-                </span>
-              </button>
-            </li>
-          ))}
+          {sessions.map(({ session, deviceName, leadId, headline, subagents }) => {
+            const workspace = workspaceName(session.workspace_name);
+            return (
+              <li key={session.id}>
+                <button type="button" disabled={!leadId} onClick={() => leadId && onSelect(leadId)}>
+                  <span className="who">
+                    {deviceName} · {PROVIDER_LABELS[session.provider]}
+                  </span>
+                  {workspace && (
+                    <span className="workspace" title={workspace}>
+                      {shortWorkspace(workspace, 32)}
+                    </span>
+                  )}
+                  <span className="what">
+                    {headline}
+                    {subagents > 0 && ` · 하위 ${subagents}`}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </aside>
