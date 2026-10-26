@@ -46,6 +46,14 @@ from smoke_common import (
 PORT = 8765
 
 
+def version_of(exe: str) -> str:
+    """설치 중에는 실행 파일이 바뀌는 중이라 실행이 실패할 수 있다(Windows 공유 위반). 그때는 빈 값."""
+    try:
+        return run([exe, "version"], check=False, timeout=60).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 def main() -> int:
     if os.environ.get("AGENT_OFFICE_SMOKE_DISPOSABLE") != "1":
         print(
@@ -144,10 +152,7 @@ def main() -> int:
                 return False
             return p.get("last_version") == a.new
 
-        c.record(
-            "version_bumped",
-            wait(lambda: a.new in run([core, "version"], check=False).stdout, 900),
-        )
+        c.record("version_bumped", wait(lambda: a.new in version_of(core), 900))
         c.record("post_install_done", wait(upgraded, 300))
         c.record("result_consumed", not (prefs.parent / "update-result.json").exists())
         c.record(
