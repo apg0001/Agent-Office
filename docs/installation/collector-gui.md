@@ -15,7 +15,7 @@
 | Linux arm64 데스크톱 빌드·실행 | **검증(컨테이너)**: bookworm `libgtk-3-dev 3.24.38-2~deb12u3`·`libwebkit2gtk-4.0-dev 2.50.6-1~deb12u2`로 `-tags desktop,production` 빌드, Xvfb에서 창 표시·탭 전환·Go 바인딩 호출(설정 읽기, Core `status`·`hooks status`) 스크린샷 확인, GUI 종료 뒤 Core `status` 정상 | 아래 [Linux](#linux) |
 | 실제 데스크톱 세션(Wayland·GNOME 등)·`BrowserOpenURL`로 브라우저 열기 | **미실행**: 컨테이너에 데스크톱·브라우저 없음. 브라우저 열기는 단위 테스트에서 호출 주소만 확인 | `app_test.go` |
 | Linux amd64 | **미실행**(CI `Go GUI` 작업은 amd64에서 백엔드 테스트만 실행) | `.github/workflows/ci.yml` |
-| Ubuntu 24.04 등 webkit2gtk 4.1만 있는 배포판 | **미검증**: Wails v2는 `-tags webkit2_41`이 필요할 수 있음 | — |
+| Ubuntu 22.04·24.04(webkit2gtk-4.1) | **검증(러너)**: `-tags webkit2_41`, ubuntu:22.04 빌드 desktop deb를 네 러너(22.04·24.04 × amd64·arm64)에 설치·실행(#180) | [지원 Linux 배포판](#지원-linux-배포판데스크톱-패키지) |
 | macOS(WKWebView) | **검증(러너)**: GitHub Actions `macos-latest`(arm64, macOS 26.6)에서 백엔드 `go vet`·`go test`(실제 Core 계약 테스트 포함), `-tags desktop,production` 빌드, 실행 후 15초 유지. 창 화면·조작은 **미실행** | `.github/workflows/cross-os.yml`, [macOS·Windows](#macoswindowsgithub-actions-러너-검증) |
 | Windows(WebView2) | **검증(러너)**: `windows-latest`(Windows Server 2025, amd64)에서 같은 항목, `-H windowsgui` 빌드 실행 후 15초 유지. 창 화면·조작과 Core 실행 시 콘솔 창 숨김(`CREATE_NO_WINDOW`) 육안 확인은 **미실행** | 같은 워크플로, `hidewindow_windows.go` |
 | 실제 Agent Office 서버에서 웹 코드 발급 → GUI 등록 | **미실행**: 웹 화면은 Vitest·빌드, 등록은 `httptest` 서버로만 확인 | `devices.test.tsx`, `integration_test.go` |
@@ -32,7 +32,7 @@
 | 트레이 자동 시작(XDG autostart·LaunchAgent·HKCU Run) | **검증(러너, 등록·제거)**: 세 OS 설치본에서 `agent-office-collector-tray autostart install` → 상태 `installed`·정의가 트레이 실행 파일을 가리킴 → 제거 프로그램(또는 제거 도우미)이 소유 항목만 삭제. 생성 `.desktop`은 `desktop-file-validate`, plist는 `plutil -lint` 통과(#43). 실제 로그인 시 실행은 **미실행** | `autostart_test.go`, `installer_smoke.py` |
 | GUI/Core 독립성 | **검증**: 실제 Core `run`을 별도 프로세스로 띄우고 GUI 프로세스를 SIGKILL·트레이 종료로 끝내도 Core가 계속 Hook 이벤트를 전송, Core 강제 종료·재시작 시 트레이 상태 회복 | `tray/independence_test.go`(CI `Go GUI`) |
 | 재부팅 후 자동 수집(Core 서비스 + 트레이 자동 시작) | **미실행**: 러너·컨테이너에서 다시 로그인할 수 없음 | [Collector CLI 자동 시작](collector-cli.md#자동-시작service) |
-| 설치 프로그램 설치 → 실행 → 제거 | **검증(러너)**: Windows NSIS `.exe`(사용자별), macOS 유니버설 `.pkg`, Ubuntu 24.04 amd64·arm64 deb. 자세한 항목은 [설치 프로그램 실측](#설치-프로그램-실측cross-os-collector) | `.github/workflows/cross-os.yml` |
+| 설치 프로그램 설치 → 실행 → 제거 | **검증(러너)**: Windows NSIS `.exe`(사용자별), macOS 유니버설 `.pkg`, Ubuntu 22.04·24.04 amd64·arm64 deb(#180부터 22.04 포함). 자세한 항목은 [설치 프로그램 실측](#설치-프로그램-실측cross-os-collector) | `.github/workflows/cross-os.yml` |
 | Gatekeeper·SmartScreen 경고, 사람이 쓰는 데스크톱의 첫 실행 | **미실행**: 러너는 내려받은 파일 격리 속성(quarantine)·Mark of the Web 없이 설치 | [서명하지 않은 설치 프로그램](#서명하지-않은-설치-프로그램) |
 | Linux rpm(Fedora 등) 데스크톱 패키지 설치 | **미실행**: 빌드만(의존 `gtk3`·`webkit2gtk4.1`) | — |
 
@@ -259,7 +259,15 @@ Pi 같은 헤드리스 Linux(Core deb만, `/usr/bin`)는 설치 위치가 같아
 
 데스크톱 GUI는 `ubuntu:22.04`(glibc 2.35)에서 `libwebkit2gtk-4.1-dev`로 빌드하고, 빌드 스크립트가 GUI의 GLIBC 심볼 최고 요구 버전이 2.35 이하인지 확인합니다. Core·트레이는 `CGO_ENABLED=0` 정적 실행 파일이라 glibc 버전과 무관합니다. 의존성은 `agent-office-collector (= 같은 버전)`, `libgtk-3-0 | libgtk-3-0t64`, `libwebkit2gtk-4.1-0`(버전 하한 없음, Ubuntu 22.04는 jammy-updates에 있음)입니다.
 
-@@DISTRO_TABLE@@
+| 배포판 | 아키텍처 | 상태 | 근거 |
+|---|---|---|---|
+| Ubuntu 22.04.5 LTS(glibc 2.35) | amd64·arm64 | **검증(러너)**: Core deb + desktop deb `apt-get install`(의존성 해결) → 트레이 15초·단일 실행 → 최소 Watcher 등록·dbusmenu 클릭 → 셀프 테스트(GUI 창 실행·종료) → 승인형 업데이트(아래) → 제거 | GitHub `ubuntu-22.04`·`ubuntu-22.04-arm`, Cross-OS Collector 40263681542 |
+| Ubuntu 24.04.5 LTS(glibc 2.39) | amd64·arm64 | **검증(러너)**: 같은 항목 | `ubuntu-24.04`·`ubuntu-24.04-arm`, 같은 실행 |
+| Ubuntu 22.04 컨테이너(arm64) | arm64 | **검증(컨테이너)**: `libwebkit2gtk-4.1-0 2.50.4-0ubuntu0.22.04.1`·`libgtk-3-0 3.24.33-1ubuntu2.2`만 설치한 `ubuntu:22.04`에서 `ldd`가 GUI의 모든 라이브러리를 찾고, Xvfb에서 GUI가 10초 넘게 떠 있음, 트레이는 `not a dynamic executable` | Raspberry Pi 5, 2026-10-26 |
+| Debian 12 bookworm | amd64·arm64 | **미실행**(#159까지는 bookworm에서 빌드했고 #180부터 jammy 빌드라 다시 확인 필요, glibc 2.36 ≥ 2.35라 실행 조건은 충족) | — |
+| Fedora 등 rpm | — | **미실행**(빌드만) | — |
+
+빌드 산출물 확인(같은 실행): GUI GLIBC 심볼 최고 버전 2.34(`GLIBC_2.4`·`2.32`·`2.34`), Core·트레이는 `file`·`ldd` 기준 정적 실행 파일, desktop deb `Depends: agent-office-collector (= 0.0.0~ci.N), libgtk-3-0 | libgtk-3-0t64, libwebkit2gtk-4.1-0`.
 
 ### 업데이트·이전 실측(Cross-OS Collector)
 
@@ -269,7 +277,13 @@ Pi 같은 헤드리스 Linux(Core deb만, `/usr/bin`)는 설치 위치가 같아
 - `tests/cross_os/migration_smoke.py`(Windows·macOS): 명령행 Core를 예전 위치에 두고 Hook(Claude·Codex)·자동 시작·일시중지 → 설치 프로그램 → 트레이 첫 실행 → Hook·서비스 정의가 새 경로만 가리킴, 남의 Hook 유지, Codex `hooks.json` 다시 씀(재신뢰 필요), Core 프로세스가 새 실행 파일 하나뿐, 일시중지 상태 유지(같은 설정 폴더) → `legacy status`가 3개 파일 → `legacy remove --yes`로 모두 삭제.
 - 사람이 없는 러너에서 자동화하지 못하는 것: macOS 관리자 암호 대화상자와 Linux polkit 인증 창(러너는 `AGENT_OFFICE_UPDATE_ELEVATE=sudo-n`으로 같은 `installer`·`apt-get` 명령을 암호 없는 sudo로 실행), OS 알림이 화면에 뜨는지(요청 횟수만 셈), Installer.app 대화형 설치 뒤 postinstall이 트레이를 여는 것(러너는 명령행 `installer`라 postinstall이 띄우지 않는 경로만 확인), NSIS 마침 화면 "열기", 사람이 마법사를 눌러 진행하는 것(마법사 백엔드는 `app` 단위 테스트, 화면은 JS 구문 확인만).
 
-@@CI_RESULT@@
+결과(2026-10-26, PR #185, Cross-OS Collector 실행 40263681542): 설치 실측·업데이트 실측·이전 실측 모두 실패 항목 0개.
+
+| 러너 | 업데이트(`update_smoke.py`) | 이전(`migration_smoke.py`) |
+|---|---|---|
+| `windows-latest`(Windows Server 2025 10.0.26100) | 감지 → 메뉴 승인 → `setup.exe /S`(관리자 권한 없음) → 새 트레이·후처리 → Core·트레이 버전 상승, Hook·남의 Hook·Codex `hooks.json`(바이트 그대로)·작업 스케줄러 등록 유지, 새 Core 실행 | `%LOCALAPPDATA%\AgentOffice\bin` → 설치 프로그램: Hook·작업 XML이 새 경로만, 새 Core 프로세스 하나, 일시중지 유지, 이전 파일 3개 정리 |
+| `macos-latest`(macOS 26.6.2 arm64) | 같은 항목(`installer -pkg`는 `sudo -n`, 관리자 암호 창 대신) | `~/.local/bin` → `.pkg`: 같은 항목(LaunchAgent bootout·bootstrap으로 이전 Core 종료) |
+| `ubuntu-24.04`·`ubuntu-24.04-arm`·`ubuntu-22.04`·`ubuntu-22.04-arm` | 같은 항목(`apt-get install`은 `sudo -n`, polkit 창 대신). 러너에 systemd 사용자 세션이 없어 서비스 항목은 확인하지 않음 | 미실행(요청 범위 Windows·macOS. Linux 헤드리스 deb는 `/usr/bin` 그대로라 옮길 것이 없음) |
 
 ### 이전 기록: GUI 안 트레이(#43, Linux 컨테이너)
 
