@@ -133,28 +133,25 @@ func TestCheckInstallerBackwardCompatible(t *testing.T) {
 }
 
 func TestInstallCommand(t *testing.T) {
-	abs := "/tmp/x.pkg"
-	if os.PathSeparator == '\\' {
-		abs = `C:\x\setup.exe`
-	}
+	win, abs := `C:\x\setup.exe`, "/tmp/x.pkg"
 	cases := []struct {
 		goos, kind, elevate string
+		files               []string
 		want                []string
 	}{
-		{"windows", KindNSIS, "", []string{abs, "/S"}},
-		{"darwin", KindPkg, ElevateSudoN, []string{"sudo", "-n", "/usr/sbin/installer", "-pkg", abs, "-target", "/"}},
-		{"linux", KindDeb, ElevateSudoN, []string{"sudo", "-n", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/apt-get", "install", "-y", "-q", "--no-install-recommends", abs, abs}},
-		{"linux", KindRPM, "", []string{"/usr/bin/pkexec", "/usr/bin/env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/dnf", "install", "-y", abs, abs}},
+		{"windows", KindNSIS, "", []string{win}, []string{win, "/S"}},
+		{"darwin", KindPkg, ElevateSudoN, []string{abs}, []string{"sudo", "-n", "/usr/sbin/installer", "-pkg", abs, "-target", "/"}},
+		{"linux", KindDeb, ElevateSudoN, []string{abs, abs}, []string{"sudo", "-n", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/apt-get", "install", "-y", "-q", "--no-install-recommends", abs, abs}},
+		{"linux", KindRPM, "", []string{abs, abs}, []string{"/usr/bin/pkexec", "/usr/bin/env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/dnf", "install", "-y", abs, abs}},
 	}
 	for _, c := range cases {
-		files := []string{abs}
-		if c.goos == "linux" {
-			files = []string{abs, abs}
-		}
-		got, err := InstallCommand(c.goos, c.kind, c.elevate, files)
+		got, err := InstallCommand(c.goos, c.kind, c.elevate, c.files)
 		if err != nil || !slices.Equal(got, c.want) {
 			t.Fatalf("%s/%s: %q %v", c.goos, c.kind, got, err)
 		}
+	}
+	if _, err := InstallCommand("windows", KindNSIS, "", []string{"setup.exe"}); Code(err) != "bad_path" {
+		t.Fatalf("relative windows path: %v", err)
 	}
 	// macOS 기본은 관리자 승인 창이고 경로는 셸 문자열이 아니라 argv로 넘긴다.
 	got, err := InstallCommand("darwin", KindPkg, "", []string{"/tmp/a'b.pkg"})

@@ -38,6 +38,9 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | `hooks install\|uninstall [--tool claude\|codex] [--yes] [--scope user]` | 사용자 설정에 Hook 추가·제거(기본 `claude`). `--yes`가 없으면 미리보기만 출력합니다. Codex는 설치 뒤 Codex에서 직접 신뢰해야 실행됩니다 |
 | `hooks status [--tool claude\|codex] [--json]` | Hook 설치 상태와 도구 버전 검증 수준. `--json`은 GUI용으로 도구별 감지 여부·버전·검증 수준·Hook 상태 enum·개수와 읽기 실패 코드만 출력합니다(설정 경로·다른 Hook 명령 원문 없음) |
 | `hooks print [--tool claude\|codex] [--os linux\|darwin\|windows] [--exe PATH]` | Hook 항목 미리보기(파일을 쓰지 않음) |
+| `update check\|apply …` | 명령행 설치 Core 자체 업데이트([Collector 자체 업데이트](collector-update.md)) |
+| `update check\|download\|install --installer …`, `update post-install [--json]` | 설치 프로그램 배치의 설치 파일 기반 업데이트와 설치 뒤 후처리(#180). 트레이가 부릅니다([설치 파일 기반 업데이트](collector-update.md#설치-파일-기반-업데이트180)) |
+| `legacy status\|remove [--yes] [--json]` | 설치 프로그램으로 옮긴 뒤 남은 이전 명령행 설치 파일(`~/.local/bin`, `%LOCALAPPDATA%\AgentOffice\bin`의 이 도구 파일만)을 보여 주고 `--yes`면 지웁니다. 지금 Core가 설치 프로그램 배치일 때만, 자동 시작·Hook이 그 파일을 더는 가리키지 않을 때만 지웁니다(#180, [옮기기](collector-gui.md#명령행-설치에서-설치-프로그램으로-옮기기)) |
 | `version` | 버전·OS·아키텍처 |
 
 종료 코드: 0 성공, 1 실패, 2 사용법 오류. `hook`은 예외 없이 0입니다.

@@ -247,7 +247,7 @@ func InstallCommand(goos, kind, elevate string, files []string) ([]string, error
 		return nil, fail("unsupported_installer")
 	}
 	for _, f := range files {
-		if !filepath.IsAbs(f) || strings.ContainsAny(f, "\x00\r\n") {
+		if !absFor(goos, f) || strings.ContainsAny(f, "\x00\r\n") {
 			return nil, fail("bad_path")
 		}
 	}
@@ -275,6 +275,14 @@ func InstallCommand(goos, kind, elevate string, files []string) ([]string, error
 		return elevated(elevate, cmd), nil
 	}
 	return nil, fail("unsupported_installer")
+}
+
+// absFor는 대상 OS 기준 절대 경로인지다(명령 구성은 어느 OS에서나 테스트한다).
+func absFor(goos, p string) bool {
+	if goos == "windows" {
+		return len(p) >= 3 && p[1] == ':' && (p[2] == '\\' || p[2] == '/') || strings.HasPrefix(p, `\\`)
+	}
+	return strings.HasPrefix(p, "/")
 }
 
 func elevated(elevate string, cmd []string) []string {

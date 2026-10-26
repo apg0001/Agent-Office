@@ -110,6 +110,9 @@ func (r *recorder) install(te *testEnv) {
 		if len(args) == 2 && args[1] == "version" {
 			return []byte("agent-office-collector " + r.coreV + " (x)\n"), nil
 		}
+		if len(args) > 1 && args[0] == "schtasks" && args[1] == "/Query" {
+			return nil, os.ErrNotExist // 같은 이름 작업 없음
+		}
 		if r.failOn != "" && args[0] == r.failOn {
 			return nil, os.ErrPermission
 		}
