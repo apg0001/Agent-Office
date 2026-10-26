@@ -90,3 +90,29 @@ code { font-size: 13px; }
 .wizard-tool { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
 fieldset.modes { border: 1px solid var(--line); border-radius: 6px; }
 select { font: inherit; padding: 4px 6px; }
+
+/* 페이지 안 확인 창(#204): macOS WKWebView는 window.confirm을 지원하지 않는다. */
+.ask-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.ask-box {
+  max-width: 460px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: #1e1e1e;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.ask-box p {
+  margin: 0 0 14px;
+  line-height: 1.6;
+}

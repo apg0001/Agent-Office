@@ -47,7 +47,7 @@ $("wiz-server-form").addEventListener("submit", async (e) => {
     $("server-url").value = $("wiz-server-url").value;
     wizardGo(2);
   } else {
-    window.alert(r.message);
+    await tell(r.message);
   }
 });
 
@@ -133,7 +133,7 @@ $("wiz-apply").addEventListener("click", async () => {
     wizardGo(4);
     return;
   }
-  if (!window.confirm(parts.join(", ") + "을(를) 설치합니다. 원본 설정은 백업합니다. 계속할까요?")) {
+  if (!await ask(parts.join(", ") + "을(를) 설치합니다. 원본 설정은 백업합니다. 계속할까요?")) {
     return;
   }
   const v = await call("SetupApply", choices, true);
@@ -228,7 +228,7 @@ $("update-check").addEventListener("click", async () => {
 });
 
 $("legacy-remove").addEventListener("click", async () => {
-  if (!window.confirm("목록의 이전 명령행 설치 파일만 지웁니다. 등록·장치 토큰·큐는 그대로입니다. 계속할까요?")) {
+  if (!await ask("목록의 이전 명령행 설치 파일만 지웁니다. 등록·장치 토큰·큐는 그대로입니다. 계속할까요?")) {
     return;
   }
   const r = await call("LegacyRemove", true);
