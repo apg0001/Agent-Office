@@ -291,6 +291,8 @@
 205. #170(PR #173, 서브에이전트): `hooks install|uninstall|status --tool codex` — Codex 사용자 Hook 위치 `$CODEX_HOME/hooks.json`(기본 `~/.codex/hooks.json`), Codex는 신뢰(대화형 `codex`의 "Hooks need review"에서 Trust)해야 실행. Pi 실제 Codex CLI 0.163.0 exec + 합성 Responses 서버로 설치→신뢰→수집→서버→제거 실측(`tests/e2e/codex_flow.sh`). 후속: 제거 도우미(uninstall.sh·ps1)에 Codex Hook 제거 추가, GUI의 "Codex 자동 설치 미지원" 문구 교체(#159 영역), macOS·Windows Codex 실기 확인, `hook codex` 버전 기록으로 CLI PostToolUse 승격 여부 결정.
 206. #159(PR #168, 서브에이전트) 병합·종료: 별도 트레이 프로세스 `agent-office-collector-tray`(ADR-0005, 모든 OS), Windows NSIS 설치기·macOS universal pkg(.app + LoginItems 트레이)·Linux `agent-office-collector-desktop` deb/rpm. 러너(windows·macos·ubuntu amd64/arm64)에서 설치→트레이→셀프 테스트→제거 실측. 미검증: 실제 패널 아이콘 클릭, Gatekeeper·SmartScreen, 재로그인 자동 시작, rpm 설치, Windows arm64. 명세 차이: 트레이 "동기화" 대신 전송 대기 건수, 업데이트 OS 알림·주기 확인은 #44 후속.
 207. #175(PR #176): GUI에서 Claude·Codex 도구 선택 Hook 설치·제거, Codex 신뢰 안내, 제거 도우미 Codex Hook 정리. 간헐 실패 #177(Linux 트레이 종료 대기) 기록.
+208. #180(PR #185, 서브에이전트): 설치 직후 "처음 설정" 마법사, 승인형 자동 업데이트(manifest `installers`, `update download|install --installer`, 트레이 주기 확인·알림·승인, 후처리), 명령어 설치 → 설치 프로그램 이전(`legacy status|remove`), Ubuntu 22.04 데스크톱 빌드(jammy, webkit2gtk-4.1), `publish-collector.yml` `publish_channel` 입력으로 채널 Release 갱신. ADR-0006.
+209. #181(PR #186, 서브에이전트): 세션 이름 = 작업 폴더 마지막 이름, PC별 `settings workspace-name on` 동의 시에만, 이벤트 v1 선택 필드 `workspace_name`, 마이그레이션 0008. #182(PR #183): 하위 에이전트 겹침. #187(PR #188): 덤프 64KB 초과 시 백업 항상 실패(운영 Pi에서 10-25 17:36 KST 뒤 백업 없음) 수정. 운영 Pi를 `deploy/upgrade.sh`로 dev-2a82a71(DB 0008)로 올림. #184 macOS tail 권한 오류 기록. #189(PR #190) 22.04 arm GUI 단일 실행 판정 완화.
 
 ## 이번 변경 요약(#22)
 
