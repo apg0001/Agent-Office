@@ -336,11 +336,16 @@ def main() -> int:
             stderr=subprocess.DEVNULL,
         )
         # 셀프 테스트의 "사무실 열기"(서버 없음 → 설정 창)·"설정 열기"가 GUI 창 프로세스를 실제로 띄우는지 본다.
+        # 두 번째 실행은 잠금을 확인하고 바로 끝나지만, GTK·WebKit을 동적으로 불러오는 동안(느린 arm 러너에서
+        # 1초 안팎) 프로세스가 잠깐 보인다. 단일 실행 위반은 "둘 이상이 연속 3초 이상 남아 있음"으로 판정한다.
         gui_seen, gui_max, deadline = 0, 0, time.monotonic() + 900
+        dup_run, dup_longest = 0, 0
         while self_test.poll() is None and time.monotonic() < deadline:
             n = count("agent-office-collector-gui")
             gui_seen += 1 if n else 0
             gui_max = max(gui_max, n)
+            dup_run = dup_run + 1 if n >= 2 else 0
+            dup_longest = max(dup_longest, dup_run)
             time.sleep(1)
         if self_test.poll() is None:
             self_test.kill()
@@ -349,7 +354,8 @@ def main() -> int:
         record("gui_started_from_tray", gui_seen >= 3)
         # "사무실 열기"와 "설정 열기"가 GUI를 두 번 띄워도 창 프로세스는 하나여야 한다(단일 실행).
         results["gui_max_processes_during_self_test"] = gui_max
-        record("gui_single_instance", gui_max == 1)
+        results["gui_duplicate_longest_seconds"] = dup_longest
+        record("gui_single_instance", gui_max >= 1 and dup_longest < 3)
         report = (
             json.loads(report_path.read_text(encoding="utf-8"))
             if report_path.exists()
