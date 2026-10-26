@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+## 0.1.0-beta.2 (2026-10-26)
+
+자세한 내용은 `docs/releases/0.1.0-beta.2.md`. **Collector 0.1.0-beta.1 사용자는 한 번 직접 설치해야 합니다**(자체 업데이트 불가).
+
+- Collector 설치 파일: Windows 설치 프로그램, macOS `.pkg`, Linux desktop deb·rpm, 모든 OS 트레이(#159)
+- Codex Hook 설치·제거(`--tool codex`, GUI 포함, 설치 뒤 Codex에서 신뢰 필요)(#170, #175)
+- Windows 자동 시작 콘솔 창 닫기(#169), 자체 업데이트 리다이렉트 수정(#44), 패키지 파일 이름 수정(#42)
+- 사무실 화면: CC0 가구·벽, 칸막이·문·출입구, 머리 위 상태, 활성 세션 목록, 범례, 픽셀 UI(#153, #156, #160, #162, #164, #166)
+- 하위 에이전트·TodoWrite 흐름의 계획 단계 전달 수정(#38)
+
 ## 0.1.0-beta.1 (2026-10-25)
 
 첫 Beta. 자세한 내용과 검증 범위는 `docs/releases/0.1.0-beta.1.md`를 봅니다.
