@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +39,12 @@ const installerTimeout = 30 * time.Minute
 // helperSettle은 도우미가 설치 프로그램을 실행하기 전 기다리는 시간이다. 승인한 트레이가 끝나 트레이 잠금을
 // 놓을 시간을 준다(그래야 설치 뒤 다시 띄운 새 트레이가 곧바로 뜬다). 테스트는 0으로 둔다.
 var helperSettle = 2 * time.Second
+
+// coreStopWait·retryDelay는 서비스 재설치 때 이전 Core 종료 대기·launchd 재시도 간격이다(테스트는 줄인다).
+var (
+	coreStopWait = 20 * time.Second
+	retryDelay   = time.Second
+)
 
 // trayWait는 트레이 잠금이 풀리기를 기다리는 상한이다.
 var trayWait = 60 * time.Second
@@ -402,11 +409,25 @@ func reinstallService(env Env, dirs paths.Dirs, exe string) string {
 	if err != nil {
 		return "failed"
 	}
-	if env.GOOS == "windows" {
-		// 이전(명령행 설치 등) 경로의 Core를 먼저 멈춘다. /Create /F는 실행 중인 인스턴스를 끝내지 않는다.
+	domain := "gui/" + strconv.Itoa(os.Getuid())
+	// 이전(명령행 설치 등) 경로의 Core를 먼저 멈추고 Core 잠금이 풀릴 때까지 기다린다. 바로 새 Core를 띄우면
+	// 이전 Core가 아직 잠금을 쥐고 있어 새 Core가 곧바로 끝날 수 있다(Windows /End·launchd bootout은 비동기).
+	switch env.GOOS {
+	case "windows":
 		_, _ = env.Command("schtasks", "/End", "/TN", service.TaskName)
+	case "darwin":
+		_, _ = env.Command("launchctl", "bootout", domain+"/"+service.LaunchdLabel)
 	}
-	if _, err := service.Install(def, true, env.Command); err != nil {
+	waitUnlocked(dirs.LockFile(), coreStopWait)
+	_, err = service.Install(def, true, env.Command)
+	if err != nil && env.GOOS == "darwin" {
+		// bootout 직후 bootstrap은 "Input/output error"로 실패할 수 있어 잠시 뒤 다시 시도한다.
+		for i := 0; i < 5 && err != nil; i++ {
+			time.Sleep(retryDelay)
+			_, err = env.Command("launchctl", "bootstrap", domain, loc)
+		}
+	}
+	if err != nil {
 		return "failed"
 	}
 	if env.GOOS == "linux" {
