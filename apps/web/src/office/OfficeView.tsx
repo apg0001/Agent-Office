@@ -70,7 +70,7 @@ export function ScopePicker({ scope }: { scope: OfficeScope }) {
 
 const SCOPE_NOTES: Record<OfficeScope["kind"], string> = {
   personal: "",
-  team: " · 팀 사무실(공유된 프로젝트만)",
+  team: " · 팀 사무실(팀원마다 고른 공유 범위만)",
   combined: " · 통합 사무실(내 것 + 팀에 공유된 것, 중복 없이)",
   side: "",
 };
@@ -215,7 +215,7 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       )}
       <div className="office-stage">
         <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
-        {!compact && office && <SessionList state={office} onSelect={setSelected} />}
+        {!compact && office && <SessionList state={office} onSelect={setSelected} unnamed={scope.kind !== "personal"} />}
       </div>
       {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
       {!compact && <ZoneLegend />}

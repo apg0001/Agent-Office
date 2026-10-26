@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import { Card, Notice } from "./AccountPages";
 import { type SessionInfo, call, messageFor, pendingInvite, rememberInvite, tokenFromHash } from "./api";
+import { ShareConsent } from "./ShareConsent";
+import { shareModeFromConsent } from "./teams";
 
 /** 팀 초대 수락(#27). 초대받은 이메일로 로그인해야 수락된다. */
 export function InvitePage() {
@@ -9,6 +11,8 @@ export function InvitePage() {
   const [session, setSession] = useState<SessionInfo | null | undefined>(undefined);
   const [joined, setJoined] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 새 팀원의 기본은 "모두 공유"이고, 화면에서 미리 체크한 것을 그대로 보낸다(#197).
+  const [shareAll, setShareAll] = useState(true);
 
   useEffect(() => {
     if (window.location.hash) {
@@ -43,7 +47,7 @@ export function InvitePage() {
     );
   }
   const accept = async () => {
-    const result = await call<{ name: string }>("POST", "/api/v1/invitations/accept", { token }, session.csrf_token);
+    const result = await call<{ name: string }>("POST", "/api/v1/invitations/accept", { token, share_mode: shareModeFromConsent(shareAll) }, session.csrf_token);
     if (result.data) {
       rememberInvite(null);
       setJoined(result.data.name);
@@ -67,6 +71,7 @@ export function InvitePage() {
       ) : (
         <>
           <p>{session.user.display_name} 계정으로 초대를 수락합니다.</p>
+          <ShareConsent checked={shareAll} onChange={setShareAll} />
           <Notice error={error} />
           <button type="button" onClick={() => void accept()}>
             수락

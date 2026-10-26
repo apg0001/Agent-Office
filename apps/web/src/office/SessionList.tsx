@@ -1,6 +1,6 @@
 import { headlineFor } from "./headline";
 import type { OfficeState, SessionState } from "./types";
-import { shortWorkspace, workspaceName } from "./workspace";
+import { sessionName, shortWorkspace } from "./workspace";
 
 const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
   claude: "Claude",
@@ -34,8 +34,11 @@ export function activeSessions(state: OfficeState): ActiveSession[] {
     .sort((a, b) => (b.session.last_event_at ?? "").localeCompare(a.session.last_event_at ?? ""));
 }
 
-/** 사무실 왼쪽 위에 겹쳐 보이는 활성 세션 목록. 누르면 그 세션 대장의 상세를 연다. */
-export function SessionList({ state, onSelect }: { state: OfficeState; onSelect: (agentId: string) => void }) {
+/**
+ * 사무실 왼쪽 위에 겹쳐 보이는 활성 세션 목록. 누르면 그 세션 대장의 상세를 연다.
+ * `unnamed`(팀·통합 화면)이면 이름이 없는 세션을 "(이름 없음)"으로 보여 준다(#197).
+ */
+export function SessionList({ state, onSelect, unnamed = false }: { state: OfficeState; onSelect: (agentId: string) => void; unnamed?: boolean }) {
   const sessions = activeSessions(state);
   return (
     <aside className="session-list" aria-label="활성 세션">
@@ -47,7 +50,7 @@ export function SessionList({ state, onSelect }: { state: OfficeState; onSelect:
       ) : (
         <ul>
           {sessions.map(({ session, deviceName, leadId, headline, subagents }) => {
-            const workspace = workspaceName(session.workspace_name);
+            const workspace = sessionName(session, unnamed);
             return (
               <li key={session.id}>
                 <button type="button" disabled={!leadId} onClick={() => leadId && onSelect(leadId)}>

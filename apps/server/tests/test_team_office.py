@@ -46,15 +46,16 @@ class Person:
         return self.client.request(method, f"/api/v1{path}", json=body, headers=self.headers)
 
 
-def team_with(owner: Person, *members: Person) -> str:
-    team = owner.call("POST", "/teams", {"name": "팀"}).json()["id"]
+def team_with(owner: Person, *members: Person, mode: str = "selected") -> str:
+    """팀을 만들고 구성원을 초대 수락으로 합류시킨다. 기존 규칙(#54) 테스트는 공유 범위를
+    'selected'(공유한 프로젝트만)로 둔다. 범위별 규칙은 test_share_modes(#197)."""
+    team = owner.call("POST", "/teams", {"name": "팀", "share_mode": mode}).json()["id"]
     for member in members:
         invited = owner.call("POST", f"/teams/{team}/invitations", {"email": email_of(member)})
         token = re.search(r"#token=(.+)$", invited.json()["invite_url"])
         assert token
-        assert (
-            member.call("POST", "/invitations/accept", {"token": token.group(1)}).status_code == 200
-        )
+        body = {"token": token.group(1), "share_mode": mode}
+        assert member.call("POST", "/invitations/accept", body).status_code == 200
     return str(team)
 
 

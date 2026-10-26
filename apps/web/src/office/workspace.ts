@@ -39,3 +39,31 @@ export function withWorkspaceName<T extends SessionState>(session: T): T {
   const name = workspaceName((session as { workspace_name?: unknown }).workspace_name);
   return session.workspace_name === name ? session : { ...session, workspace_name: name };
 }
+
+/** 프로젝트 표시 이름 최대 길이(서버 `projects.display_name`). */
+export const MAX_PROJECT_NAME = 120;
+/** 팀·통합 화면에서 이름이 없는 세션의 표시(#197). */
+export const UNNAMED_SESSION = "(이름 없음)";
+
+// 제어 문자와 보이지 않는 서식 문자(방향 바꿈 등). 프로젝트 이름은 사람이 붙이므로 `/`는 허용한다.
+const FORBIDDEN_IN_PROJECT = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb]/u;
+
+/** 서버가 준 프로젝트 표시 이름(#197). 비었거나 너무 길거나 제어·서식 문자가 있으면 null. */
+export function projectName(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const name = value.trim();
+  if (name === "" || Array.from(name).length > MAX_PROJECT_NAME || FORBIDDEN_IN_PROJECT.test(name)) {
+    return null;
+  }
+  return name;
+}
+
+/**
+ * 세션 표시 이름. 내 세션은 작업 폴더 이름(#181)이 먼저이고, 팀 화면에는 폴더 이름이 오지 않으므로
+ * 그 범위에 보이는 프로젝트 이름(#197)을 쓴다. `unnamed`이면 둘 다 없을 때 "(이름 없음)".
+ */
+export function sessionName(session: Pick<SessionState, "workspace_name" | "project_name">, unnamed = false): string | null {
+  return workspaceName(session.workspace_name) ?? projectName(session.project_name) ?? (unnamed ? UNNAMED_SESSION : null);
+}

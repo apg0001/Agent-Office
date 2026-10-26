@@ -423,6 +423,7 @@ def assert_world_intact(client: TestClient, engine: Engine, world: World) -> Non
         {
             "id": str(world.project_id),
             "display_name": VICTIM_PROJECT,
+            "origin": "manual",
             "shared_team_ids": [str(world.team_id)],
         }
     ]

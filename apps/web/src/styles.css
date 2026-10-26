@@ -633,6 +633,42 @@ code,
   background: #3a4370;
 }
 
+/* 팀 공유 범위(#197): 동의 상자와 팀별 설정. 픽셀 UI처럼 평면 색 + 2px 테두리. */
+.share-consent,
+.share-settings {
+  margin: 12px 0;
+  padding: 8px 10px;
+  border: 2px solid var(--ink);
+  background: var(--field);
+  box-shadow: inset 2px 2px 0 var(--hi), inset -2px -2px 0 var(--lo);
+}
+
+.share-consent p,
+.share-settings > p {
+  margin: 6px 0 0;
+}
+
+.share-settings legend {
+  padding: 0 4px;
+  color: var(--accent);
+}
+
+.project-checklist {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding-left: 20px;
+  list-style: square;
+}
+
+.origin-chip {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 2px solid var(--ink);
+  background: #2f4a3a;
+  font-size: 0.85em;
+}
+
 .members,
 .device-table {
   width: 100%;
