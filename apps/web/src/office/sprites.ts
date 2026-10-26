@@ -1,6 +1,6 @@
 /**
  * 픽셀 캐릭터(#46). 외부 에셋 없이 문자 격자로 그린다(라이선스·저장소 크기 부담 없음).
- * 리드와 하위 에이전트는 색이 아니라 모양(왕관·크기·넥타이)으로도 구분한다.
+ * 리드와 하위 에이전트는 색이 아니라 모양(왕관·크기·넥타이)으로, Claude·Codex는 모자·안경으로 구분한다.
  */
 
 import { mixHash } from "./presence";
@@ -46,11 +46,49 @@ const SUB_LEGS: Record<Frame, string[]> = {
   1: ["..pp..pp..", "..pp..pp..", "..oo..oo.."],
 };
 
-export function spriteRows(role: AgentState["role"], frame: Frame): string[] {
-  return role === "lead" ? [...LEAD_BODY, ...LEAD_LEGS[frame]] : [...SUB_BODY, ...SUB_LEGS[frame]];
+/** 도구별 겉모습(#192): Claude는 주황 모자, Codex는 검은 안경. 색이 아니라 모양으로도 구분한다. */
+export type Look = "claude" | "codex" | "plain";
+
+export function lookFor(provider: string | undefined): Look {
+  return provider === "claude" || provider === "codex" ? provider : "plain";
 }
 
-/** 어두운 바닥에서도 구분되는 옷 색 8개. 색만으로 의미를 전달하지 않는다(PC 구분 보조용). */
+/** 눈 줄(`e`가 있는 줄)을 안경으로: 두 눈을 g로 감싼다. */
+function withGlasses(row: string): string {
+  const chars = Array.from(row);
+  chars.forEach((c, i) => {
+    if (c === "e") {
+      if (chars[i - 1] === "s") chars[i - 1] = "g";
+      if (chars[i + 1] === "s") chars[i + 1] = "g";
+    }
+  });
+  return chars.join("");
+}
+
+function applyLook(rows: string[], look: Look): string[] {
+  if (look === "claude") {
+    // 머리카락 위 두 줄을 모자로.
+    let capped = 0;
+    return rows.map((row) => {
+      if (capped < 2 && row.includes("h") && !row.includes("s")) {
+        capped += 1;
+        return row.replaceAll("h", "a");
+      }
+      return row;
+    });
+  }
+  if (look === "codex") {
+    return rows.map((row) => (row.includes("e") ? withGlasses(row) : row));
+  }
+  return rows;
+}
+
+export function spriteRows(role: AgentState["role"], frame: Frame, look: Look = "plain"): string[] {
+  const rows = role === "lead" ? [...LEAD_BODY, ...LEAD_LEGS[frame]] : [...SUB_BODY, ...SUB_LEGS[frame]];
+  return applyLook(rows, look);
+}
+
+/** 어두운 바닥에서도 구분되는 옷 색 8개. 색만으로 의미를 전달하지 않는다(세션 구분 보조용). */
 export const SHIRT_COLORS = [
   0x3f6fd0, 0xd0603f, 0x3fa060, 0xa04fc0, 0xc0a03f, 0x3fa0b0, 0xc04f7f, 0x7f8f3f,
 ] as const;
@@ -63,11 +101,24 @@ const FIXED_COLORS: Record<string, number> = {
   b: 0xf0f0f0,
   p: 0x303848,
   o: 0x181818,
+  a: 0xe0783a,
+  g: 0x1a1a22,
 };
 
-/** 같은 PC의 캐릭터는 같은 옷 색. 장치 ID 해시로 정하므로 새로고침해도 같다. */
-export function shirtIndex(deviceId: string): number {
-  return mixHash(deviceId) % SHIRT_COLORS.length;
+/** 해시로 정한 옷 색(책상 번호가 없을 때). */
+export function shirtIndex(id: string): number {
+  return mixHash(id) % SHIRT_COLORS.length;
+}
+
+/**
+ * 세션 옷 색(#192). 서버가 활성 세션마다 겹치지 않게 주는 책상 번호를 쓰므로 동시에 일하는 세션 8개까지는
+ * 색이 모두 다르다(PC 해시를 쓰면 서로 다른 PC가 같은 색이 될 수 있었다). 같은 세션의 대장·하위는 같은 색.
+ */
+export function shirtForSession(session: { id: string; desk_slot: number | null } | undefined, fallback: string): number {
+  if (session && session.desk_slot !== null && session.desk_slot >= 0) {
+    return session.desk_slot % SHIRT_COLORS.length;
+  }
+  return shirtIndex(session?.id ?? fallback);
 }
 
 export function pixelColor(code: string, shirt: number): number | null {
@@ -80,8 +131,8 @@ export function pixelColor(code: string, shirt: number): number | null {
   return FIXED_COLORS[code] ?? null;
 }
 
-export function textureKey(role: AgentState["role"], shirt: number, frame: Frame): string {
-  return `agent-${role}-${shirt}-${frame}`;
+export function textureKey(role: AgentState["role"], shirt: number, frame: Frame, look: Look = "plain"): string {
+  return `agent-${role}-${look}-${shirt}-${frame}`;
 }
 
 /** 걷는 중이면 180ms마다 다리를 바꾼다. 서 있으면 첫 프레임. */

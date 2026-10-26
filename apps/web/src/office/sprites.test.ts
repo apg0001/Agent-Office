@@ -4,7 +4,9 @@ import { createSyntheticOffice } from "./synthetic";
 import {
   SHIRT_COLORS,
   labelFor,
+  lookFor,
   pixelColor,
+  shirtForSession,
   shirtIndex,
   spriteRows,
   textureKey,
@@ -46,7 +48,8 @@ describe("sprites", () => {
     for (const index of used) {
       expect(index).toBeLessThan(SHIRT_COLORS.length);
     }
-    expect(textureKey("lead", 3, 1)).toBe("agent-lead-3-1");
+    expect(textureKey("lead", 3, 1)).toBe("agent-lead-plain-3-1");
+    expect(textureKey("subagent", 2, 0, "codex")).toBe("agent-subagent-codex-2-0");
   });
 
   it("alternates legs only while walking", () => {
@@ -69,5 +72,35 @@ describe("labelFor", () => {
 
   it("labels subagents by role only", () => {
     expect(labelFor(sub, device("Work PC"))).toBe("하위");
+  });
+});
+
+describe("provider looks and session colors (#192)", () => {
+  it("gives Claude a cap and Codex glasses on every role and frame", () => {
+    for (const role of ["lead", "subagent"] as const) {
+      for (const frame of [0, 1] as const) {
+        const plain = spriteRows(role, frame).join("");
+        const claude = spriteRows(role, frame, "claude").join("");
+        const codex = spriteRows(role, frame, "codex").join("");
+        expect(plain).not.toMatch(/[ag]/);
+        expect(claude).toMatch(/a/);
+        expect(codex).toMatch(/g/);
+        expect(claude.length).toBe(plain.length);
+        expect(codex.length).toBe(plain.length);
+        expect(pixelColor("a", 0)).not.toBeNull();
+        expect(pixelColor("g", 0)).not.toBeNull();
+      }
+    }
+  });
+
+  it("colors active sessions by desk number so they never collide", () => {
+    const colors = Array.from({ length: SHIRT_COLORS.length }, (_, i) =>
+      shirtForSession({ id: `s-${i}`, desk_slot: i }, "x"),
+    );
+    expect(new Set(colors).size).toBe(SHIRT_COLORS.length);
+    expect(shirtForSession({ id: "s", desk_slot: null }, "x")).toBe(shirtForSession({ id: "s", desk_slot: null }, "y"));
+    expect(lookFor("claude")).toBe("claude");
+    expect(lookFor("codex")).toBe("codex");
+    expect(lookFor("unknown")).toBe("plain");
   });
 });
