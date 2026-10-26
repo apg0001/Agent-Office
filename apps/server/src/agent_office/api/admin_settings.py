@@ -241,6 +241,9 @@ def update_smtp(
     host = body.host.strip().lower()
     if any(ch.isspace() or ch in "/@" for ch in host):
         raise _bad("invalid_host")
+    # SMTP 로그인(AUTH)은 ASCII만 보낸다. 한글 실명 같은 이름은 시험·발송을 깨뜨린다(#198).
+    if body.username and not body.username.strip().isascii():
+        raise _bad("smtp_username_not_ascii")
     _store_secret(connection, instance.SMTP_PASSWORD_SECRET, body.password, admin)
     instance.put_value(
         connection,
