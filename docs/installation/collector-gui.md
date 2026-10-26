@@ -162,6 +162,13 @@ agent-office-collector-tray version
 | Fedora 등(rpm) | `agent-office-collector-<버전>.<arch>.rpm` + `agent-office-collector-desktop-…rpm` | 같음(의존 `gtk3`·`webkit2gtk4.1`, **미검증**) | `sudo dnf install` |
 
 - Windows는 WebView2 런타임이 필요합니다(Windows 11·최신 Windows 10에는 기본 포함). 없으면 GUI 창이 뜨지 않고 Microsoft의 Evergreen 런타임을 설치해야 합니다. 무인 설치는 `setup.exe /S`, 무인 제거는 `uninstall.exe /S`입니다. 업그레이드는 새 설치 프로그램을 실행합니다(실행 중인 트레이·GUI·Core 작업을 멈추고 바꾼 뒤 Core 로그온 작업이 있으면 다시 시작).
+- Linux는 **두 파일을 함께 `apt`로** 설치합니다. `dpkg -i`는 의존 패키지(같은 버전 Core, `libwebkit2gtk-4.1-0`)를 받지 않아 "dependency problems"로 멈춥니다(소유자 Ubuntu 22.04 실측). 그때도 아래 명령을 실행하면 설치가 끝납니다.
+
+  ```sh
+  cd ~/Downloads
+  sudo apt install ./agent-office-collector_<버전>_amd64.deb ./agent-office-collector-desktop_<버전>_amd64.deb
+  ```
+
 - Linux 데스크톱 패키지는 GTK3·webkit2gtk-4.1에 의존합니다(GUI는 `-tags webkit2_41`, #180부터 `ubuntu:22.04`에서 빌드해 glibc 2.35 이상이면 됨, [지원 배포판](#지원-linux-배포판데스크톱-패키지)). 헤드리스 서버는 Core 패키지만 설치합니다.
 - 설치 프로그램으로 설치한 Core는 Core만 바꾸는 자체 업데이트(`update apply`)를 `managed_by_package`로 거절합니다. 대신 트레이가 설치 파일 기반 승인형 업데이트를 합니다([승인형 자동 업데이트](#승인형-자동-업데이트)).
 
