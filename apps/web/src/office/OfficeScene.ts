@@ -23,7 +23,9 @@ import {
   type Frame,
   labelFor,
   pixelColor,
-  shirtIndex,
+  type Look,
+  lookFor,
+  shirtForSession,
   spriteRows,
   textureKey,
   walkFrame,
@@ -59,6 +61,7 @@ interface Actor {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Image;
   shirt: number;
+  look: Look;
   label: Phaser.GameObjects.Text;
   /** 이름표 아래 작은 세션 이름(#181). 서버가 주지 않으면 숨긴다. */
   workspace: Phaser.GameObjects.Text;
@@ -312,7 +315,7 @@ export class OfficeScene extends Phaser.Scene {
       if (actor.agent.turn_state !== "IDLE") {
         active.push(actor.position);
       }
-      const key = this.texture(actor.agent.role, actor.shirt, walkFrame(actor.path.length > 0, time));
+      const key = this.texture(actor.agent.role, actor.shirt, walkFrame(actor.path.length > 0, time), actor.look);
       if (actor.sprite.texture.key !== key) {
         actor.sprite.setTexture(key);
       }
@@ -340,10 +343,10 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   /** 역할·옷 색·프레임별 텍스처를 처음 필요할 때 한 번만 만든다. */
-  private texture(role: AgentState["role"], shirt: number, frame: Frame): string {
-    const key = textureKey(role, shirt, frame);
+  private texture(role: AgentState["role"], shirt: number, frame: Frame, look: Look): string {
+    const key = textureKey(role, shirt, frame, look);
     if (!this.textures.exists(key)) {
-      const rows = spriteRows(role, frame);
+      const rows = spriteRows(role, frame, look);
       const graphics = this.make.graphics({}, false);
       rows.forEach((row, y) => {
         Array.from(row).forEach((code, x) => {
@@ -365,8 +368,9 @@ export class OfficeScene extends Phaser.Scene {
     const container = this.add.container(0, 0);
     const session = this.state.sessions.find((s) => s.id === agent.session_id);
     const device = this.state.devices.find((d) => d.id === session?.device_id);
-    const shirt = shirtIndex(session?.device_id ?? agent.id);
-    const sprite = this.add.image(0, 0, this.texture(agent.role, shirt, 0)).setOrigin(0.5, 1);
+    const shirt = shirtForSession(session, agent.id);
+    const look = lookFor(session?.provider);
+    const sprite = this.add.image(0, 0, this.texture(agent.role, shirt, 0, look)).setOrigin(0.5, 1);
     const top = -sprite.height;
     // "!"는 관측된 승인 대기.
     const marker = this.add
@@ -418,6 +422,7 @@ export class OfficeScene extends Phaser.Scene {
       container,
       sprite,
       shirt,
+      look,
       label,
       workspace,
       marker,
