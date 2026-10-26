@@ -34,7 +34,7 @@ const (
 )
 
 // TestMain의 도우미 모드는 "GUI 프로세스" 역할이다. 실제 Core를 corecli로 부르며 트레이 상태를
-// 갱신하다가 부모가 SIGKILL로 죽이거나(crash) 트레이 "GUI 종료"로 스스로 끝난다(quit).
+// 갱신하다가 부모가 SIGKILL로 죽이거나(crash) 트레이 "종료"로 스스로 끝난다(quit).
 func TestMain(m *testing.M) {
 	if mode := os.Getenv(envHelper); mode != "" {
 		guiHelper(mode)
@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 func guiHelper(mode string) {
 	a := app.New(app.Options{Runner: &corecli.Runner{Bin: os.Getenv(envHelperBin), Env: os.Environ()}})
 	c := New(a, nil)
-	c.QuitGUI = func() { os.Exit(0) }
+	c.QuitTray = func() { os.Exit(0) }
 	v := c.Refresh()
 	fmt.Printf("ready %s\n", v.State)
 	if mode == "quit" {
@@ -139,7 +139,7 @@ func (c coreProc) alive() bool {
 }
 
 // GUI/Core 독립성(#43):
-//  1. 별도 프로세스로 실행 중인 Core는 GUI 프로세스가 비정상 종료(SIGKILL)하거나 트레이 "GUI 종료"로
+//  1. 별도 프로세스로 실행 중인 Core는 GUI 프로세스가 비정상 종료(SIGKILL)하거나 트레이 "종료"로
 //     끝나도 계속 실행·수집·전송한다.
 //  2. GUI(트레이 Controller)는 Core가 죽으면 core_stopped를 보이고, Core가 다시 시작하면 running으로 회복한다.
 //  3. 트레이 일시중지·재개와 GUI 로그아웃은 Core 명령으로만 동작하고, 로그아웃 뒤 Core는 전송을 멈춘다.

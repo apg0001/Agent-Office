@@ -3,12 +3,14 @@ package cli
 import (
 	"flag"
 	"io"
+	"os"
 	"time"
 
 	"github.com/apg0001/Agent-Office/collector/core/internal/adapter"
 	"github.com/apg0001/Agent-Office/collector/core/internal/adapter/claude"
 	"github.com/apg0001/Agent-Office/collector/core/internal/adapter/codex"
 	"github.com/apg0001/Agent-Office/collector/core/internal/config"
+	"github.com/apg0001/Agent-Office/collector/core/internal/paths"
 	"github.com/apg0001/Agent-Office/collector/core/internal/spool"
 )
 
@@ -52,6 +54,7 @@ func runHook(args []string, env Env) (code int) {
 		return ExitOK
 	}
 	rt := adapter.Runtime{Version: *version, OS: env.GOOS, Mode: *mode}
+	opts := hookOptions(cfg, dirs)
 	var c adapter.Candidate
 	switch provider {
 	case "claude":
@@ -60,13 +63,13 @@ func runHook(args []string, env Env) (code int) {
 		if rt.Version == "" {
 			rt.Version, rt.Mode = cfg.ClaudeVersion, cfg.ClaudeMode
 		}
-		c, err = claude.ParseHook(payload, rt)
+		c, err = claude.ParseHookWith(payload, rt, opts)
 	case "codex":
 		rt.Product = codex.ProductCLI
 		if *product == codex.ProductDesktop {
 			rt.Product = codex.ProductDesktop
 		}
-		c, err = codex.ParseHook(payload, rt)
+		c, err = codex.ParseHookWith(payload, rt, opts)
 	default:
 		return ExitOK
 	}
@@ -75,6 +78,22 @@ func runHook(args []string, env Env) (code int) {
 	}
 	_ = spool.Write(dirs.SpoolDir(), spool.FromCandidate(c, observedAt), 0)
 	return ExitOK
+}
+
+// hookOptions는 PC별 동의(#181)가 켜져 있을 때만 작업 폴더 이름을 읽게 한다. 홈 폴더 자체에서
+// 실행한 세션은 마지막 이름이 OS 사용자 이름이므로 보내지 않는다.
+func hookOptions(cfg config.Config, dirs paths.Dirs) adapter.HookOptions {
+	if !cfg.ShareWorkspaceName {
+		return adapter.HookOptions{}
+	}
+	opts := adapter.HookOptions{WorkspaceName: true}
+	if dirs.Home != "" {
+		opts.ExcludeDirs = append(opts.ExcludeDirs, dirs.Home)
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		opts.ExcludeDirs = append(opts.ExcludeDirs, home)
+	}
+	return opts
 }
 
 // readLimited는 최대 limit 바이트를 timeout 안에 읽는다. 넘거나 늦으면 false다.

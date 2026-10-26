@@ -6,9 +6,9 @@
 |---|---|
 | `keyring-secret-service.sh` | gnome-keyring(Secret Service)을 `dbus-run-session`에서 잠금 해제하고 `AGENT_OFFICE_TEST_REAL_KEYRING=1`로 Core 실제 저장소 테스트 실행 |
 | `autostart-validate.sh` | GUI 자동 시작 `.desktop`을 `desktop-file-validate`, plist를 `xmllint`로 검사 |
-| `tray-e2e.sh` | Xvfb·최소 StatusNotifierWatcher·합성 서버로 트레이 메뉴(일시중지·재개·창 열기·GUI 종료), 숨김 시작, 단일 실행, Core 재시작 회복, GUI 종료 뒤 수집 계속 확인 |
-| `tray-close.sh` | openbox·`wmctrl -c`로 창 닫기: Watcher 없으면 종료, 있으면 트레이로 숨김 |
-| `sni_watcher.py`, `sni_client.py` | `org.kde.StatusNotifierWatcher` 최소 구현과 dbusmenu 클라이언트(메뉴 목록·클릭·툴팁) |
+| `tray-e2e.sh` | (#43 당시, GUI 안 트레이) Xvfb·최소 StatusNotifierWatcher·합성 서버로 트레이 메뉴(일시중지·재개·창 열기·GUI 종료), 숨김 시작, 단일 실행, Core 재시작 회복, GUI 종료 뒤 수집 계속 확인. #159에서 트레이가 별도 도우미로 바뀌어 기록용으로만 남김 |
+| `tray-close.sh` | (#43 당시) openbox·`wmctrl -c`로 창 닫기: Watcher 없으면 종료, 있으면 트레이로 숨김. #159부터 창 닫기는 항상 GUI 종료 |
+| `sni_watcher.py`, `sni_client.py` | `org.kde.StatusNotifierWatcher` 최소 구현과 dbusmenu 클라이언트(메뉴 목록·클릭·툴팁). #159부터 CI `Cross-OS Collector`의 `Installer (ubuntu-24.04 deb)` 작업이 트레이 도우미 검증에 씀 |
 | `fake_office.py` | 등록·heartbeat·배치·폐기만 있는 합성 서버(127.0.0.1) |
 
 저장소 루트에서(Raspberry Pi 5 arm64에서 확인):

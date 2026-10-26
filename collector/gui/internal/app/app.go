@@ -44,8 +44,8 @@ type App struct {
 	opts Options
 	mu   sync.Mutex
 	ctx  context.Context
-	// hookPreviewed는 이번 실행에서 Hook 설치 미리보기를 보여 줬는지다(명시적 동의 흐름).
-	hookPreviewed bool
+	// hookPreviewed는 이번 실행에서 Hook 설치 미리보기를 보여 준 도구다(명시적 동의 흐름).
+	hookPreviewed map[string]bool
 }
 
 // New는 App을 만든다.
@@ -71,7 +71,7 @@ func New(o Options) *App {
 	if o.Registry == nil {
 		o.Registry = autostart.SystemRegistry()
 	}
-	return &App{opts: o, ctx: context.Background()}
+	return &App{opts: o, ctx: context.Background(), hookPreviewed: map[string]bool{}}
 }
 
 // OnStartup은 Wails OnStartup 콜백을 돌려준다(메서드가 아니어서 프런트엔드에 바인딩되지 않음).
@@ -217,6 +217,23 @@ func (a *App) RegistrationPageURL() (string, error) {
 	return u + DevicesPath, nil
 }
 
+// OfficeURL은 웹 사무실(서버 루트) 주소다. 트레이 "사무실 열기"가 쓴다(#159).
+func (a *App) OfficeURL() (string, error) {
+	path, err := a.prefsPath()
+	if err != nil {
+		return "", err
+	}
+	p, _ := prefs.Load(path)
+	if p.ServerURL == "" {
+		return "", errors.New("server_not_set")
+	}
+	u, err := corecli.NormalizeServerURL(p.ServerURL)
+	if err != nil {
+		return "", err
+	}
+	return u + "/", nil
+}
+
 // OpenRegistrationPage는 기본 브라우저에서 웹 로그인 뒤 등록 코드 발급 화면을 연다.
 // 로그인은 브라우저에서만 하며 GUI는 계정 비밀번호를 받지 않는다.
 func (a *App) OpenRegistrationPage() Result {
@@ -329,6 +346,46 @@ func (a *App) simple(okCode, failCode string, args ...string) Result {
 	return okResult(okCode, "")
 }
 
+// updateTimeout은 `update check`(manifest 내려받기·서명 확인) 상한이다. Core 내부 상한(2분)보다 조금 길다.
+const updateTimeout = 150 * time.Second
+
+// UpdateCheck는 Core `update check`로 새 버전이 있는지만 확인한다(적용하지 않음, #159 트레이).
+// 채널은 현재 Core 버전이 SemVer 사전 배포(`-beta.N` 등)면 beta, 아니면 stable이다.
+// Output은 Core가 출력한 첫 줄(버전·채널만 담음)이다.
+func (a *App) UpdateCheck() Result {
+	channel := a.updateChannel()
+	r, err := a.runner()
+	if err != nil {
+		return fail(errCode(err))
+	}
+	r.Timeout = updateTimeout
+	res, err := r.Run(a.context(), "", "update", "check", "--channel", channel)
+	if err != nil {
+		return fail(errCode(err))
+	}
+	if res.Exit != 0 {
+		out := fail("update_check_failed")
+		out.Output = firstLine(redact(res.Stderr))
+		return out
+	}
+	line := firstLine(res.Stdout)
+	if strings.Contains(line, "새 버전") {
+		return okResult("update_available", line)
+	}
+	return okResult("update_latest", line)
+}
+
+func firstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i]
+	}
+	if r := []rune(s); len(r) > 120 {
+		s = string(r[:120])
+	}
+	return strings.TrimSpace(s)
+}
+
 // --- 도구 탐지·Hook ---------------------------------------------------------------
 
 // ToolsView는 도구 탐지 화면 데이터다.
@@ -352,21 +409,31 @@ func (a *App) Tools() ToolsView {
 	return ToolsView{OK: true, OS: t.OS, Tools: t.Tools}
 }
 
-// HookPreview는 Claude Code Hook 설치 미리보기(`hooks install`, `--yes` 없음)다. 파일을 바꾸지 않는다.
-func (a *App) HookPreview() Result {
-	res := a.output("hook_preview", "hook_preview_failed", "hooks", "install", "--tool", "claude")
+// hookTools는 Core `hooks install`이 자동 설치를 지원하는 도구다(Codex는 #170부터).
+var hookTools = map[string]bool{"claude": true, "codex": true}
+
+// HookPreview는 도구(claude·codex)의 Hook 설치 미리보기(`hooks install`, `--yes` 없음)다. 파일을 바꾸지 않는다.
+func (a *App) HookPreview(tool string) Result {
+	if !hookTools[tool] {
+		return fail("invalid_tool")
+	}
+	res := a.output("hook_preview", "hook_preview_failed", "hooks", "install", "--tool", tool)
 	if res.OK {
 		a.mu.Lock()
-		a.hookPreviewed = true
+		a.hookPreviewed[tool] = true
 		a.mu.Unlock()
 	}
 	return res
 }
 
-// HookInstall은 미리보기를 본 뒤 사용자가 승인했을 때만 `hooks install --yes`를 실행한다.
-func (a *App) HookInstall(confirmed bool) Result {
+// HookInstall은 같은 도구의 미리보기를 본 뒤 사용자가 승인했을 때만 `hooks install --yes`를 실행한다.
+// Codex는 설치 뒤 Codex 안에서 사용자가 Hook을 신뢰해야 실행된다(Collector는 신뢰 상태를 쓰지 않음).
+func (a *App) HookInstall(tool string, confirmed bool) Result {
+	if !hookTools[tool] {
+		return fail("invalid_tool")
+	}
 	a.mu.Lock()
-	previewed := a.hookPreviewed
+	previewed := a.hookPreviewed[tool]
 	a.mu.Unlock()
 	if !confirmed {
 		return fail("confirmation_required")
@@ -374,24 +441,26 @@ func (a *App) HookInstall(confirmed bool) Result {
 	if !previewed {
 		return fail("preview_required")
 	}
-	res := a.output("hook_installed", "hook_install_failed", "hooks", "install", "--tool", "claude", "--yes")
+	done := "hook_installed"
+	if tool == "codex" {
+		done = "codex_hook_installed"
+	}
+	res := a.output(done, "hook_install_failed", "hooks", "install", "--tool", tool, "--yes")
 	a.mu.Lock()
-	a.hookPreviewed = false
+	delete(a.hookPreviewed, tool)
 	a.mu.Unlock()
 	return res
 }
 
-// HookUninstall은 승인 시 Agent Office 소유 Hook만 제거한다.
-func (a *App) HookUninstall(confirmed bool) Result {
+// HookUninstall은 승인 시 그 도구의 Agent Office 소유 Hook만 제거한다.
+func (a *App) HookUninstall(tool string, confirmed bool) Result {
+	if !hookTools[tool] {
+		return fail("invalid_tool")
+	}
 	if !confirmed {
 		return fail("confirmation_required")
 	}
-	return a.output("hook_uninstalled", "hook_uninstall_failed", "hooks", "uninstall", "--tool", "claude", "--yes")
-}
-
-// CodexHookPrint는 Codex용 hooks.json 항목 미리보기다(자동 설치 미지원).
-func (a *App) CodexHookPrint() Result {
-	return a.output("codex_hook_print", "hook_preview_failed", "hooks", "print", "--tool", "codex")
+	return a.output("hook_uninstalled", "hook_uninstall_failed", "hooks", "uninstall", "--tool", tool, "--yes")
 }
 
 // --- 자동 시작 ---------------------------------------------------------------------
@@ -483,10 +552,15 @@ func (a *App) guiExecutable() (string, error) {
 	return filepath.Abs(exe)
 }
 
+// autostartDef는 로그인 시 띄울 실행 파일 정의다. 설치 배치에 트레이 도우미가 있으면 트레이를
+// 띄우고(#159, 창은 트레이 "설정"으로 연다), 없으면(개발 빌드) GUI를 띄운다.
 func (a *App) autostartDef() (autostart.Definition, error) {
 	exe, err := a.guiExecutable()
 	if err != nil {
 		return autostart.Definition{}, autostart.ErrInvalidExecutable
+	}
+	if tray, ok := corecli.FindSibling(exe, a.opts.GOOS, corecli.TrayName); ok {
+		exe = tray
 	}
 	home, _ := a.opts.UserHomeDir()
 	return autostart.Generate(autostart.Params{GOOS: a.opts.GOOS, Exe: exe, Home: home, Getenv: a.opts.Getenv})

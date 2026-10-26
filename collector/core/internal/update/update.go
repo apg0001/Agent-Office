@@ -63,12 +63,15 @@ type Artifact struct {
 	Format string `json:"format"`
 }
 
+// Manifest는 채널 manifest다. schema 1에 설치 파일 목록(installers, #180)을 더했다. 이전 Core는 모르는 키를
+// 무시하므로 같은 schema를 쓴다(서명은 manifest 바이트 전체에 대한 것이라 installers도 함께 보호된다).
 type Manifest struct {
-	Schema      int        `json:"schema"`
-	Channel     string     `json:"channel"`
-	Version     string     `json:"version"`
-	PublishedAt time.Time  `json:"published_at"`
-	Artifacts   []Artifact `json:"artifacts"`
+	Schema      int         `json:"schema"`
+	Channel     string      `json:"channel"`
+	Version     string      `json:"version"`
+	PublishedAt time.Time   `json:"published_at"`
+	Artifacts   []Artifact  `json:"artifacts"`
+	Installers  []Installer `json:"installers,omitempty"`
 }
 
 // ParseKeys는 쉼표로 구분한 base64 공개 키를 읽는다. 잘못된 키는 버린다.
@@ -197,6 +200,27 @@ func (o Options) checkURL(raw string) error {
 	return fail("insecure_url")
 }
 
+// maxRedirects는 업데이트 다운로드가 따라갈 최대 리다이렉트 수다.
+const maxRedirects = 5
+
+// redirectingClient는 o.Client 설정을 쓰되 리다이렉트를 따라가는 복사본이다. GitHub Release
+// 다운로드는 저장소 주소로 302를 돌려준다. 공통 클라이언트는 장치 토큰이 다른 호스트로 새지 않게
+// 리다이렉트를 막지만, 업데이트 요청에는 인증 헤더가 없다. 각 단계 주소도 https(또는 허용한
+// 루프백)인지 다시 검사한다.
+func (o Options) redirectingClient() *http.Client {
+	c := http.Client{}
+	if o.Client != nil {
+		c = *o.Client
+	}
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= maxRedirects {
+			return fail("too_many_redirects")
+		}
+		return o.checkURL(req.URL.String())
+	}
+	return &c
+}
+
 func (o Options) get(ctx context.Context, raw string, limit int64) ([]byte, error) {
 	if err := o.checkURL(raw); err != nil {
 		return nil, err
@@ -205,8 +229,15 @@ func (o Options) get(ctx context.Context, raw string, limit int64) ([]byte, erro
 	if err != nil {
 		return nil, fail("bad_url")
 	}
-	resp, err := o.Client.Do(req)
+	resp, err := o.redirectingClient().Do(req)
 	if err != nil {
+		var uerr *url.Error
+		if errors.As(err, &uerr) {
+			var e *Error
+			if errors.As(uerr.Err, &e) {
+				return nil, e
+			}
+		}
 		return nil, fail("download_failed")
 	}
 	defer resp.Body.Close()
@@ -223,29 +254,43 @@ func (o Options) get(ctx context.Context, raw string, limit int64) ([]byte, erro
 	return data, nil
 }
 
-// Check는 manifest와 `.sig`를 받아 검증하고, 현재보다 새 버전이 있으면 돌려준다(없으면 nil).
-func Check(ctx context.Context, o Options) (*Available, error) {
+// Fetch는 manifest와 `.sig`를 받아 서명·형식·채널을 검증한다.
+func Fetch(ctx context.Context, o Options) (Manifest, error) {
 	manifest, err := o.get(ctx, o.ManifestURL, MaxManifestBytes)
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
 	sig, err := o.get(ctx, o.ManifestURL+".sig", 1024)
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
 	m, err := Verify(manifest, string(sig), o.Keys)
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
 	if m.Channel != o.Channel {
-		return nil, fail("channel_mismatch")
+		return Manifest{}, fail("channel_mismatch")
 	}
+	return m, nil
+}
+
+// Newer는 manifest 버전이 현재보다 높은지다.
+func (o Options) Newer(m Manifest) (bool, error) {
 	cmp, ok := CompareSemver(m.Version, o.Current)
 	if !ok {
-		return nil, fail("bad_version")
+		return false, fail("bad_version")
 	}
-	if cmp <= 0 {
-		return nil, nil
+	return cmp > 0, nil
+}
+
+// Check는 manifest와 `.sig`를 받아 검증하고, 현재보다 새 버전이 있으면 돌려준다(없으면 nil).
+func Check(ctx context.Context, o Options) (*Available, error) {
+	m, err := Fetch(ctx, o)
+	if err != nil {
+		return nil, err
+	}
+	if newer, err := o.Newer(m); err != nil || !newer {
+		return nil, err
 	}
 	for _, a := range m.Artifacts {
 		if a.OS == o.GOOS && a.Arch == o.GOARCH {
@@ -368,10 +413,29 @@ type Hooks struct {
 	Healthy func() error
 }
 
+// Managed는 Core 실행 파일이 패키지 관리자(deb·rpm, /usr/bin) 또는 데스크톱 설치 프로그램(#159: macOS
+// 앱 번들, Windows 설치기·Linux 데스크톱 패키지처럼 트레이 도우미가 같은 폴더에 있음)으로 설치됐는지다.
+// 이때 Core만 바꾸면 GUI·트레이와 버전이 어긋나므로 자체 업데이트를 하지 않는다.
+func Managed(current string) bool {
+	if strings.HasPrefix(current, "/usr/bin/") || strings.HasPrefix(current, "/usr/sbin/") {
+		return true
+	}
+	if strings.Contains(filepath.ToSlash(current), ".app/Contents/MacOS/") {
+		return true
+	}
+	dir := filepath.Dir(current)
+	for _, n := range []string{"agent-office-collector-tray", "agent-office-collector-tray.exe"} {
+		if fi, err := os.Stat(filepath.Join(dir, n)); err == nil && fi.Mode().IsRegular() {
+			return true
+		}
+	}
+	return false
+}
+
 // Apply는 newBinary를 current 자리로 원자적으로 바꾼다. 실패하면 되돌린다.
 func Apply(current, newBinary, expectVersion string, h Hooks) error {
-	if strings.HasPrefix(current, "/usr/bin/") || strings.HasPrefix(current, "/usr/sbin/") {
-		// 패키지 관리자가 관리하는 파일은 패키지로 업데이트한다.
+	if Managed(current) {
+		// 패키지 관리자·설치 프로그램이 관리하는 파일은 그 수단으로 업데이트한다.
 		return fail("managed_by_package")
 	}
 	out, err := h.Version(newBinary)

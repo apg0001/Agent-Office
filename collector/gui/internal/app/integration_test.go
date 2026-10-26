@@ -129,17 +129,17 @@ func TestRealCoreContract(t *testing.T) {
 	if c.Tool != "claude" || !c.Detected || c.Version != "2.1.308" || c.HookState != "not_installed" || c.Foreign != 1 {
 		t.Errorf("claude tool: %+v", c)
 	}
-	if tools.Tools[1].Detected || tools.Tools[1].HookInstall != "print_only" {
+	if tools.Tools[1].Detected || tools.Tools[1].HookInstall != "auto" { // #170: Codex hooks install 지원
 		t.Errorf("codex tool: %+v", tools.Tools[1])
 	}
 
-	if p := a.HookPreview(); !p.OK || !strings.Contains(p.Output, "+ SessionStart") {
+	if p := a.HookPreview("claude"); !p.OK || !strings.Contains(p.Output, "+ SessionStart") {
 		t.Fatalf("hook preview: %+v", p)
 	}
 	if b, _ := os.ReadFile(settings); string(b) != userSettings {
 		t.Fatal("preview modified settings.json")
 	}
-	if r := a.HookInstall(true); !r.OK {
+	if r := a.HookInstall("claude", true); !r.OK {
 		t.Fatalf("hook install: %+v", r)
 	}
 	b, _ := os.ReadFile(settings)
@@ -149,11 +149,15 @@ func TestRealCoreContract(t *testing.T) {
 	if tools := a.Tools(); tools.Tools[0].HookState != "installed" {
 		t.Errorf("hook state after install: %+v", tools.Tools[0])
 	}
-	if r := a.HookUninstall(true); !r.OK {
+	if r := a.HookUninstall("claude", true); !r.OK {
 		t.Errorf("hook uninstall: %+v", r)
 	}
-	if r := a.CodexHookPrint(); !r.OK || !json.Valid([]byte(r.Output)) {
-		t.Errorf("codex print: %+v", r)
+	// Codex는 설정 폴더(~/.codex)가 있어야 설치한다(사용자가 Codex를 한 번 실행한 상태).
+	if err := os.MkdirAll(filepath.Join(home, ".codex"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if r := a.HookPreview("codex"); !r.OK || !strings.Contains(r.Output, "SessionStart") {
+		t.Errorf("codex preview: %+v", r)
 	}
 
 	if runtime.GOOS == "linux" {

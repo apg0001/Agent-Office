@@ -42,7 +42,7 @@ Codex·Claude Hook stdin과 Claude transcript JSONL 한 줄을 제공자 중립 
 | `UserPromptSubmit` | `turn.started`(키 `prompt_id`) | `turn.started`(키 `turn_id`) |
 | `Stop` | `turn.completed`(키 없음) | 같음 |
 | `PreToolUse` | `tool.started` | 같음 |
-| `PostToolUse` | `tool.completed` | Desktop 런타임만 `tool.completed`. CLI·미상 런타임은 `unknown`(CLI exec 미관측, #17) |
+| `PostToolUse` | `tool.completed` | Desktop 런타임과 PostToolUse를 관측한 CLI 실측 대상(#170 `0.163.0` `linux` `exec`)과 정확히 같은 런타임만 `tool.completed`. 그 밖의 CLI·미상 런타임은 `unknown`(#17 Windows `0.162` exec 미관측) |
 | `PostToolUseFailure` | `tool.failed`(미관측이라 `unverified`) | 매핑 없음 → `unknown` |
 | `PermissionRequest` | `approval.requested`(키 없음) | 같음 |
 | `SubagentStart` / `SubagentStop` | `agent.started` / `agent.completed`(키 `agent_id`) | 같음 |
@@ -93,10 +93,12 @@ Hook payload에는 도구 버전이 없으므로 호출자가 로컬에서 감�
 |---|---|---|
 | `claude-code` `2.1.308` `linux` `print`(-p) | `verified` | Session·Prompt·Pre/Post·Subagent·Permission·Stop·End, transcript |
 | `codex-cli` `0.162.0-alpha.17.2` `windows` `exec` | `verified` | SessionStart, UserPromptSubmit, PreToolUse, Stop, SessionEnd |
+| `codex-cli` `0.163.0` `linux` `exec` | `verified`(4회, #170) | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop, SessionEnd. 사용자 범위 `$CODEX_HOME/hooks.json` + TUI 신뢰. [실측](../verification/codex-user-hooks.md) |
 | `codex-desktop` `26.1007.2314.0` `windows` `desktop` | `partial`(1회 실측) | UserPromptSubmit, Pre/PostToolUse, PermissionRequest, Subagent*, Stop, SessionEnd |
 
 - 런타임이 목록과 정확히 일치하지 않거나 그 런타임에서 관측되지 않은 이벤트는 `Support=unverified`입니다. 파싱은 같은 규칙으로 안전하게 하지만 지원으로 주장하지 않습니다.
 - `Confidence`는 `verified`만 `observed`, `partial`·`unverified`는 `inferred`입니다. 대화형 TUI, macOS·Windows Claude, 다른 버전은 모두 `inferred`가 됩니다.
+- `hook codex`는 Codex 버전을 기록하지 않으므로(payload에 버전·실행 모드 없음) 실제 수집 런타임은 버전이 비어 `unverified` → `inferred`이고 CLI `PostToolUse`는 `unknown`입니다. `hooks status`의 버전 판정만 위 표를 씁니다.
 - 새 버전을 지원하려면 실측 보고서를 남긴 뒤 `VerifiedTargets`에 추가하고 호환성 행렬을 갱신합니다.
 
 ## 중복 제거와 참조 구현 일치
@@ -131,3 +133,11 @@ Hook payload에는 도구 버전이 없으므로 호출자가 로컬에서 감�
 - #31: Hook 설치·버전 감지로 `Runtime` 채우기
 - #32: 후보 → 이벤트 v1 정규화는 [Collector 이벤트 정규화](collector-normalize.md)의 `internal/normalize`가 맡음
 - #33: SQLite 큐에 키 집합·무작위 `event_id` 영속화
+
+## 작업 폴더 이름(#181)
+
+- `claude.ParseHookWith`·`codex.ParseHookWith`는 `adapter.HookOptions{WorkspaceName: true}`일 때만 Hook payload의 `cwd`를 문자열로 읽고 `adapter.WorkspaceName`으로 마지막 이름만 정리해 `Candidate.WorkspaceName`에 담습니다. `ParseHook`(옵션 없음)은 읽지 않습니다. 알 수 없는 이벤트 후보에는 담지 않습니다.
+- `hook` 명령은 설정 `share_workspace_name`(PC별 동의, 기본 false)이 켜져 있을 때만 옵션을 켜고, 사용자 홈 폴더는 제외 목록으로 넘깁니다.
+- spool 레코드(`workspace_name`)와 Normalizer는 `adapter.ValidWorkspaceName`으로 다시 검증하고, 맞지 않으면 이름 없이 이벤트를 만듭니다(2차 방어선). 이벤트 id·중복 제거 키에는 영향을 주지 않습니다.
+- transcript JSONL의 `cwd`는 읽지 않습니다. 같은 턴을 transcript가 먼저 보고하면 그 `turn.started`에는 이름이 없고, 같은 세션의 다른 Hook 이벤트가 이름을 전달합니다.
+- 테스트: 동의가 꺼져 있으면 상위 폴더 sentinel과 폴더 이름이 spool·큐 DB·이벤트 바이트에 없음, 켜져 있으면 마지막 이름만 있음(`cli/workspace_test.go`), 정리 규칙과 스키마 일치(`adapter/workspace_test.go`, `normalize/schema_test.go`).

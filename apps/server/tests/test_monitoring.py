@@ -43,7 +43,7 @@ def test_ready_reports_database_and_migrations(client: TestClient, engine: Engin
 
 
 def test_expected_revision_is_the_package_head() -> None:
-    assert monitoring.expected_revision() == "0007"
+    assert monitoring.expected_revision() == "0008"
 
 
 def admin_headers(engine: Engine, role: str = "SUPER_ADMIN") -> dict[str, str]:
@@ -73,7 +73,7 @@ def test_metrics_for_admins_only_without_identifiers(
     assert body["collection"]["devices"] == 1 and body["collection"]["events_last_hour"] == 1
     assert body["collection"]["open_sessions"] == 1
     assert body["collection"]["ingest_lag_p95_seconds"] >= 0
-    assert body["database"]["migration"] == "0007" and body["database"]["size_bytes"] > 0
+    assert body["database"]["migration"] == "0008" and body["database"]["size_bytes"] > 0
     assert body["host"]["disk"]["total_bytes"] > 0
     assert body["external_heartbeat"]["configured"] is True
     dumped = json.dumps(body)
@@ -146,7 +146,7 @@ def test_security_checks_and_deployment(
         "setup_incomplete",
     } <= codes
     assert body["deployment"]["version"] == "1.2.3"
-    assert body["deployment"]["migration_expected"] == "0007"
+    assert body["deployment"]["migration_expected"] == "0008"
     assert "office.example" not in json.dumps(body["security"])
 
     key = base64.urlsafe_b64encode(os.urandom(32)).decode()

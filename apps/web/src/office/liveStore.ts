@@ -4,6 +4,7 @@
  */
 
 import type { AgentState, DeviceState, OfficeState, SessionState } from "./types";
+import { withWorkspaceName } from "./workspace";
 
 export interface SnapshotMessage {
   type: "snapshot";
@@ -23,7 +24,7 @@ export function applySnapshot(message: SnapshotMessage): OfficeState {
   return {
     source: "server",
     devices: message.devices,
-    sessions: message.sessions,
+    sessions: message.sessions.map(withWorkspaceName),
     agents: message.agents,
   };
 }
@@ -51,7 +52,7 @@ export function applyDelta(state: OfficeState, message: DeltaMessage): OfficeSta
   return {
     source: "server",
     devices: [...devices.values()],
-    sessions: mergeBySeq(state.sessions, message.sessions),
+    sessions: mergeBySeq(state.sessions, message.sessions.map(withWorkspaceName)),
     agents: mergeBySeq(state.agents, message.agents),
   };
 }

@@ -62,7 +62,15 @@ export interface AgentOfficeEventV1 {
   sequence: number;
   /** plan.updated에서만: 계획 단계 상태만 순서대로(#38). 단계 문장은 담지 않는다. */
   plan_steps?: PlanStepStatus[];
+  /**
+   * 작업 폴더의 마지막 이름만(#181, 1..64자). 사용자가 PC별로 켰을 때만 온다.
+   * 경로 구분자(`/`, `\\`)와 제어 문자는 담지 않는다. 이전 Collector는 보내지 않는다.
+   */
+  workspace_name?: string;
 }
+
+/** 이벤트 v1 `workspace_name` 최대 길이(코드 포인트). */
+export const WORKSPACE_NAME_MAX_LENGTH = 64;
 
 export interface CollectorEventBatchRequestV1 {
   schema_version: typeof EVENT_SCHEMA_VERSION;

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { assignSeats, deskRowsFor, targetTile, zoneForActivity } from "./behavior";
-import { contains, createDefaultOffice, isWalkable, tileAt, walkableTiles } from "./grid";
+import { assignSeats, deskRowsFor, spreadTargets, targetTile, zoneForActivity } from "./behavior";
+import { ZONE_COLORS, ZONE_GUIDE, contains, createDefaultOffice, isWalkable, tileAt, walkableTiles } from "./grid";
 import { depthOf, gridToScreen, screenToGrid, tileDiamond } from "./iso";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
 import type { ZoneKind } from "./grid";
+import type { Activity } from "./types";
 
 describe("isometric projection", () => {
   it("round-trips grid points", () => {
@@ -87,6 +88,12 @@ describe("behavior", () => {
     const seat = seats.get(lead!.session_id)!;
     expect(targetTile(map, lead!, seats)).toEqual(seat);
     expect(targetTile(map, child!, seats)).toEqual({ x: seat.x + 1, y: seat.y });
+    // 둘째·셋째 하위 에이전트는 다른 칸에 선다(#182).
+    const spots = [0, 1, 2, 3].map((i) => targetTile(map, child!, seats, "desk", 0, i));
+    expect(new Set(spots.map((p) => `${p.x},${p.y}`)).size).toBe(4);
+    for (const spot of spots) {
+      expect(isWalkable(map, spot)).toBe(true);
+    }
   });
 
   it("uses the server desk slot and leaves returned desks empty", () => {
@@ -130,5 +137,48 @@ describe("synthetic adapter", () => {
   it("refuses to advance server data", () => {
     const server = { ...createSyntheticOffice({ sessions: 1, subagentsPerSession: 0 }), source: "server" as const };
     expect(() => advanceSynthetic(server, 1)).toThrow();
+  });
+});
+
+describe("zone guide (#160)", () => {
+  it("explains every zone a character can be sent to, with the map color", () => {
+    const activities: Activity[] = [
+      "reading", "browsing", "coding", "testing", "planning", "delegating",
+      "reporting", "thinking", "waiting_user", "idle", "unknown",
+    ];
+    const reachable = new Set(
+      activities.flatMap((a) => [zoneForActivity(a, "WORKING"), zoneForActivity(a, "IDLE")]),
+    );
+    const explained = new Set(ZONE_GUIDE.map((g) => g.zone));
+    for (const zone of reachable) {
+      expect(explained.has(zone), zone).toBe(true);
+      expect(ZONE_COLORS[zone]).toBeTypeOf("number");
+    }
+  });
+});
+
+describe("no overlapping characters (#194)", () => {
+  const map = createDefaultOffice(2);
+
+  it("gives every character its own tile, keeps fixed seats and stays in the wanted zone", () => {
+    const lounge = walkableTiles(map, "lounge")[0]!;
+    const seat = map.seats[0]!;
+    const wants = [
+      ...Array.from({ length: 6 }, (_, i) => ({ id: `idle-${i}`, point: lounge, fixed: false })),
+      { id: "lead", point: seat, fixed: true },
+      { id: "visitor", point: seat, fixed: false },
+    ];
+    const targets = spreadTargets(map, wants);
+    const keys = [...targets.values()].map((p) => `${p.x},${p.y}`);
+    expect(new Set(keys).size).toBe(wants.length);
+    expect(targets.get("lead")).toEqual(seat);
+    for (let i = 0; i < 6; i += 1) {
+      const p = targets.get(`idle-${i}`)!;
+      expect(tileAt(map, p)?.zone).toBe("lounge");
+      expect(isWalkable(map, p)).toBe(true);
+    }
+    expect(targets.get("visitor")).not.toEqual(seat);
+    // 같은 입력이면 같은 결과(매 프레임 흔들리지 않음).
+    expect(spreadTargets(map, [...wants].reverse())).toEqual(targets);
   });
 });

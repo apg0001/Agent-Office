@@ -35,17 +35,18 @@ function showOutput(id, text) {
 
 // --- 페이지 전환 ---------------------------------------------------------------
 const loaders = {};
-document.querySelectorAll("nav button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b === btn));
-    document.querySelectorAll(".page").forEach((p) => {
-      p.hidden = p.id !== "page-" + btn.dataset.page;
-    });
-    const load = loaders[btn.dataset.page];
-    if (load) {
-      void load();
-    }
+function openPage(page) {
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
+  document.querySelectorAll(".page").forEach((p) => {
+    p.hidden = p.id !== "page-" + page;
   });
+  const load = loaders[page];
+  if (load) {
+    void load();
+  }
+}
+document.querySelectorAll("nav button").forEach((btn) => {
+  btn.addEventListener("click", () => openPage(btn.dataset.page));
 });
 
 // --- 계정·서버 --------------------------------------------------------------------
@@ -152,19 +153,27 @@ async function loadTools() {
 loaders.tools = loadTools;
 $("tools-refresh").addEventListener("click", () => void loadTools());
 
+const hookTool = () => $("hook-tool").value;
+const TOOL_NAMES = { claude: "Claude Code", codex: "Codex" };
+
+$("hook-tool").addEventListener("change", () => {
+  $("hook-install").disabled = true;
+});
+
 $("hook-preview").addEventListener("click", async () => {
-  const r = await call("HookPreview");
+  const r = await call("HookPreview", hookTool());
   show("hook-result", r);
   showOutput("hook-output", r.output);
   $("hook-install").disabled = !r.ok;
 });
 
 $("hook-install").addEventListener("click", async () => {
-  const yes = window.confirm("미리보기의 변경을 Claude Code 사용자 설정에 적용합니다. 원본은 백업됩니다. 계속할까요?");
+  const tool = hookTool();
+  const yes = window.confirm("미리보기의 변경을 " + TOOL_NAMES[tool] + " 사용자 설정에 적용합니다. 원본은 백업됩니다. 계속할까요?");
   if (!yes) {
     return;
   }
-  const r = await call("HookInstall", true);
+  const r = await call("HookInstall", tool, true);
   show("hook-result", r);
   showOutput("hook-output", r.output);
   $("hook-install").disabled = true;
@@ -172,19 +181,14 @@ $("hook-install").addEventListener("click", async () => {
 });
 
 $("hook-uninstall").addEventListener("click", async () => {
-  if (!window.confirm("Agent Office가 추가한 Hook만 제거합니다. 계속할까요?")) {
+  const tool = hookTool();
+  if (!window.confirm(TOOL_NAMES[tool] + "에서 Agent Office가 추가한 Hook만 제거합니다. 계속할까요?")) {
     return;
   }
-  const r = await call("HookUninstall", true);
+  const r = await call("HookUninstall", tool, true);
   show("hook-result", r);
   showOutput("hook-output", r.output);
   void loadTools();
-});
-
-$("codex-print").addEventListener("click", async () => {
-  const r = await call("CodexHookPrint");
-  show("hook-result", r);
-  showOutput("hook-output", r.output);
 });
 
 // --- 자동 시작 ---------------------------------------------------------------------
@@ -220,7 +224,7 @@ async function loadGUIAutostart() {
 loaders.service = loadGUIAutostart;
 
 $("gui-autostart-install").addEventListener("click", async () => {
-  if (!window.confirm("로그인 시 GUI(트레이)를 자동으로 띄우는 사용자 정의를 설치합니다. 계속할까요?")) {
+  if (!window.confirm("로그인 시 트레이 아이콘(agent-office-collector-tray)을 자동으로 띄우는 사용자 정의를 설치합니다. 계속할까요?")) {
     return;
   }
   show("gui-autostart-result", await call("GUIAutostartInstall", true));

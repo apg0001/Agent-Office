@@ -1,6 +1,6 @@
 # ADR-0004: 장치 토큰은 go-keyring으로 OS 보안 저장소에, 트레이는 Linux에서만 fyne.io/systray로
 
-- 상태: 제안됨(#41·#43 구현 근거, 소유자 검토 대기)
+- 상태: 제안됨(#41·#43 구현 근거, 소유자 검토 대기). 결정 5~7(트레이 Linux 전용, 창 닫기 숨기기, GUI 자동 시작)은 [ADR-0005](0005-collector-tray-helper-installers.md)(#159)가 대체합니다.
 - 날짜: 2026-10-24
 - 관련 이슈: #41, #43. [ADR-0003](0003-collector-gui-wails-v2.md) 결정 5를 구체화합니다.
 

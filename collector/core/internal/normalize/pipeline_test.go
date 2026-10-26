@@ -261,6 +261,12 @@ func TestCodexCLINeverEmitsToolCompleted(t *testing.T) {
 	if recs := p.Hook(adapter.ProviderCodex, desktop, payload, observed); len(recs) != 1 || recs[0].Event.EventType != "tool.completed" || recs[0].Event.Confidence != "inferred" {
 		t.Fatalf("desktop: %+v", recs)
 	}
+	// #170: Linux 0.163.0 exec는 PostToolUse를 반복 관측했다(버전·OS·모드가 정확히 같을 때만).
+	linux := codex.VerifiedTargets[2].Runtime
+	p = NewPipeline(newNormalizer(t, Options{}))
+	if recs := p.Hook(adapter.ProviderCodex, linux, payload, observed); len(recs) != 1 || recs[0].Event.EventType != "tool.completed" || recs[0].Event.Confidence != "observed" {
+		t.Fatalf("linux 0.163.0: %+v", recs)
+	}
 	// 어댑터가 바뀌어 CLI 완료 후보를 내도 조립 단계에서 막는다.
 	c := adapter.Candidate{Provider: adapter.ProviderCodex, Source: adapter.SourceHook, EventType: adapter.EventToolCompleted,
 		SessionRef: "s1", ToolUseRef: "t1", Activity: adapter.ActivityCoding, Confidence: adapter.ConfidenceObserved, Support: adapter.SupportVerified}

@@ -1,6 +1,10 @@
 name: Cross-OS Collector
 
 # macOS·Windows 실제 러너에서 Collector Core·GUI를 검증한다(#40~#43).
+# 설치 프로그램(#159): Windows NSIS·Linux deb는 Linux 컨테이너(데스크톱 GUI는 ubuntu:22.04 기반)에서, macOS .pkg는
+# macOS 러너에서 만들고 각 OS 러너(Linux는 Ubuntu 22.04·24.04 amd64·arm64 러너 + Xvfb + 최소 StatusNotifierWatcher)에서
+# 설치 → 트레이 → 제거를 실측한다. #180: 이전 빌드 설치 → 로컬 서명 manifest → 트레이 승인 → 업데이트·후처리,
+# Windows·macOS는 명령행 설치 → 설치 프로그램 이전도 실측한다.
 # 러너는 일회용이라 실제 사용자 위치(OS 보안 저장소, 자동 시작, ~/.claude/settings.json)에 쓰고 지운다.
 on:
   pull_request:
@@ -8,12 +12,14 @@ on:
     paths:
       - "collector/**"
       - "tests/cross_os/**"
+      - "tests/poc/collector/desktop/**"
       - ".github/workflows/cross-os.yml"
   push:
     branches: [develop]
     paths:
       - "collector/**"
       - "tests/cross_os/**"
+      - "tests/poc/collector/desktop/**"
       - ".github/workflows/cross-os.yml"
   workflow_dispatch:
 
@@ -115,3 +121,249 @@ jobs:
             u="$RUNNER_TEMP/ao/agent-office-collector-uninstall"
           fi
           python tests/cross_os/collector_smoke.py "$RUNNER_TEMP/ao/agent-office-collector$EXE" "$u"
+
+  # 설치 프로그램 빌드(#159) + 업데이트 실측용 새 버전·서명 manifest(#180).
+  # 업데이트 서명 키는 이 작업에서 만든 일회용 테스트 키다(실제 배포 키·비밀 값을 쓰지 않음). 공개 키만 빌드에 넣고
+  # 비밀 키는 manifest 서명 직후 지운다. manifest의 설치 파일 주소는 각 OS 러너의 127.0.0.1:8765 테스트 서버다.
+  installer-build:
+    name: Installer build (Windows NSIS, Linux deb amd64)
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_number }}
+      NEW_VERSION: 0.0.1-ci.${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test-only update signing key
+        run: collector/packaging/ci-test-key.sh "$RUNNER_TEMP/key"
+      - name: Windows installer (cross-built in Docker, old and new)
+        run: |
+          collector/packaging/build-windows-installer.sh "$VERSION" "$RUNNER_TEMP/dist"
+          collector/packaging/build-windows-installer.sh "$NEW_VERSION" "$RUNNER_TEMP/update"
+      - name: Linux Core and desktop packages (amd64, Ubuntu 22.04 base, old and new)
+        run: |
+          collector/packaging/build.sh "$VERSION" "$RUNNER_TEMP/core" >/dev/null
+          cp "$RUNNER_TEMP"/core/agent-office-collector_*_amd64.deb "$RUNNER_TEMP"/core/agent-office-collector-"$VERSION"-windows-amd64.zip "$RUNNER_TEMP/dist/"
+          collector/packaging/build-desktop-linux.sh "$VERSION" "$RUNNER_TEMP/dist"
+          collector/packaging/build.sh "$NEW_VERSION" "$RUNNER_TEMP/core-new" >/dev/null
+          cp "$RUNNER_TEMP"/core-new/agent-office-collector_*_amd64.deb "$RUNNER_TEMP/update/"
+          collector/packaging/build-desktop-linux.sh "$NEW_VERSION" "$RUNNER_TEMP/update"
+          dpkg-deb -I "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_amd64.deb | sed -n '/Depends/p'
+          dpkg-deb -c "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_amd64.deb | awk '{print $6}'
+      - name: Static Core and tray (no glibc requirement)
+        run: |
+          mkdir -p "$RUNNER_TEMP/x" && dpkg-deb -x "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_amd64.deb "$RUNNER_TEMP/x"
+          dpkg-deb -x "$RUNNER_TEMP"/dist/agent-office-collector_*_amd64.deb "$RUNNER_TEMP/x"
+          for b in agent-office-collector agent-office-collector-tray; do
+            file "$RUNNER_TEMP/x/usr/bin/$b" | grep -q "statically linked"
+            if ldd "$RUNNER_TEMP/x/usr/bin/$b" 2>&1 | grep -q "not a dynamic executable"; then echo "$b: static"; else exit 1; fi
+          done
+          objdump -T "$RUNNER_TEMP/x/usr/bin/agent-office-collector-gui" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -3
+      - name: Signed test manifest for the new version
+        run: |
+          collector/packaging/ci-test-manifest.sh "$RUNNER_TEMP/key" "$RUNNER_TEMP/update" "$NEW_VERSION"
+          ls -l "$RUNNER_TEMP/dist" "$RUNNER_TEMP/update"
+      - name: Upload installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers
+          path: ${{ runner.temp }}/dist
+          retention-days: 3
+          if-no-files-found: error
+      - name: Upload update test set
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: update
+          path: ${{ runner.temp }}/update
+          retention-days: 3
+          if-no-files-found: error
+
+  installer-build-arm64:
+    name: Installer build (Linux deb arm64)
+    runs-on: ubuntu-24.04-arm
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_number }}
+      NEW_VERSION: 0.0.1-ci.${{ github.run_number }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test-only update signing key
+        run: collector/packaging/ci-test-key.sh "$RUNNER_TEMP/key"
+      - name: Linux Core and desktop packages (arm64, Ubuntu 22.04 base, old and new)
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist" "$RUNNER_TEMP/update"
+          collector/packaging/build.sh "$VERSION" "$RUNNER_TEMP/core" >/dev/null
+          cp "$RUNNER_TEMP"/core/agent-office-collector_*_arm64.deb "$RUNNER_TEMP/dist/"
+          collector/packaging/build-desktop-linux.sh "$VERSION" "$RUNNER_TEMP/dist"
+          collector/packaging/build.sh "$NEW_VERSION" "$RUNNER_TEMP/core-new" >/dev/null
+          cp "$RUNNER_TEMP"/core-new/agent-office-collector_*_arm64.deb "$RUNNER_TEMP/update/"
+          collector/packaging/build-desktop-linux.sh "$NEW_VERSION" "$RUNNER_TEMP/update"
+      - name: Signed test manifest for the new version
+        run: collector/packaging/ci-test-manifest.sh "$RUNNER_TEMP/key" "$RUNNER_TEMP/update" "$NEW_VERSION"
+      - name: Upload installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-arm64
+          path: ${{ runner.temp }}/dist
+          retention-days: 3
+          if-no-files-found: error
+      - name: Upload update test set
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: update-arm64
+          path: ${{ runner.temp }}/update
+          retention-days: 3
+          if-no-files-found: error
+
+  installer-windows:
+    name: Installer (windows-latest)
+    needs: installer-build
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_number }}
+      NEW_VERSION: 0.0.1-ci.${{ github.run_number }}
+      AGENT_OFFICE_SMOKE_DISPOSABLE: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Download installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: installers
+          path: ${{ runner.temp }}/dist
+      - name: Download update test set
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: update
+          path: ${{ runner.temp }}/update
+      - name: Install, tray, uninstall (NSIS per-user)
+        run: python tests/cross_os/installer_smoke.py "$VERSION" "$RUNNER_TEMP/dist/agent-office-collector-setup-$VERSION-windows-amd64.exe"
+      - name: Approval-based update (old installer, local signed manifest, tray approval, NSIS /S)
+        if: ${{ !cancelled() }}
+        run: |
+          python tests/cross_os/update_smoke.py --old "$VERSION" --new "$NEW_VERSION" --serve "$RUNNER_TEMP/update" \
+            --install "$RUNNER_TEMP/dist/agent-office-collector-setup-$VERSION-windows-amd64.exe"
+      - name: Command-line install to installer migration
+        if: ${{ !cancelled() }}
+        run: |
+          python -m zipfile -e "$RUNNER_TEMP/dist/agent-office-collector-$VERSION-windows-amd64.zip" "$RUNNER_TEMP/cli"
+          python tests/cross_os/migration_smoke.py --version "$VERSION" --cli-core "$RUNNER_TEMP/cli/agent-office-collector.exe" \
+            --install "$RUNNER_TEMP/dist/agent-office-collector-setup-$VERSION-windows-amd64.exe"
+
+  installer-macos:
+    name: Installer (macos-latest)
+    runs-on: macos-latest
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_number }}
+      NEW_VERSION: 0.0.1-ci.${{ github.run_number }}
+      AGENT_OFFICE_SMOKE_DISPOSABLE: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.24.x"
+          cache: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Test-only update signing key
+        run: collector/packaging/ci-test-key.sh "$RUNNER_TEMP/key"
+      - name: Build universal .pkg (old and new)
+        run: |
+          collector/packaging/macos/build-pkg.sh "$VERSION" "$RUNNER_TEMP/dist"
+          collector/packaging/macos/build-pkg.sh "$NEW_VERSION" "$RUNNER_TEMP/update"
+          collector/packaging/ci-test-manifest.sh "$RUNNER_TEMP/key" "$RUNNER_TEMP/update" "$NEW_VERSION"
+          pkgutil --expand "$RUNNER_TEMP/dist/agent-office-collector-$VERSION-macos-universal.pkg" "$RUNNER_TEMP/expanded"
+          ls "$RUNNER_TEMP"/expanded/*/Scripts
+      - name: Command-line Core (for migration)
+        working-directory: collector/core
+        run: go build -trimpath -ldflags "-X main.version=0.0.0-cli" -o "$RUNNER_TEMP/cli/agent-office-collector" ./cmd/agent-office-collector
+      - name: Install, tray, uninstall (.pkg)
+        run: python tests/cross_os/installer_smoke.py "$VERSION" "$RUNNER_TEMP/dist/agent-office-collector-$VERSION-macos-universal.pkg"
+      - name: Approval-based update (old .pkg, local signed manifest, tray approval, installer(8) via sudo -n)
+        if: ${{ !cancelled() }}
+        run: |
+          python tests/cross_os/update_smoke.py --old "$VERSION" --new "$NEW_VERSION" --serve "$RUNNER_TEMP/update" \
+            --install "$RUNNER_TEMP/dist/agent-office-collector-$VERSION-macos-universal.pkg"
+      - name: Command-line install to installer migration
+        if: ${{ !cancelled() }}
+        run: |
+          python tests/cross_os/migration_smoke.py --version "$VERSION" --cli-core "$RUNNER_TEMP/cli/agent-office-collector" \
+            --install "$RUNNER_TEMP/dist/agent-office-collector-$VERSION-macos-universal.pkg"
+      - name: Upload .pkg
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-macos
+          path: ${{ runner.temp }}/dist
+          retention-days: 3
+
+  installer-linux:
+    name: Installer (${{ matrix.runner }} deb)
+    needs: [installer-build, installer-build-arm64]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+            set: ""
+          - runner: ubuntu-22.04
+            arch: amd64
+            set: ""
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            set: -arm64
+          - runner: ubuntu-22.04-arm
+            arch: arm64
+            set: -arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_number }}
+      NEW_VERSION: 0.0.1-ci.${{ github.run_number }}
+      AGENT_OFFICE_SMOKE_DISPOSABLE: "1"
+      AGENT_OFFICE_COLLECTOR_TOKEN_STORE: file
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: installers${{ matrix.set }}
+          path: ${{ runner.temp }}/dist
+      - name: Download update test set
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: update${{ matrix.set }}
+          path: ${{ runner.temp }}/update
+      - name: Runner OS
+        run: |
+          (. /etc/os-release && echo "$PRETTY_NAME")
+          ldd --version | head -1
+          python3 --version
+      - name: Desktop session tools (Xvfb, D-Bus, minimal StatusNotifierWatcher)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends xvfb dbus dbus-x11 python3-dbus python3-gi
+      - name: Install, tray (D-Bus menu clicks), uninstall (apt)
+        run: |
+          tests/cross_os/linux_desktop_session.sh tests/cross_os/installer_smoke.py "$VERSION" \
+            "$(ls "$RUNNER_TEMP"/dist/agent-office-collector_*_${{ matrix.arch }}.deb)" \
+            "$(ls "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_${{ matrix.arch }}.deb)"
+      - name: Approval-based update (old deb, local signed manifest, tray approval, apt-get via sudo -n)
+        if: ${{ !cancelled() }}
+        run: |
+          tests/cross_os/linux_desktop_session.sh tests/cross_os/update_smoke.py --old "$VERSION" --new "$NEW_VERSION" \
+            --serve "$RUNNER_TEMP/update" \
+            --install "$(ls "$RUNNER_TEMP"/dist/agent-office-collector_*_${{ matrix.arch }}.deb)" \
+            --install "$(ls "$RUNNER_TEMP"/dist/agent-office-collector-desktop_*_${{ matrix.arch }}.deb)"

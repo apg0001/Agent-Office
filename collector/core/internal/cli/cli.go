@@ -5,11 +5,12 @@
 //	agent-office-collector run
 //	agent-office-collector hook claude|codex [--product P] [--tool-version V] [--mode M]
 //	agent-office-collector pause | resume
+//	agent-office-collector settings workspace-name on|off|status [--json]
 //	agent-office-collector status [--json]
 //	agent-office-collector diagnose [--json] [--offline]
 //	agent-office-collector service install|uninstall [--activate]
 //	agent-office-collector service print [--os linux|darwin|windows] [--exe PATH]
-//	agent-office-collector hooks install|uninstall [--tool claude] [--yes] [--scope user]
+//	agent-office-collector hooks install|uninstall [--tool claude|codex] [--yes] [--scope user]
 //	agent-office-collector hooks status [--tool claude|codex] [--json]
 //	agent-office-collector hooks print [--tool claude|codex] [--os linux|darwin|windows] [--exe PATH]
 //	agent-office-collector version
@@ -74,6 +75,11 @@ type Env struct {
 	// Secrets는 장치 토큰 보관용 OS 보안 저장소다(#41). nil이면 secret.System(환경 변수·OS로 결정,
 	// 사용할 수 없으면 파일 보관). 테스트는 secret.Memory를 넣어 실제 저장소를 건드리지 않는다.
 	Secrets secret.Store
+	// Spawn은 프로세스를 띄우고 기다리지 않는다(업데이트 도우미·트레이 재실행, #180).
+	Spawn func(name string, args ...string) error
+	// RunLong은 설치 프로그램처럼 오래 걸리는 명령을 timeout까지 기다린다. 종료 코드와 출력 끝 일부를 돌려준다
+	// (출력은 취소 판정에만 쓰고 표시·기록하지 않음).
+	RunLong func(timeout time.Duration, args ...string) (int, []byte, error)
 }
 
 func (e *Env) defaults() {
@@ -131,6 +137,12 @@ func (e *Env) defaults() {
 	if e.HookTimeout <= 0 {
 		e.HookTimeout = 2 * time.Second
 	}
+	if e.Spawn == nil {
+		e.Spawn = spawnDetached
+	}
+	if e.RunLong == nil {
+		e.RunLong = runLong
+	}
 	if e.Secrets == nil {
 		// 인터페이스에 nil 포인터가 들어가지 않게 명시적으로 확인한다.
 		if s := secret.System(e.Getenv, e.GOOS); s != nil {
@@ -143,6 +155,33 @@ func execCommand(args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return exec.CommandContext(ctx, args[0], args[1:]...).CombinedOutput()
+}
+
+func spawnDetached(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	detachAttr(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
+}
+
+func runLong(timeout time.Duration, args ...string) (int, []byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	out := &capped{max: 4096}
+	cmd.Stdout, cmd.Stderr = out, out
+	err := cmd.Run()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return exit.ExitCode(), out.buf.Bytes(), nil
+	}
+	if err != nil {
+		return -1, nil, err
+	}
+	return 0, out.buf.Bytes(), nil
 }
 
 // Main은 명령을 실행하고 종료 코드를 돌려준다.
@@ -168,6 +207,8 @@ func Main(args []string, env Env) int {
 		return cmdRun(rest, env)
 	case "pause", "resume":
 		return cmdPause(cmd == "pause", rest, env)
+	case "settings":
+		return cmdSettings(rest, env)
 	case "status":
 		return cmdStatus(rest, env, false)
 	case "diagnose":
@@ -178,6 +219,8 @@ func Main(args []string, env Env) int {
 		return cmdHooks(rest, env)
 	case "update":
 		return cmdUpdate(rest, env)
+	case "legacy":
+		return cmdLegacy(rest, env)
 	case "help", "-h", "--help":
 		usage(env.Stdout)
 		return ExitOK
@@ -195,15 +238,19 @@ func usage(w io.Writer) {
   run                                                          수집·전송 실행(포그라운드, SIGINT/SIGTERM으로 종료)
   hook claude|codex                                            Hook stdin을 실행 중인 Collector에 전달(항상 종료 코드 0)
   pause | resume                                               수집·전송 일시중지/재개
+  settings workspace-name on|off|status [--json]               작업 폴더 마지막 이름(예: Agent-Office)을 서버에 보낼지(PC별, 기본 꺼짐)
   status [--json]                                              로컬 상태 요약
   diagnose [--json] [--offline]                                안전한 진단 정보(경로·토큰·내용 없음)
   service install|uninstall [--activate]                       OS 사용자 자동 시작 정의 설치/제거
   service print [--os linux|darwin|windows] [--exe PATH]       자동 시작 정의 미리보기
-  hooks install|uninstall [--tool claude] [--yes] [--scope user]
+  hooks install|uninstall [--tool claude|codex] [--yes] [--scope user]
                                                                Claude Code 사용자 설정에 Hook 추가/제거(미리보기 후 --yes로 적용, 백업)
   hooks status [--tool claude|codex] [--json]                           Hook 설치 상태와 도구 버전 검증 수준
   hooks print [--tool claude|codex] [--os OS] [--exe PATH]     Hook 항목 미리보기(Codex는 print 전용)
   update check|apply [--channel stable|beta] [--manifest-url URL] [--yes]
+  update check|download|install --installer [--json] [--yes]  설치 프로그램 기반 업데이트(GUI 트레이가 사용, 서명·해시 검증)
+  update post-install [--json]                                 설치·업데이트 뒤 소유 Hook·서비스 정의 재적용과 Core 재시작
+  legacy status|remove [--yes] [--json]                        설치 프로그램으로 옮긴 뒤 이전 명령행 설치 파일 정리
                                                                서명된 manifest로 새 버전 확인·적용(실패 시 되돌림)
   version
 `)
@@ -224,6 +271,11 @@ func cmdRun(args []string, env Env) int {
 	if err != nil {
 		fmt.Fprintln(env.Stderr, "사용자 디렉터리를 찾을 수 없습니다")
 		return ExitError
+	}
+	// Windows 로그온 작업으로 시작하면 콘솔 창이 새로 생긴다. 혼자 쓰는 콘솔이면 떼어 내 창을 닫는다(#169).
+	// 그 뒤의 표준 오류 출력은 버려진다(상태는 status·diagnose로 본다).
+	if env.GOOS == "windows" {
+		detachOwnConsole()
 	}
 	logger := log.New(env.Stderr, "agent-office-collector: ", log.LstdFlags)
 	o := runner.Options{Dirs: dirs, Version: env.Version, GOOS: env.GOOS, Now: env.Now, Logf: logger.Printf, Secrets: env.Secrets}

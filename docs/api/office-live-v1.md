@@ -6,12 +6,12 @@
 
 ## 데이터
 
-담는 값은 서버 ID, enum, 시각, 사용자가 붙인 장치 이름뿐입니다. Collector가 보낸 세션·에이전트 ID, 토큰, 원문은 없습니다.
+담는 값은 서버 ID, enum, 시각, 사용자가 붙인 장치 이름, 그리고 사용자가 PC별로 켠 경우의 작업 폴더 마지막 이름(`workspace_name`, #181)뿐입니다. Collector가 보낸 세션·에이전트 ID, 토큰, 원문은 없습니다.
 
 | 배열 | 필드 |
 |---|---|
 | `devices` | `id`, `name`, `connection`(`ONLINE`/`DISCONNECTED`) |
-| `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(개인 사무실 책상 번호, 반납되면 `null`, #48), `change_seq` |
+| `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(개인 사무실 책상 번호, 반납되면 `null`, #48), `workspace_name`(작업 폴더 마지막 이름, 동의하지 않았거나 팀 화면이면 `null`, #181), `change_seq` |
 | `agents` | `id`, `session_id`, `parent_agent_id`, `role`(`lead`/`subagent`), `turn_state`, `activity`, `confidence`(현재 활동을 만든 이벤트의 `observed`/`inferred`, #47), `state_version`, `started_at`, `ended_at`, `change_seq` |
 
 - 스냅샷의 세션은 종료되지 않았거나 종료 후 10분이 지나지 않은 것입니다(퇴근 연출용).
@@ -54,6 +54,12 @@
 - `change_seq`는 전역 시퀀스(`state_change_seq`)에서 나오며 화면에 보이는 값이 바뀔 때만 증가합니다. 클라이언트는 같은 `id`에 대해 `change_seq`가 더 큰 값만 적용합니다.
 - 서버는 매 주기 최근 30초 동안 바뀐 행을 다시 조회하고, 연결별로 이미 보낸 `change_seq`를 걸러 보냅니다. 늦게 커밋된 트랜잭션도 놓치지 않기 위해서입니다.
 - 화면 애니메이션은 이 사실 상태와 비동기로 움직입니다. 연출 상태는 서버로 보내지 않습니다.
+
+### 작업 폴더 이름(#181)
+
+- `workspace_name`은 장치 소유자 본인의 개인 사무실(`/api/v1/office`, 상세)과 통합 사무실(`/api/v1/office/combined`, 본인 장치 세션만)에서만 값이 있습니다. 팀 사무실 스냅샷·실시간·팀 상세에서는 소유자 본인을 포함해 항상 `null`입니다.
+- 이름이 바뀌면 세션의 `change_seq`가 올라가 증분으로 전달됩니다.
+- 이전 서버는 이 필드를 보내지 않습니다. 클라이언트는 없으면 `null`로 봅니다.
 
 ## 알려진 제한
 

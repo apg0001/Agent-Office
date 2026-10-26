@@ -57,6 +57,8 @@ type Record struct {
 	Support      string    `json:"support"`
 	// Plan은 계획 도구 호출의 단계 상태 enum 목록이다(#38). 단계 문장은 담지 않는다.
 	Plan *PlanRecord `json:"plan,omitempty"`
+	// WorkspaceName은 작업 폴더 마지막 이름이다(#181). Hook이 PC별 동의를 확인하고 정리한 값만 쓴다.
+	WorkspaceName string `json:"workspace_name,omitempty"`
 }
 
 // PlanRecord는 adapter.Plan의 spool 표현이다.
@@ -73,8 +75,16 @@ func FromCandidate(c adapter.Candidate, observedAt time.Time) Record {
 		SessionRef: c.SessionRef, TurnRef: c.TurnRef, ToolUseRef: c.ToolUseRef, AgentRef: c.AgentRef,
 		ToolCategory: string(c.ToolCategory), Activity: string(c.Activity), AgentType: string(c.AgentType),
 		Confidence: string(c.Confidence), Support: string(c.Support),
-		Plan: planRecord(c.Plan),
+		Plan: planRecord(c.Plan), WorkspaceName: workspaceName(c.WorkspaceName),
 	}
+}
+
+// workspaceName은 정리된 이름만 통과시킨다. 아니면 빈 값이다(이벤트는 이름 없이 처리).
+func workspaceName(s string) string {
+	if adapter.ValidWorkspaceName(s) {
+		return s
+	}
+	return ""
 }
 
 func planRecord(p *adapter.Plan) *PlanRecord {
@@ -116,7 +126,7 @@ func (r Record) Candidate() (adapter.Candidate, error) {
 		SessionRef: r.SessionRef, TurnRef: r.TurnRef, ToolUseRef: r.ToolUseRef, AgentRef: r.AgentRef,
 		ToolCategory: adapter.ToolCategory(r.ToolCategory), Activity: adapter.Activity(r.Activity),
 		AgentType: adapter.AgentTypeCategory(r.AgentType), Confidence: adapter.Confidence(r.Confidence),
-		Support: adapter.SupportLevel(r.Support), Plan: plan,
+		Support: adapter.SupportLevel(r.Support), Plan: plan, WorkspaceName: workspaceName(r.WorkspaceName),
 	}, nil
 }
 

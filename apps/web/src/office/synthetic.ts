@@ -29,6 +29,9 @@ export interface SyntheticOptions {
   subagentsPerSession: number;
 }
 
+/** 합성 세션 이름. 몇 개는 비워 두어 이름이 없는 세션도 보인다. */
+const SYNTHETIC_WORKSPACES: (string | null)[] = ["Agent-Office", "blog", null];
+
 export function createSyntheticOffice(options: SyntheticOptions): OfficeState {
   const device = { id: syntheticId("device", 1), name: "합성 PC", connection: "ONLINE" as const };
   const sessions = [];
@@ -44,6 +47,8 @@ export function createSyntheticOffice(options: SyntheticOptions): OfficeState {
       ended_at: null,
       last_event_at: null,
       desk_slot: s,
+      // 합성 세션 이름(#181). 실제 PC 값이 아니다.
+      workspace_name: SYNTHETIC_WORKSPACES[s % SYNTHETIC_WORKSPACES.length],
       change_seq: 1,
     });
     const leadId = syntheticId("agent", s * 100);

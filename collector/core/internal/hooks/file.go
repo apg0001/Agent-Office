@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -159,6 +160,13 @@ func writeBackup(path string, data []byte, now time.Time) (string, error) {
 		return name, nil
 	}
 	return "", ErrIO
+}
+
+// CodexHooksPath는 사용자 범위 Codex Hook 파일 위치 `$CODEX_HOME/hooks.json`이다. codexHome은
+// paths.Dirs.CodexHome(`$CODEX_HOME` 또는 `~/.codex`)이다. Codex 0.163.0은 사용자 설정 계층의
+// 폴더(config.toml이 있는 곳)에서 hooks.json을 읽는다(소스 `discovery.rs` `load_hooks_json`, #170 실측).
+func CodexHooksPath(codexHome string) string {
+	return filepath.Join(codexHome, "hooks.json")
 }
 
 // ClaudeSettingsPath는 사용자 범위 Claude Code 설정 파일 위치다. claudeProjects는

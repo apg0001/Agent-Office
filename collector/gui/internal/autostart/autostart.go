@@ -1,7 +1,9 @@
-// Package autostart는 로그인 시 GUI(트레이)를 띄우는 사용자 수준 정의를 만들고 설치·제거한다(#43).
+// Package autostart는 로그인 시 트레이 도우미를 띄우는 사용자 수준 정의를 만들고 설치·제거한다(#43, #159).
 //
 // Core의 자동 시작(`agent-office-collector service install`, systemd·launchd·작업 스케줄러)과는
-// 별개다. Core는 GUI 없이도 수집하고, 이 정의는 트레이 아이콘을 보여 주기 위한 GUI만 띄운다.
+// 별개다. Core는 GUI 없이도 수집하고, 이 정의는 트레이 아이콘을 보여 주기 위한 트레이 도우미
+// (`agent-office-collector-tray`, 없으면 개발 빌드의 GUI)만 띄운다. 파일 이름·Label·값 이름은 #43의
+// GUI 자동 시작과 같아서 이전 항목을 그대로 갱신한다.
 //
 //   - Linux: XDG autostart `${XDG_CONFIG_HOME:-~/.config}/autostart/agent-office-collector-gui.desktop`
 //   - macOS: LaunchAgent `~/Library/LaunchAgents/io.github.apg0001.agent-office.collector-gui.plist`
@@ -38,6 +40,8 @@ const (
 	RunKey = `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 	// ExeBase는 소유 판정에 쓰는 GUI 실행 파일 이름(확장자 제외)이다.
 	ExeBase = "agent-office-collector-gui"
+	// TrayExeBase는 트레이 도우미 실행 파일 이름(확장자 제외)이다(#159).
+	TrayExeBase = "agent-office-collector-tray"
 )
 
 var (
@@ -138,7 +142,7 @@ func desktopEntry(exe string) string {
 # Only files carrying the marker above are replaced or removed by Agent Office Collector GUI.
 Type=Application
 Name=Agent Office Collector
-Comment=Agent Office Collector tray (collection runs in the separate Core service)
+Comment=Agent Office Collector tray icon (collection runs in the separate Core service)
 Exec=` + desktopExecQuote(exe) + ` ` + Arg + `
 Terminal=false
 NoDisplay=true
@@ -182,7 +186,7 @@ func Owned(goos, content string) bool {
 	if goos != "windows" {
 		return strings.Contains(content, Marker)
 	}
-	// "<드라이브:\...\agent-office-collector-gui.exe>" --autostart
+	// "<드라이브:\...\agent-office-collector-(gui|tray).exe>" --autostart
 	if !strings.HasPrefix(content, `"`) {
 		return false
 	}
@@ -195,7 +199,7 @@ func Owned(goos, content string) bool {
 	if i := strings.LastIndexAny(exe, `\/`); i >= 0 {
 		base = exe[i+1:]
 	}
-	return rest == " "+Arg && strings.EqualFold(base, ExeBase+".exe")
+	return rest == " "+Arg && (strings.EqualFold(base, ExeBase+".exe") || strings.EqualFold(base, TrayExeBase+".exe"))
 }
 
 // State는 installed / outdated(소유지만 실행 파일 위치가 다름) / absent / foreign이다.

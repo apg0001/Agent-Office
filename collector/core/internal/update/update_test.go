@@ -287,4 +287,46 @@ func TestApplyRefusesBadBinaryAndPackageInstalls(t *testing.T) {
 	if err := Apply("/usr/bin/agent-office-collector", next, "0.2.0", hooks); Code(err) != "managed_by_package" {
 		t.Fatalf("package: %v", err)
 	}
+	if err := Apply("/Applications/Agent Office Collector.app/Contents/MacOS/agent-office-collector", next, "0.2.0", hooks); Code(err) != "managed_by_package" {
+		t.Fatalf("app bundle: %v", err)
+	}
+	// 설치 프로그램 배치(트레이 도우미가 옆에 있음)도 설치 프로그램으로 업데이트한다.
+	if err := os.WriteFile(filepath.Join(filepath.Dir(current), "agent-office-collector-tray.exe"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(current, next, "0.2.0", hooks); Code(err) != "managed_by_package" {
+		t.Fatalf("installer layout: %v", err)
+	}
+}
+
+// GitHub Release 다운로드는 302로 저장소 주소를 돌려준다. CLI 공통 클라이언트처럼 리다이렉트를
+// 막는 클라이언트를 넘겨도 업데이트는 따라가되, 각 단계가 안전한 주소인지 다시 검사한다.
+func TestGetFollowsSafeRedirectsOnly(t *testing.T) {
+	r, s := newRelease(t), newServer(t)
+	a := artifactFor(s, []byte("bin"))
+	s.publish(t, r, Manifest{Schema: 1, Channel: "beta", Version: "0.2.0", PublishedAt: time.Now(), Artifacts: []Artifact{a}})
+	redir := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case "/loop":
+			http.Redirect(w, req, "/loop", http.StatusFound)
+		case "/insecure":
+			http.Redirect(w, req, "http://example.invalid/manifest.json", http.StatusFound)
+		default:
+			http.Redirect(w, req, s.URL+req.URL.Path, http.StatusFound)
+		}
+	}))
+	t.Cleanup(redir.Close)
+	o := options(s, r)
+	o.Client = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	o.ManifestURL = redir.URL + "/manifest.json"
+	if avail, err := Check(context.Background(), o); err != nil || avail == nil || avail.Version != "0.2.0" {
+		t.Fatalf("redirected manifest: %+v %v", avail, err)
+	}
+	for path, code := range map[string]string{"/loop": "too_many_redirects", "/insecure": "insecure_url"} {
+		_, err := o.get(context.Background(), redir.URL+path, 1<<10)
+		var e *Error
+		if !errors.As(err, &e) || e.Code != code {
+			t.Fatalf("%s: %v", path, err)
+		}
+	}
 }

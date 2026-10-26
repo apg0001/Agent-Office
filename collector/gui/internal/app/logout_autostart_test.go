@@ -102,3 +102,64 @@ func TestGUIAutostartFlow(t *testing.T) {
 		}
 	}
 }
+
+// 트레이 도우미가 GUI 옆에 설치돼 있으면 자동 시작은 트레이를 띄운다(#159).
+func TestGUIAutostartPrefersTray(t *testing.T) {
+	if goos == "windows" {
+		t.Skip("POSIX 경로 테스트")
+	}
+	home := t.TempDir()
+	dir := filepath.Join(home, "opt")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tray := filepath.Join(dir, corecli.TrayName)
+	if err := os.WriteFile(tray, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a := New(Options{
+		GOOS:        "linux",
+		Getenv:      func(string) string { return "" },
+		Executable:  func() (string, error) { return filepath.Join(dir, corecli.GUIName), nil },
+		UserHomeDir: func() (string, error) { return home, nil },
+		Runner:      &corecli.Runner{Bin: os.Args[0]},
+	})
+	if r := a.GUIAutostartInstall(true); !r.OK {
+		t.Fatalf("install: %+v", r)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".config", "autostart", "agent-office-collector-gui.desktop"))
+	if err != nil || !strings.Contains(string(b), "Exec=\""+tray+"\" --autostart") {
+		t.Fatalf("desktop file should start the tray: %v\n%s", err, b)
+	}
+}
+
+func TestOfficeURLAndUpdateCheck(t *testing.T) {
+	h := newHarness(t, "")
+	if _, err := h.app.OfficeURL(); err == nil {
+		t.Fatal("office url without server")
+	}
+	if r := h.app.SaveServer("https://office.example"); !r.OK {
+		t.Fatal(r)
+	}
+	if u, err := h.app.OfficeURL(); err != nil || u != "https://office.example/" {
+		t.Fatalf("office url: %q %v", u, err)
+	}
+	// 가짜 Core 버전이 0.0.0-dev(사전 배포)라 beta 채널로 확인한다.
+	if r := h.app.UpdateCheck(); !r.OK || r.Code != "update_latest" || !strings.Contains(r.Output, "beta") {
+		t.Fatalf("latest: %+v", r)
+	}
+	if r := newHarness(t, "update_available").app.UpdateCheck(); !r.OK || r.Code != "update_available" || !strings.Contains(r.Output, "0.2.0") {
+		t.Fatalf("available: %+v", r)
+	}
+	if r := newHarness(t, "update_offline").app.UpdateCheck(); r.OK || r.Code != "update_check_failed" || r.Output != "업데이트 확인 실패: manifest_unreachable" {
+		t.Fatalf("offline: %+v", r)
+	}
+	for _, code := range []string{"update_latest", "update_available", "update_check_failed"} {
+		if _, ok := messages[code]; !ok {
+			t.Errorf("message missing for %s", code)
+		}
+	}
+	if got := firstLine("  새 버전 0.2.0이 있습니다\n둘째 줄"); got != "새 버전 0.2.0이 있습니다" {
+		t.Errorf("firstLine: %q", got)
+	}
+}

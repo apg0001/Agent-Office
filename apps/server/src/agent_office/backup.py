@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -156,7 +157,12 @@ def _sha256(path: Path) -> str:
 
 
 def _restore_list(path: Path, key: bytes) -> None:
-    """복호화 스트림을 `pg_restore --list`에 넣어 덤프 목차를 읽을 수 있는지 확인한다."""
+    """복호화 스트림을 `pg_restore --list`에 넣어 덤프 목차를 읽을 수 있는지 확인한다.
+
+    파이프로 받은 custom 형식은 목차만 읽고 끝나므로, 덤프가 파이프 버퍼(약 64KiB)보다 크면
+    나머지를 쓰다 BrokenPipeError가 난다(#187: 운영 DB 약 300KB에서 백업이 항상 실패). 그때도
+    파일 끝까지 복호화해 모든 청크의 AES-GCM 인증을 확인하고, 판정은 pg_restore 종료 코드로 한다.
+    """
     process = subprocess.Popen(  # noqa: S603 - 고정 인자
         ["pg_restore", "--list"],
         stdin=subprocess.PIPE,
@@ -164,14 +170,19 @@ def _restore_list(path: Path, key: bytes) -> None:
         stderr=subprocess.DEVNULL,
     )
     assert process.stdin is not None
+    reader_open = True
     try:
         with path.open("rb") as handle:
             for chunk in decrypt_chunks(handle, key):
-                process.stdin.write(chunk)
-    except BrokenPipeError as error:
-        raise BackupError("dump_unreadable") from error
+                if not reader_open:
+                    continue
+                try:
+                    process.stdin.write(chunk)
+                except BrokenPipeError:
+                    reader_open = False
     finally:
-        process.stdin.close()
+        with contextlib.suppress(BrokenPipeError):
+            process.stdin.close()
     if process.wait() != 0:
         raise BackupError("dump_unreadable")
 

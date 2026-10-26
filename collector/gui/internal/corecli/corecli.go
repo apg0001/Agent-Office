@@ -39,7 +39,7 @@ var (
 )
 
 // Locate는 Core 실행 파일을 찾는다. 순서: $AGENT_OFFICE_COLLECTOR_BIN(절대 경로) →
-// GUI 실행 파일과 같은 디렉터리 → PATH.
+// GUI·트레이 실행 파일 옆(SiblingCandidates) → PATH.
 func Locate(getenv func(string) string, guiExe string, goos string) (string, error) {
 	if p := getenv(EnvBin); p != "" {
 		if !filepath.IsAbs(p) {
@@ -51,10 +51,9 @@ func Locate(getenv func(string) string, guiExe string, goos string) (string, err
 		return "", ErrCoreMissing
 	}
 	name := BinName(goos)
-	if guiExe != "" {
-		if p := filepath.Join(filepath.Dir(guiExe), name); isFile(p) {
-			return p, nil
-		}
+	// GUI·트레이 실행 파일 옆(macOS 트레이 번들이면 바깥 GUI 번들의 Contents/MacOS).
+	if p, ok := FindSibling(guiExe, goos, "agent-office-collector"); ok {
+		return p, nil
 	}
 	if p, err := exec.LookPath(name); err == nil {
 		if abs, err := filepath.Abs(p); err == nil {

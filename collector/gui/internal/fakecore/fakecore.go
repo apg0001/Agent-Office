@@ -143,6 +143,12 @@ func run(args []string) int {
 		fmt.Println("백업(0600): ~/.claude/settings.json.agent-office-backup-x\nHook을 설치했습니다.")
 	case joined == "hooks uninstall --tool claude --yes":
 		fmt.Println("Agent Office Hook만 제거했습니다.")
+	case joined == "hooks install --tool codex":
+		fmt.Println("대상: ~/.codex/hooks.json\n변경 미리보기:\n  + SessionStart\n파일을 바꾸지 않았습니다.")
+	case joined == "hooks install --tool codex --yes":
+		fmt.Println("백업(0600): ~/.codex/hooks.json.agent-office-backup-x\nHook을 설치했습니다.")
+	case joined == "hooks uninstall --tool codex --yes":
+		fmt.Println("Agent Office Hook만 제거했습니다.")
 	case joined == "hooks print --tool codex":
 		fmt.Println(`{"hooks":{}}`)
 	case args[0] == "register":
@@ -165,6 +171,39 @@ func run(args []string) int {
 		}
 		fmt.Println("서버에서 이 장치를 폐기했습니다.\n로컬 장치 토큰과 등록 정보를 지웠습니다. " + SentinelToken)
 	case joined == "pause" || joined == "resume":
+	case strings.HasPrefix(joined, "update check --installer") || strings.HasPrefix(joined, "update download --installer") ||
+		strings.HasPrefix(joined, "update install --installer"):
+		status := map[string]string{"check": "available", "download": "downloaded", "install": "installer_started"}[args[1]]
+		switch scenario {
+		case "update_latest":
+			status = "latest"
+		case "update_cli":
+			fmt.Println(`{"status":"error","code":"not_installer_install","current":"0.1.0","channel":"beta"}`)
+			return 1
+		case "update_leak":
+			fmt.Println(`{"status":"available","version":"/home/user/secret","current":"0.1.0","channel":"beta","code":"Bad Code ` + SentinelToken + `"}`)
+			return 0
+		}
+		if args[1] == "install" && !strings.Contains(joined, "--yes") {
+			fmt.Println(`{"status":"error","code":"confirmation_required","current":"0.1.0","channel":"beta"}`)
+			return 1
+		}
+		fmt.Println(`{"status":"` + status + `","version":"0.2.0","current":"0.1.0","channel":"beta","kind":"deb"}`)
+	case joined == "update post-install --json":
+		fmt.Println(`{"status":"attention","version":"0.2.0","hooks":[{"tool":"claude","action":"reapplied"},{"tool":"codex","action":"reapplied"}],"service":"reinstalled","health":"healthy","codex_retrust":true,"legacy_files":2}`)
+		return 1
+	case strings.HasPrefix(joined, "legacy "):
+		fmt.Println(`{"eligible":true,"files":[{"kind":"binary","name":"agent-office-collector","location":"~/.local/bin","state":""},{"kind":"readme","name":"../../etc","location":"~","state":""}],"removed":0,"failed":0}`)
+	case strings.HasPrefix(joined, "update check --channel "):
+		switch scenario {
+		case "update_available":
+			fmt.Println("새 버전 0.2.0이 있습니다(현재 0.1.0, " + args[3] + " 채널)")
+		case "update_offline":
+			fmt.Fprintln(os.Stderr, "업데이트 확인 실패: manifest_unreachable")
+			return 1
+		default:
+			fmt.Println("최신 버전입니다(0.1.0, " + args[3] + " 채널)")
+		}
 	case joined == "service print":
 		fmt.Println("[Unit]\nDescription=Agent Office Collector")
 	case strings.HasPrefix(joined, "service install"):

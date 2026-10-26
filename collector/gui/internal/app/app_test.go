@@ -180,34 +180,41 @@ func TestCoreMissing(t *testing.T) {
 // Hook 설치는 미리보기 → 명시적 승인 순서를 지켜야 Core에 --yes가 간다.
 func TestHookConsentFlow(t *testing.T) {
 	h := newHarness(t, "")
-	if r := h.app.HookInstall(true); r.OK || r.Code != "preview_required" {
+	if r := h.app.HookInstall("claude", true); r.OK || r.Code != "preview_required" {
 		t.Errorf("install without preview: %+v", r)
 	}
-	if r := h.app.HookInstall(false); r.Code != "confirmation_required" {
+	if r := h.app.HookInstall("claude", false); r.Code != "confirmation_required" {
 		t.Errorf("install without confirm: %+v", r)
 	}
-	p := h.app.HookPreview()
+	p := h.app.HookPreview("claude")
 	if !p.OK || !strings.Contains(p.Output, "+ SessionStart") {
 		t.Fatalf("preview: %+v", p)
 	}
-	if r := h.app.HookInstall(false); r.OK {
+	if r := h.app.HookInstall("claude", false); r.OK {
 		t.Error("installed without confirmation")
 	}
-	if r := h.app.HookInstall(true); !r.OK || r.Code != "hook_installed" {
+	if r := h.app.HookInstall("claude", true); !r.OK || r.Code != "hook_installed" {
 		t.Errorf("install: %+v", r)
 	}
 	// 한 번 승인은 한 번만 쓴다.
-	if r := h.app.HookInstall(true); r.Code != "preview_required" {
+	if r := h.app.HookInstall("claude", true); r.Code != "preview_required" {
 		t.Errorf("second install reused consent: %+v", r)
 	}
-	if r := h.app.HookUninstall(false); r.OK {
+	if r := h.app.HookUninstall("claude", false); r.OK {
 		t.Error("uninstall without confirmation")
 	}
-	if r := h.app.HookUninstall(true); !r.OK {
+	if r := h.app.HookUninstall("claude", true); !r.OK {
 		t.Errorf("uninstall: %+v", r)
 	}
-	if r := h.app.CodexHookPrint(); !r.OK || !json.Valid([]byte(r.Output)) {
-		t.Errorf("codex print: %+v", r)
+	// 다른 도구의 미리보기로는 설치할 수 없고, 모르는 도구는 거부한다(#175).
+	if r := h.app.HookPreview("codex"); !r.OK {
+		t.Errorf("codex preview: %+v", r)
+	}
+	if r := h.app.HookInstall("claude", true); r.Code != "preview_required" {
+		t.Errorf("claude install with codex preview: %+v", r)
+	}
+	if r := h.app.HookPreview("vim"); r.Code != "invalid_tool" {
+		t.Errorf("unknown tool: %+v", r)
 	}
 	yes := 0
 	for _, c := range h.calls() {

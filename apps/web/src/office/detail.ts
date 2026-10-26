@@ -5,6 +5,7 @@
 
 import { type OfficeScope, PERSONAL } from "./liveSource";
 import type { Activity, AgentState, DeviceState, OfficeState, SessionState } from "./types";
+import { withWorkspaceName } from "./workspace";
 
 export interface TimelineEntry {
   event_type: string;
@@ -65,7 +66,11 @@ export async function fetchAgentDetail(
     const response = await fetcher(detailPath(agentId, scope), {
       credentials: "same-origin",
     });
-    return response.ok ? ((await response.json()) as AgentDetail) : null;
+    if (!response.ok) {
+      return null;
+    }
+    const detail = (await response.json()) as AgentDetail;
+    return detail?.session ? { ...detail, session: withWorkspaceName(detail.session) } : detail;
   } catch {
     return null;
   }

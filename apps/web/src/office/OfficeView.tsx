@@ -7,6 +7,8 @@ import { detailFromState, fetchAgentDetail, type AgentDetail } from "./detail";
 import { createDefaultOffice } from "./grid";
 import { type OfficeScope, PERSONAL, connectLive, hasSession, scopeFromSearch, searchFor } from "./liveSource";
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
+import { SessionList } from "./SessionList";
+import { ZoneLegend } from "./ZoneLegend";
 import type { DataSource, OfficeState } from "./types";
 
 /**
@@ -104,10 +106,12 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
     let game: { destroy: (removeCanvas: boolean) => void } | undefined;
     let stop: (() => void) | undefined;
     void (async () => {
-      const [{ default: Phaser }, { OfficeScene }, live] = await Promise.all([
+      const [{ default: Phaser }, { OfficeScene, RENDER_SCALE }, live] = await Promise.all([
         import("phaser"),
         import("./OfficeScene"),
         hasSession(),
+        // 지도 글자(캔버스)는 글꼴이 준비된 뒤 그려야 픽셀 글꼴로 나온다. 실패해도 대체 글꼴로 계속.
+        document.fonts?.load("12px Galmuri11").catch(() => undefined),
       ]);
       if (disposed) {
         return;
@@ -123,10 +127,12 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: element,
-        width: element.clientWidth || 960,
-        height: compact ? 320 : 560,
+        width: Math.round((element.clientWidth || 960) / RENDER_SCALE),
+        height: (compact ? 320 : 560) / RENDER_SCALE,
+        zoom: RENDER_SCALE,
         backgroundColor: "#2b2d31",
         pixelArt: true,
+        roundPixels: true,
         scene,
       });
       let rows = 2;
@@ -202,13 +208,17 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
         </>
       )}
       {title && <h3 className="office-title">{title}</h3>}
-      {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
       {!autoFocus && (
         <button type="button" className="focus-button" onClick={() => resume.current()}>
           자동 초점 다시 켜기
         </button>
       )}
-      <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
+      <div className="office-stage">
+        <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
+        {!compact && office && <SessionList state={office} onSelect={setSelected} />}
+      </div>
+      {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
+      {!compact && <ZoneLegend />}
       {detail && (
         <AgentPanel detail={detail} source={source} now={Date.now()} onClose={close} onSelect={setSelected} />
       )}

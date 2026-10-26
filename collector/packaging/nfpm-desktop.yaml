@@ -1,0 +1,46 @@
+# Linux 데스크톱 패키지(#159): GUI(설정 창)·트레이 도우미·메뉴 항목·아이콘.
+# 수집은 Core 패키지(agent-office-collector, nfpm.yaml)가 하고 이 패키지는 그 버전과 같은 Core에 의존한다.
+# @DEPVER@는 build-desktop-linux.sh가 패키지 버전(SemVer의 첫 `-`를 `~`로, 예: 0.1.0~beta.1)으로 바꾼다.
+# GUI는 webkit2gtk-4.1로 빌드한다(-tags webkit2_41). Ubuntu 24.04에는 4.0 런타임이 없다.
+# ubuntu:22.04에서 빌드해 glibc 2.35·jammy의 libwebkit2gtk-4.1-0(jammy-updates)으로도 설치·실행된다(#180).
+# 의존성에 jammy보다 새 버전 하한을 두지 않는다.
+# 트레이·자동 시작·Hook은 사용자 계정 단위라 패키지가 켜지 않는다(사용자가 GUI에서 승인).
+name: agent-office-collector-desktop
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: utils
+priority: optional
+maintainer: Agent Office <noreply@users.noreply.github.com>
+description: |
+  Agent Office Collector GUI(설정 창)와 시스템 트레이 도우미. 수집은 agent-office-collector 패키지가 한다.
+homepage: https://github.com/apg0001/Agent-Office
+license: UNLICENSED
+overrides:
+  deb:
+    depends:
+      - agent-office-collector (= @DEPVER@)
+      - libgtk-3-0 | libgtk-3-0t64
+      - libwebkit2gtk-4.1-0
+  rpm:
+    depends:
+      - agent-office-collector = @DEPVER@
+      - gtk3
+      - webkit2gtk4.1
+contents:
+  - src: /stage/agent-office-collector-gui
+    dst: /usr/bin/agent-office-collector-gui
+    file_info:
+      mode: 0755
+  - src: /stage/agent-office-collector-tray
+    dst: /usr/bin/agent-office-collector-tray
+    file_info:
+      mode: 0755
+  - src: /pkg/linux/io.github.apg0001.agent-office.collector.desktop
+    dst: /usr/share/applications/io.github.apg0001.agent-office.collector.desktop
+    file_info:
+      mode: 0644
+  - src: /pkg/assets/agent-office-collector.png
+    dst: /usr/share/icons/hicolor/256x256/apps/agent-office-collector.png
+    file_info:
+      mode: 0644
