@@ -6,7 +6,7 @@
 
 import Phaser from "phaser";
 
-import { assignSeats, subagentIndexOf, targetTile } from "./behavior";
+import { assignSeats, spreadTargets, subagentIndexOf, targetTile } from "./behavior";
 import {
   type CameraState,
   focusPoint,
@@ -65,15 +65,22 @@ interface Actor {
   marker: Phaser.GameObjects.Text;
   position: Point;
   target: Point;
+  /** 이번 계획에서 원하는 칸(겹침 조정 전)과 그 칸이 고정 자리인지. */
+  want?: Point;
+  wantFixed?: boolean;
   /** 목적지까지 남은 칸(가구·벽 회피). */
   path: Point[];
   agent: AgentState;
   displayed?: DisplayedZone;
   leaving: boolean;
   status: Phaser.GameObjects.Text;
+  /** 말풍선 기본 높이(엇갈림 전). */
+  statusY: number;
 }
 
 const REPLAN_INTERVAL_MS = 250;
+/** 옆 칸 말풍선과 겹치지 않게 번갈아 올리는 높이(px). */
+const STATUS_LIFT = 16;
 
 export class OfficeScene extends Phaser.Scene {
   private map: OfficeMap;
@@ -213,6 +220,7 @@ export class OfficeScene extends Phaser.Scene {
       this.showWorkspace(actor, agent, session);
       this.plan(actor, Date.now());
     }
+    this.assignTargets();
     for (const [id, actor] of this.actors) {
       if (!alive.has(id) && !actor.leaving) {
         // 상태에서 빠진 캐릭터도 순간 사라지지 않고 퇴근한다.
@@ -268,14 +276,29 @@ export class OfficeScene extends Phaser.Scene {
       variant,
       subagentIndexOf(this.state, actor.agent),
     );
-    if (target.x !== actor.target.x || target.y !== actor.target.y || actor.path.length === 0) {
-      // 이동 중에 목적지가 바뀌어도 지금 서 있는 칸에서 다시 경로를 찾는다.
-      const here = { x: Math.round(actor.position.x), y: Math.round(actor.position.y) };
-      actor.path = findPath(this.map, here, target);
-      actor.target = target;
-    }
+    // 실제 목적지는 모든 캐릭터의 원하는 칸을 모아 겹치지 않게 나눈 뒤 정한다(assignTargets).
+    actor.want = target;
+    actor.wantFixed = actor.agent.role === "lead" && actor.displayed.zone === "desk" && this.seats.has(actor.agent.session_id);
     // 머리 위 표시는 관측된 승인 대기("!")만. 추정 여부는 상세 패널에서 보여 준다.
     actor.marker.setVisible(actor.agent.turn_state === "WAITING_USER");
+  }
+
+  /** 원하는 칸들을 겹치지 않게 나누고, 바뀐 캐릭터만 지금 칸에서 다시 경로를 찾는다(#194). */
+  private assignTargets(): void {
+    const planning = [...this.actors.values()].filter((a) => !a.leaving && a.want);
+    const targets = spreadTargets(
+      this.map,
+      planning.map((a) => ({ id: a.agent.id, point: a.want!, fixed: a.wantFixed ?? false })),
+    );
+    for (const actor of planning) {
+      const target = targets.get(actor.agent.id) ?? actor.want!;
+      if (target.x !== actor.target.x || target.y !== actor.target.y || actor.path.length === 0) {
+        // 이동 중에 목적지가 바뀌어도 지금 서 있는 칸에서 다시 경로를 찾는다.
+        const here = { x: Math.round(actor.position.x), y: Math.round(actor.position.y) };
+        actor.path = findPath(this.map, here, target);
+        actor.target = target;
+      }
+    }
   }
 
   update(time: number, deltaMs: number): void {
@@ -287,6 +310,7 @@ export class OfficeScene extends Phaser.Scene {
       for (const actor of this.actors.values()) {
         this.plan(actor, now);
       }
+      this.assignTargets();
     }
     const step = (WALK_TILES_PER_SECOND * deltaMs) / 1000;
     const active: Point[] = [];
@@ -318,6 +342,9 @@ export class OfficeScene extends Phaser.Scene {
       }
       const screen = gridToScreen(actor.position);
       actor.container.setPosition(screen.sx, screen.sy - TILE_HEIGHT / 4);
+      // 말풍선은 칸보다 넓어 옆 칸 캐릭터와 겹친다. 칸 위치에 따라 높이를 번갈아 엇갈린다(#194).
+      const lift = (Math.round(actor.position.x) + Math.round(actor.position.y)) % 2 === 0 ? 0 : STATUS_LIFT;
+      actor.status.setY(actor.statusY - lift);
       actor.container.setDepth(depthOf(actor.position, 5));
       if (actor.leaving && actor.path.length === 0) {
         // 출입구에 도착하면 퇴근 완료. 책상은 서버가 퇴근 연출 시간 후 반납한다.
@@ -422,6 +449,7 @@ export class OfficeScene extends Phaser.Scene {
       workspace,
       marker,
       status,
+      statusY: status.y,
       position: start,
       target: start,
       path: [],
