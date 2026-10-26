@@ -34,6 +34,10 @@ const HelperName = "agent-office-update-helper"
 // installerTimeout은 설치 프로그램 실행 상한이다(사용자가 OS 승인 창에 응답하는 시간 포함).
 const installerTimeout = 30 * time.Minute
 
+// helperSettle은 도우미가 설치 프로그램을 실행하기 전 기다리는 시간이다. 승인한 트레이가 끝나 트레이 잠금을
+// 놓을 시간을 준다(그래야 설치 뒤 다시 띄운 새 트레이가 곧바로 뜬다). 테스트는 0으로 둔다.
+var helperSettle = 3 * time.Second
+
 // installerReport는 update check|download|install --installer --json 출력이다. 버전·enum만 담는다.
 type installerReport struct {
 	// Status는 latest / available / downloaded / installer_started / error다.
@@ -202,6 +206,7 @@ func cmdRunPlan(args []string, env Env) int {
 		}
 		return ExitError
 	}
+	time.Sleep(helperSettle)
 	var files []string
 	for _, f := range plan.Files {
 		// 계획을 쓴 뒤 바뀌지 않았는지 실행 직전에 다시 확인한다.

@@ -13,7 +13,7 @@
 | Windows | amd64·arm64 | `.zip` | `agent-office-collector.exe`, `uninstall.ps1`, README |
 | Windows(#159) | amd64 | `agent-office-collector-setup-<버전>-windows-amd64.exe` | Core·GUI·트레이 사용자별 설치 프로그램(`build-windows-installer.sh`, NSIS) |
 | macOS(#159) | 유니버설 | `agent-office-collector-<버전>-macos-universal.pkg` | 앱 번들(GUI·Core·트레이)(`macos/build-pkg.sh`, macOS에서만) |
-| Linux(#159) | amd64·arm64 | `agent-office-collector-desktop` `.deb`, `.rpm` | GUI·트레이·앱 메뉴 항목·아이콘, 같은 버전 Core 패키지에 의존(`build-desktop-linux.sh`, 아키텍처별 러너) |
+| Linux(#159) | amd64·arm64 | `agent-office-collector-desktop` `.deb`, `.rpm` | GUI·트레이·앱 메뉴 항목·아이콘, 같은 버전 Core 패키지에 의존(`build-desktop-linux.sh`, 아키텍처별 러너). #180부터 GUI를 `ubuntu:22.04`(glibc 2.35)에서 빌드해 Ubuntu 22.04 이상에서 설치·실행([지원 배포판](collector-gui.md#지원-linux-배포판데스크톱-패키지)) |
 
 - 정적 바이너리(`CGO_ENABLED=0`, `-trimpath`), 버전은 `-ldflags -X main.version`.
 - `SHA256SUMS`에 모든 배포물의 해시. 받은 쪽은 `sha256sum -c SHA256SUMS`(Windows `Get-FileHash`)로 확인합니다.
@@ -51,6 +51,8 @@ Claude·Codex의 원본 기록(`~/.claude/projects` 등)은 어떤 경우에도 
 | Windows | Authenticode 서명 | 미구현(비용). 설치 프로그램은 #159에서 NSIS `.exe`로 구현(MSI는 고르지 않음, ADR-0005) |
 
 ## 게시
+
+`manifest.json`에는 Core 압축본(`artifacts`)과 설치 파일(`installers`, #180)이 함께 들어갑니다. 트레이의 승인형 업데이트는 채널 Release(`collector-beta`·`collector-stable`)의 manifest를 보므로, 버전 Release를 공개한 뒤 채널 manifest를 갱신해야 사용자에게 보입니다(`publish_channel: true` 또는 `collector/packaging/update-channel.sh`, [Collector 자체 업데이트](collector-update.md#키와-서명관리자)).
 
 `.github/workflows/publish-collector.yml`(수동 실행, `collector-publish` Environment 승인)이 같은 스크립트로 빌드해 GitHub Release **초안**으로 올립니다. 관리자가 확인 후 공개합니다. #159부터 Windows 설치 프로그램(ubuntu-24.04, Docker), macOS `.pkg`(macos-latest), Linux 데스크톱 패키지(ubuntu-24.04·ubuntu-24.04-arm)를 각각 만든 뒤 Core 배포물과 합쳐 `SHA256SUMS`를 다시 계산합니다(파일 이름에 `~`가 있으면 실패). Core를 품는 작업은 업데이트 공개 키 때문에 같은 Environment 승인을 받습니다. #159의 변경 뒤로는 아직 실행하지 않았습니다(같은 스크립트를 `Cross-OS Collector`가 PR마다 실행).
 

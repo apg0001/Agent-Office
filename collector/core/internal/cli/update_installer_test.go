@@ -130,6 +130,9 @@ func decode[T any](t *testing.T, s string) T {
 }
 
 func TestUpdateInstallerFlow(t *testing.T) {
+	prevSettle := helperSettle
+	helperSettle = 0
+	t.Cleanup(func() { helperSettle = prevSettle })
 	srv, url := installerServer(t)
 	te := newTestEnv(t, "inst")
 	te.env.Version = "0.1.0-beta.1"
