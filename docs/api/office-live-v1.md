@@ -11,7 +11,7 @@
 | 배열 | 필드 |
 |---|---|
 | `devices` | `id`, `name`, `connection`(`ONLINE`/`DISCONNECTED`) |
-| `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(개인 사무실 책상 번호, 반납되면 `null`, #48), `workspace_name`(작업 폴더 마지막 이름, 동의하지 않았거나 팀 화면이면 `null`, #181), `change_seq` |
+| `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(개인 사무실 책상 번호, 반납되면 `null`, #48), `project_id`, `project_name`(프로젝트 표시 이름, 없으면 `null`, #197), `workspace_name`(작업 폴더 마지막 이름, 동의하지 않았거나 팀 화면이면 `null`, #181), `change_seq` |
 | `agents` | `id`, `session_id`, `parent_agent_id`, `role`(`lead`/`subagent`), `turn_state`, `activity`, `confidence`(현재 활동을 만든 이벤트의 `observed`/`inferred`, #47), `state_version`, `started_at`, `ended_at`, `change_seq` |
 
 - 스냅샷의 세션은 종료되지 않았거나 종료 후 10분이 지나지 않은 것입니다(퇴근 연출용).
@@ -80,16 +80,20 @@
 
 ### 세션을 프로젝트에 넣기
 
-`PUT /api/v1/office/sessions/{session_id}/project {project_id | null}` (세션 쿠키 + CSRF, `204`). 내 장치의 세션을 내 프로젝트에만 넣을 수 있고, 그 밖은 `404`입니다. 스냅샷·증분의 세션에 `project_id`가 함께 나옵니다. 자동 연결(Collector 저장소 지문)은 아직 없어 이 요청으로만 정합니다.
+`PUT /api/v1/office/sessions/{session_id}/project {project_id | null}` (세션 쿠키 + CSRF, `204`). 내 장치의 세션을 내 프로젝트에만 넣을 수 있고, 그 밖은 `404`입니다. 스냅샷·증분의 세션에 `project_id`·`project_name`이 함께 나옵니다. 이 요청으로 정한 배정(없음 포함)은 폴더 이름 자동 배정(#197, `docs/api/teams-v1.md`)보다 우선합니다. Collector 저장소 지문 연결은 아직 없습니다.
 
 ### 무엇이 보이나
 
 팀 사무실에는 다음을 모두 만족하는 세션만 나옵니다. 이벤트는 한 번만 저장되고, 여러 팀에 공유해도 각 팀이 같은 행을 이 조건으로 거릅니다.
 
-1. 세션이 프로젝트에 들어 있고, 그 프로젝트가 이 팀에 공유됨(소유자 동의)
-2. 프로젝트 소유자가 지금도 이 팀 구성원
-3. 세션이 프로젝트 소유자 본인의 폐기되지 않은 장치에서 옴
-4. 열려 있거나 종료 후 10분 이내
+1. 세션이 지금도 이 팀 구성원인 사람의 폐기되지 않은 장치에서 옴
+2. 그 구성원의 이 팀 공유 범위(#197)가
+   - `all`: 모든 세션(프로젝트 없어도. 웹은 "(이름 없음)"으로 표시)
+   - `selected`: 세션이 본인 프로젝트에 들어 있고 그 프로젝트를 이 팀에 공유함(소유자 동의, #54 규칙)
+   - `none`: 없음
+3. 열려 있거나 종료 후 10분 이내
+
+`project_name`은 위 조건으로 보이는 세션의 프로젝트에만 담기므로, 그 팀에 보이는 프로젝트(`GET /teams/{id}/projects`)의 이름뿐입니다. `workspace_name`은 계속 `null`입니다.
 
 장치 이름(PC 이름)은 팀원에게 보이지 않고 소유자 표시 이름으로 바뀝니다. 책상 번호는 팀 화면용 순번(시작 순서)이며 개인 사무실 번호와 무관합니다.
 
@@ -104,7 +108,7 @@
 ### 철회 즉시 반영
 
 - 팀 WebSocket은 매 주기(1초) 로그인 세션과 팀 구성원 자격을 다시 확인하고 팀 스냅샷을 다시 계산합니다. 탈퇴·추방되면 다음 주기에 `4404`로 닫습니다.
-- 보이던 세션·에이전트·장치가 빠지면(공유 해제, 프로젝트 지정 해제, 소유자 탈퇴·추방) 증분 대신 새 스냅샷을 보내 클라이언트가 지우게 합니다. 그 밖에는 바뀐 행만 증분으로 보냅니다.
+- 보이던 세션·에이전트·장치가 빠지면(공유 해제, 프로젝트 지정 해제, 공유 범위 축소, 소유자 탈퇴·추방) 증분 대신 새 스냅샷을 보내 클라이언트가 지우게 합니다. 그 밖에는 바뀐 행만 증분으로 보냅니다.
 - 팀에서 나간(또는 내보내진) 사람이 그 팀에 공유했던 프로젝트 공유는 함께 지웁니다.
 - REST 응답은 캐시하지 않고 요청마다 같은 조건으로 다시 거릅니다.
 

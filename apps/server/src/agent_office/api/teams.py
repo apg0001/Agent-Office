@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Path, Response, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Connection, delete, func, select, update
+from sqlalchemy import Connection, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from agent_office import audit
@@ -27,6 +27,8 @@ router = APIRouter(prefix="/api/v1", tags=["teams"])
 INVITATION_LIFETIME = dt.timedelta(days=7)
 MAX_TEAMS_PER_USER = 50
 TeamRole = Literal["OWNER", "MANAGER", "MEMBER"]
+# 팀원별 공유 범위(#197). 새 구성원의 기본은 'all'이고, 화면은 이 값을 동의 체크로 보여 주고 보낸다.
+ShareMode = Literal["all", "selected", "none"]
 InvitableRole = Literal["MANAGER", "MEMBER"]
 TeamId = Annotated[uuid.UUID, Path()]
 
@@ -40,11 +42,17 @@ class TeamBody(StrictModel):
     description: str | None = Field(default=None, max_length=500)
 
 
+class CreateTeamBody(TeamBody):
+    share_mode: ShareMode = "all"
+
+
 class TeamSummary(StrictModel):
     id: uuid.UUID
     name: str
     description: str | None
     role: TeamRole
+    # 내가 이 팀에 보여 주는 범위(#197). 다른 구성원의 값은 내보내지 않는다.
+    share_mode: ShareMode
 
 
 class Member(StrictModel):
@@ -78,6 +86,11 @@ class CreatedInvitation(Invitation):
 
 class AcceptBody(StrictModel):
     token: str = Field(max_length=256)
+    share_mode: ShareMode = "all"
+
+
+class ShareModeBody(StrictModel):
+    share_mode: ShareMode
 
 
 class RoleBody(StrictModel):
@@ -95,6 +108,8 @@ class ProjectBody(StrictModel):
 class Project(StrictModel):
     id: uuid.UUID
     display_name: str
+    # 'workspace'면 작업 폴더 이름으로 자동 생성한 프로젝트(#197).
+    origin: Literal["manual", "workspace"]
     shared_team_ids: list[uuid.UUID]
 
 
@@ -131,7 +146,20 @@ def _require_role(
     return role
 
 
-def _detail(connection: Connection, team_id: uuid.UUID, role: str) -> TeamDetail:
+def _share_mode(connection: Connection, team_id: uuid.UUID, user_id: uuid.UUID) -> str:
+    members = schema.team_members
+    return str(
+        connection.execute(
+            select(members.c.share_mode).where(
+                members.c.team_id == team_id, members.c.user_id == user_id
+            )
+        ).scalar_one()
+    )
+
+
+def _detail(
+    connection: Connection, team_id: uuid.UUID, role: str, user_id: uuid.UUID
+) -> TeamDetail:
     teams, members, users = schema.teams, schema.team_members, schema.users
     team = connection.execute(select(teams).where(teams.c.id == team_id)).one()
     rows = connection.execute(
@@ -145,6 +173,7 @@ def _detail(connection: Connection, team_id: uuid.UUID, role: str) -> TeamDetail
         name=team.name,
         description=team.description,
         role=role,  # type: ignore[arg-type]
+        share_mode=_share_mode(connection, team_id, user_id),  # type: ignore[arg-type]
         members=[
             Member(
                 user_id=r.user_id, display_name=r.display_name, role=r.role, joined_at=r.joined_at
@@ -159,7 +188,7 @@ def _detail(connection: Connection, team_id: uuid.UUID, role: str) -> TeamDetail
 
 @router.post("/teams", status_code=status.HTTP_201_CREATED, response_model=TeamDetail)
 def create_team(
-    body: TeamBody, user: UserDep, _csrf: CsrfDep, connection: DbConnection
+    body: CreateTeamBody, user: UserDep, _csrf: CsrfDep, connection: DbConnection
 ) -> TeamDetail:
     members = schema.team_members
     count = connection.execute(
@@ -172,7 +201,11 @@ def create_team(
         .values(name=body.name.strip(), description=(body.description or "").strip() or None)
         .returning(schema.teams.c.id)
     ).scalar_one()
-    connection.execute(members.insert().values(team_id=team_id, user_id=user.id, role="OWNER"))
+    connection.execute(
+        members.insert().values(
+            team_id=team_id, user_id=user.id, role="OWNER", share_mode=body.share_mode
+        )
+    )
     audit.record(
         connection,
         "team.created",
@@ -180,25 +213,35 @@ def create_team(
         actor_user_id=user.id,
         target_type="team",
         target_id=team_id,
+        details={"reason": f"share_{body.share_mode}"},
     )
-    return _detail(connection, team_id, "OWNER")
+    return _detail(connection, team_id, "OWNER", user.id)
 
 
 @router.get("/teams", response_model=list[TeamSummary])
 def list_teams(user: UserDep, connection: DbConnection) -> list[TeamSummary]:
     teams, members = schema.teams, schema.team_members
     rows = connection.execute(
-        select(teams.c.id, teams.c.name, teams.c.description, members.c.role)
+        select(teams.c.id, teams.c.name, teams.c.description, members.c.role, members.c.share_mode)
         .select_from(teams.join(members, members.c.team_id == teams.c.id))
         .where(members.c.user_id == user.id)
         .order_by(teams.c.name, teams.c.id)
     ).all()
-    return [TeamSummary(id=r.id, name=r.name, description=r.description, role=r.role) for r in rows]
+    return [
+        TeamSummary(
+            id=r.id,
+            name=r.name,
+            description=r.description,
+            role=r.role,
+            share_mode=r.share_mode,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/teams/{team_id}", response_model=TeamDetail)
 def get_team(team_id: TeamId, user: UserDep, connection: DbConnection) -> TeamDetail:
-    return _detail(connection, team_id, _require_role(connection, team_id, user))
+    return _detail(connection, team_id, _require_role(connection, team_id, user), user.id)
 
 
 @router.patch("/teams/{team_id}", response_model=TeamDetail)
@@ -215,7 +258,7 @@ def update_team(
             updated_at=func.now(),
         )
     )
-    return _detail(connection, team_id, role)
+    return _detail(connection, team_id, role, user.id)
 
 
 @router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -269,7 +312,7 @@ def change_role(
         target_id=member_id,
         details={"reason": body.role},
     )
-    return _detail(connection, team_id, "OWNER")
+    return _detail(connection, team_id, "OWNER", user.id)
 
 
 @router.delete("/teams/{team_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -315,6 +358,34 @@ def remove_member(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.put("/teams/{team_id}/share-mode", response_model=TeamDetail)
+def change_share_mode(
+    team_id: TeamId, body: ShareModeBody, user: UserDep, _csrf: CsrfDep, connection: DbConnection
+) -> TeamDetail:
+    """내가 이 팀에 보여 줄 범위를 바꾼다(#197). 본인 것만 바꿀 수 있고, 팀 사무실 스냅샷·실시간·
+    상세는 매 요청·매 주기 이 값으로 다시 거르므로 바로 반영된다. 'selected'로 돌아오면 전에
+    체크해 둔 프로젝트 공유가 그대로 쓰인다."""
+    role = _require_role(connection, team_id, user)
+    members = schema.team_members
+    previous = _share_mode(connection, team_id, user.id)
+    if previous != body.share_mode:
+        connection.execute(
+            update(members)
+            .where(members.c.team_id == team_id, members.c.user_id == user.id)
+            .values(share_mode=body.share_mode)
+        )
+        audit.record(
+            connection,
+            "team.share_mode_changed",
+            "success",
+            actor_user_id=user.id,
+            target_type="team",
+            target_id=team_id,
+            details={"reason": f"{previous}_to_{body.share_mode}"},
+        )
+    return _detail(connection, team_id, role, user.id)
+
+
 @router.post("/teams/{team_id}/transfer", response_model=TeamDetail)
 def transfer_ownership(
     team_id: TeamId, body: TransferBody, user: UserDep, _csrf: CsrfDep, connection: DbConnection
@@ -342,7 +413,7 @@ def transfer_ownership(
         target_type="user",
         target_id=body.user_id,
     )
-    return _detail(connection, team_id, "MANAGER")
+    return _detail(connection, team_id, "MANAGER", user.id)
 
 
 # --- 초대 ------------------------------------------------------------------------------
@@ -513,7 +584,10 @@ def accept_invitation(
         with connection.begin_nested():
             connection.execute(
                 schema.team_members.insert().values(
-                    team_id=row.team_id, user_id=user.id, role=row.role
+                    team_id=row.team_id,
+                    user_id=user.id,
+                    role=row.role,
+                    share_mode=body.share_mode,
                 )
             )
     except IntegrityError:
@@ -525,9 +599,10 @@ def accept_invitation(
         actor_user_id=user.id,
         target_type="team",
         target_id=row.team_id,
+        details={"reason": f"share_{body.share_mode}"},
     )
     role = _role(connection, row.team_id, user.id)
-    return _detail(connection, row.team_id, role or row.role)
+    return _detail(connection, row.team_id, role or row.role, user.id)
 
 
 # --- 프로젝트 공유 -----------------------------------------------------------------------
@@ -536,7 +611,7 @@ def accept_invitation(
 def _projects(connection: Connection, user_id: uuid.UUID) -> list[Project]:
     projects, shares = schema.projects, schema.project_shares
     rows = connection.execute(
-        select(projects.c.id, projects.c.display_name)
+        select(projects.c.id, projects.c.display_name, projects.c.origin)
         .where(projects.c.owner_user_id == user_id)
         .order_by(projects.c.display_name, projects.c.id)
     ).all()
@@ -549,7 +624,12 @@ def _projects(connection: Connection, user_id: uuid.UUID) -> list[Project]:
         ):
             shared.setdefault(share.project_id, []).append(share.team_id)
     return [
-        Project(id=r.id, display_name=r.display_name, shared_team_ids=sorted(shared.get(r.id, [])))
+        Project(
+            id=r.id,
+            display_name=r.display_name,
+            origin=r.origin,
+            shared_team_ids=sorted(shared.get(r.id, [])),
+        )
         for r in rows
     ]
 
@@ -563,7 +643,9 @@ def create_project(
         .values(owner_user_id=user.id, display_name=body.display_name.strip())
         .returning(schema.projects.c.id)
     ).scalar_one()
-    return Project(id=project_id, display_name=body.display_name.strip(), shared_team_ids=[])
+    return Project(
+        id=project_id, display_name=body.display_name.strip(), origin="manual", shared_team_ids=[]
+    )
 
 
 @router.get("/projects", response_model=list[Project])
@@ -638,17 +720,30 @@ def unshare_project(
 
 @router.get("/teams/{team_id}/projects", response_model=list[SharedProject])
 def team_projects(team_id: TeamId, user: UserDep, connection: DbConnection) -> list[SharedProject]:
-    """팀에 공유된 프로젝트. 공유를 거둔 프로젝트는 바로 사라진다."""
+    """이 팀에 보이는 프로젝트(#197). 공유 범위가 'all'인 구성원은 모든 프로젝트, 'selected'는
+    이 팀에 공유한 프로젝트만, 'none'은 없음. 공유를 거두거나 범위를 바꾸면 바로 사라진다."""
     _require_role(connection, team_id, user)
     projects, shares, users = schema.projects, schema.project_shares, schema.users
+    members = schema.team_members
+    shared_here = (
+        select(shares.c.project_id)
+        .where(shares.c.team_id == team_id, shares.c.project_id == projects.c.id)
+        .exists()
+    )
     rows = connection.execute(
         select(projects.c.id, projects.c.display_name, users.c.display_name.label("owner"))
         .select_from(
-            shares.join(projects, projects.c.id == shares.c.project_id).join(
-                users, users.c.id == projects.c.owner_user_id
+            projects.join(users, users.c.id == projects.c.owner_user_id).join(
+                members,
+                (members.c.team_id == team_id) & (members.c.user_id == projects.c.owner_user_id),
             )
         )
-        .where(shares.c.team_id == team_id)
+        .where(
+            or_(
+                members.c.share_mode == "all",
+                (members.c.share_mode == "selected") & shared_here,
+            )
+        )
         .order_by(projects.c.display_name, projects.c.id)
     ).all()
     return [

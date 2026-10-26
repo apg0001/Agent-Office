@@ -11,7 +11,7 @@ import {
   type AgentDetail,
 } from "./detail";
 import type { AgentState, DataSource } from "./types";
-import { shortWorkspace, workspaceName } from "./workspace";
+import { projectName, shortWorkspace, workspaceName } from "./workspace";
 
 interface Props {
   detail: AgentDetail;
@@ -34,6 +34,7 @@ function shortId(id: string): string {
 export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
   const { agent, session, device, parent, children, timeline, plan_steps: plan } = detail;
   const workspace = workspaceName(session.workspace_name);
+  const project = projectName(session.project_name);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -78,6 +79,14 @@ export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
             <dt>세션 이름</dt>
             <dd className="workspace" title={workspace}>
               {shortWorkspace(workspace, 40)}
+            </dd>
+          </>
+        )}
+        {project && project !== workspace && (
+          <>
+            <dt>프로젝트</dt>
+            <dd className="workspace" title={project}>
+              {shortWorkspace(project, 40)}
             </dd>
           </>
         )}

@@ -2,13 +2,27 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { Card, Field, Notice } from "./AccountPages";
 import { type SessionInfo, call, messageFor } from "./api";
-import { ROLE_LABELS, type TeamRole, canRemove, teamPermissions } from "./teams";
+import { ShareConsent } from "./ShareConsent";
+import {
+  ROLE_LABELS,
+  SHARE_MODES,
+  SHARE_MODE_HELP,
+  SHARE_MODE_LABELS,
+  SHARE_VISIBLE_TEXT,
+  type ShareMode,
+  type TeamRole,
+  canRemove,
+  shareModeFromConsent,
+  teamPermissions,
+} from "./teams";
 
 interface TeamSummary {
   id: string;
   name: string;
   description: string | null;
   role: TeamRole;
+  /** 내가 이 팀에 보여 주는 범위(#197). */
+  share_mode: ShareMode;
 }
 
 interface Member {
@@ -31,6 +45,8 @@ interface Invitation {
 interface Project {
   id: string;
   display_name: string;
+  /** "workspace"면 작업 폴더 이름으로 자동 생성한 프로젝트(#197). */
+  origin?: "manual" | "workspace";
   shared_team_ids: string[];
 }
 
@@ -40,6 +56,89 @@ interface OfficeSession {
   lifecycle: string;
   started_at: string | null;
   project_id?: string | null;
+  workspace_name?: string | null;
+}
+
+function ProjectName({ project }: { project: Project }) {
+  return (
+    <>
+      {project.display_name}
+      {project.origin === "workspace" && <span className="origin-chip">폴더</span>}
+    </>
+  );
+}
+
+/**
+ * 팀별 내 공유 범위(#197). 바꾸면 팀 사무실 스냅샷·실시간·상세에 바로 반영된다.
+ * "선택한 프로젝트만"이면 이 팀에 공유할 프로젝트를 체크한다(폴더 이름 자동 프로젝트 포함).
+ */
+function ShareSettings({ team, csrf, act, onChanged }: { team: TeamSummary; csrf: string; act: Act; onChanged: () => void }) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const mode = team.share_mode;
+
+  const loadProjects = useCallback(async () => {
+    setProjects((await call<Project[]>("GET", "/api/v1/projects")).data ?? []);
+  }, []);
+
+  useEffect(() => {
+    if (mode === "selected") {
+      void loadProjects();
+    }
+  }, [mode, loadProjects]);
+
+  return (
+    <fieldset className="choices share-settings">
+      <legend>이 팀에 보여 줄 내 작업</legend>
+      <p className="hint">{SHARE_VISIBLE_TEXT}</p>
+      {SHARE_MODES.map((option) => (
+        <label key={option}>
+          <input
+            type="radio"
+            name={`share-mode-${team.id}`}
+            value={option}
+            checked={mode === option}
+            onChange={() =>
+              void act(() => call("PUT", `/api/v1/teams/${team.id}/share-mode`, { share_mode: option }, csrf)).then((ok) => {
+                if (ok) {
+                  onChanged();
+                }
+              })
+            }
+          />{" "}
+          {SHARE_MODE_LABELS[option]}
+          <span className="hint"> — {SHARE_MODE_HELP[option]}</span>
+        </label>
+      ))}
+      {mode === "selected" && (
+        <ul className="project-checklist" aria-label={`${team.name}에 공유할 프로젝트`}>
+          {projects.length === 0 && <li className="hint">아직 프로젝트가 없습니다. 폴더 이름을 켠 PC에서 작업하면 자동으로 생깁니다.</li>}
+          {projects.map((project) => {
+            const shared = project.shared_team_ids.includes(team.id);
+            return (
+              <li key={project.id}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={shared}
+                    onChange={() =>
+                      void act(() =>
+                        call(shared ? "DELETE" : "PUT", `/api/v1/projects/${project.id}/shares/${team.id}`, undefined, csrf),
+                      ).then(async (ok) => {
+                        if (ok) {
+                          await loadProjects();
+                        }
+                      })
+                    }
+                  />{" "}
+                  <ProjectName project={project} />
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </fieldset>
+  );
 }
 
 type Act = (action: () => Promise<{ ok: boolean; error: string | null }>) => Promise<boolean>;
@@ -92,8 +191,10 @@ function TeamCard({ team, me, csrf, act, reload }: { team: TeamSummary; me: stri
       <header>
         <h3>{team.name}</h3>
         <span className="role-chip">{ROLE_LABELS[team.role]}</span>
+        <span className="role-chip">{SHARE_MODE_LABELS[team.share_mode]}</span>
         <a href={`/?team=${team.id}`}>팀 사무실 보기</a>
       </header>
+      <ShareSettings team={team} csrf={csrf} act={act} onChanged={reload} />
       {detail && (
         <table className="members">
           <tbody>
@@ -237,7 +338,10 @@ function Projects({ teams, csrf, act }: { teams: TeamSummary[]; csrf: string; ac
 
   return (
     <Card title="내 프로젝트와 공유">
-      <p className="hint">세션을 프로젝트에 넣고 그 프로젝트를 팀에 공유하면 팀 사무실에 나타납니다. 공유하지 않은 세션은 나만 봅니다.</p>
+      <p className="hint">
+        PC에서 폴더 이름을 켜 두면 세션이 그 폴더 이름의 프로젝트에 자동으로 들어갑니다(폴더 표시). 직접 고른 프로젝트가 자동 배정보다
+        우선합니다. 팀에 무엇이 보이는지는 팀마다 고른 공유 범위로 정해집니다.
+      </p>
       <form
         className="inline-form"
         onSubmit={(event) => {
@@ -250,7 +354,9 @@ function Projects({ teams, csrf, act }: { teams: TeamSummary[]; csrf: string; ac
       </form>
       {projects.map((project) => (
         <fieldset key={project.id} className="choices">
-          <legend>{project.display_name}</legend>
+          <legend>
+            <ProjectName project={project} />
+          </legend>
           {teams.map((team) => {
             const shared = project.shared_team_ids.includes(team.id);
             return (
@@ -274,7 +380,7 @@ function Projects({ teams, csrf, act }: { teams: TeamSummary[]; csrf: string; ac
             {sessions.map((session) => (
               <tr key={session.id}>
                 <td>
-                  {session.provider} 세션 {session.id.slice(-6)}
+                  {session.provider} 세션 {session.workspace_name ?? session.id.slice(-6)}
                 </td>
                 <td>
                   <select
@@ -286,7 +392,7 @@ function Projects({ teams, csrf, act }: { teams: TeamSummary[]; csrf: string; ac
                       )
                     }
                   >
-                    <option value="">프로젝트 없음(비공개)</option>
+                    <option value="">프로젝트 없음</option>
                     {projects.map((project) => (
                       <option key={project.id} value={project.id}>
                         {project.display_name}
@@ -308,6 +414,7 @@ export function TeamsPage() {
   const [session, setSession] = useState<SessionInfo | null | undefined>(undefined);
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [name, setName] = useState("");
+  const [shareAll, setShareAll] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
 
@@ -353,9 +460,10 @@ export function TeamsPage() {
           className="inline-form"
           onSubmit={(event) => {
             event.preventDefault();
-            void act(() => call("POST", "/api/v1/teams", { name }, csrf)).then((ok) => {
+            void act(() => call("POST", "/api/v1/teams", { name, share_mode: shareModeFromConsent(shareAll) }, csrf)).then((ok) => {
               if (ok) {
                 setName("");
+                setShareAll(true);
                 reload();
               }
             });
@@ -364,9 +472,10 @@ export function TeamsPage() {
           <Field label="새 팀 이름" name="team_name" value={name} onChange={setName} />
           <button type="submit">팀 만들기</button>
         </form>
+        <ShareConsent checked={shareAll} onChange={setShareAll} />
         {teams.length === 0 && <p className="hint">아직 속한 팀이 없습니다. 팀을 만들거나 초대 링크를 받으세요.</p>}
         {teams.map((team) => (
-          <TeamCard key={`${team.id}-${team.role}-${version}`} team={team} me={session.user.id} csrf={csrf} act={act} reload={reload} />
+          <TeamCard key={`${team.id}-${team.role}-${team.share_mode}-${version}`} team={team} me={session.user.id} csrf={csrf} act={act} reload={reload} />
         ))}
       </Card>
       <Projects key={version} teams={teams} csrf={csrf} act={act} />

@@ -42,3 +42,29 @@ export const ROLE_LABELS: Record<TeamRole, string> = {
   MANAGER: "관리자",
   MEMBER: "구성원",
 };
+
+/** 팀원별 공유 범위(#197). 서버가 매 요청·매 주기 이 값으로 팀 화면을 다시 거른다. */
+export type ShareMode = "all" | "selected" | "none";
+
+export const SHARE_MODES: ShareMode[] = ["all", "selected", "none"];
+
+export const SHARE_MODE_LABELS: Record<ShareMode, string> = {
+  all: "모두 공유",
+  selected: "선택한 프로젝트만",
+  none: "공유 안 함",
+};
+
+export const SHARE_MODE_HELP: Record<ShareMode, string> = {
+  all: "내 모든 세션이 이 팀 사무실에 보입니다. 프로젝트가 없는 세션은 '(이름 없음)'으로 보입니다.",
+  selected: "아래에서 체크한 프로젝트의 세션만 보입니다. 폴더 이름으로 자동으로 만든 프로젝트도 고를 수 있습니다.",
+  none: "이 팀에는 내 세션이 하나도 보이지 않습니다. 팀원의 세션은 계속 볼 수 있습니다.",
+};
+
+/** 가입·생성 화면과 설정에 함께 보이는 동의 설명(#197). */
+export const SHARE_VISIBLE_TEXT =
+  "팀원에게 보이는 것: 상태·활동 종류·표시 이름·프로젝트 이름. 대화·코드·경로·폴더 전체 경로는 보이지 않습니다.";
+
+/** 가입·생성 화면의 "모두 공유" 체크(기본 체크)를 서버에 보낼 범위로 바꾼다. */
+export function shareModeFromConsent(shareAll: boolean): ShareMode {
+  return shareAll ? "all" : "selected";
+}

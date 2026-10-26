@@ -39,7 +39,7 @@ erDiagram
     users |o--o{ audit_logs : "행위자(SET NULL)"
 ```
 
-실시간 전달(#37)을 위해 마이그레이션 `0003`이 전역 시퀀스 `state_change_seq`와 `agent_sessions.change_seq·changed_at`, `agent_current_states.change_seq`를 추가했습니다. 화면에 보이는 값이 바뀔 때만 증가합니다. 마이그레이션 `0004`는 현재 활동의 관측·추정 구분 `agent_current_states.confidence`를 추가했습니다(#47). 마이그레이션 `0008`은 세션 작업 폴더 이름 `agent_sessions.workspace_name`을 추가했습니다(#181).
+실시간 전달(#37)을 위해 마이그레이션 `0003`이 전역 시퀀스 `state_change_seq`와 `agent_sessions.change_seq·changed_at`, `agent_current_states.change_seq`를 추가했습니다. 화면에 보이는 값이 바뀔 때만 증가합니다. 마이그레이션 `0004`는 현재 활동의 관측·추정 구분 `agent_current_states.confidence`를 추가했습니다(#47). 마이그레이션 `0008`은 세션 작업 폴더 이름 `agent_sessions.workspace_name`을 추가했습니다(#181). 마이그레이션 `0009`는 팀원별 공유 범위 `team_members.share_mode`(`all`·`selected`·`none`, 기존 행은 `selected`, 이후 기본 `all`), 프로젝트 출처 `projects.origin`(`manual`·`workspace`), 직접 정한 배정 표시 `agent_sessions.project_manual`(기존에 프로젝트가 있던 세션은 `true`)을 추가했습니다(#197). 다운그레이드 가능하며 내려가면 세 컬럼이 지워집니다(공유 범위 선택이 사라지고 #54 규칙으로 돌아감).
 
 `instance_settings`와 `notification_channels`는 인스턴스 전역 테이블입니다. 마스터 사양의 `schema_migrations`는 Alembic의 `alembic_version` 테이블이 맡습니다.
 
@@ -63,6 +63,8 @@ erDiagram
 | 관측·추정 구분 | `source = 'inferred'`면 `confidence = 'inferred'` |
 | 책상 배정 | 레이아웃당 슬롯 번호·좌표 고유, 세션은 레이아웃당 책상 1개 |
 | 프로젝트 공유 | `(project_id, team_id)` PK. 한 프로젝트를 여러 팀에 공유해도 이벤트는 한 번만 저장 |
+| 팀원별 공유 범위 | `ck_team_members_share_mode`: `all`·`selected`·`none`만(#197) |
+| 프로젝트 출처 | `ck_projects_origin`: `manual`·`workspace`만. 폴더 이름 프로젝트는 소유자·이름당 하나(서비스 계층 advisory lock) |
 
 부모 에이전트 순환(A→B→A)은 FK로 막을 수 없습니다. 수집 API(#35)가 부모가 먼저 존재하는지 확인하고, 부모를 나중에 바꾸지 않습니다.
 
@@ -72,6 +74,7 @@ erDiagram
 - `activity_events` 컬럼은 이벤트 v1 허용 필드와 서버 전용 `received_at`·`payload_digest`뿐입니다.
 - `plan_steps`는 순서와 상태만 저장하고 계획 문장은 저장하지 않습니다.
 - `agent_sessions.workspace_name`(마이그레이션 `0008`, #181)은 사용자가 PC별로 켠 경우의 작업 폴더 **마지막 이름**만 담습니다(`varchar(64)`, NULL 허용). `ck_agent_sessions_workspace_name`이 1~64자와 `/`·`\`·제어 문자 없음을 강제합니다. 전체 경로·상위 폴더는 저장하지 않습니다.
+- 폴더 이름 자동 프로젝트(#197)의 `projects.display_name`은 `workspace_name`(마지막 폴더 이름) 그대로이며, 상위 경로는 없습니다. 이 이름은 그 프로젝트가 팀에 보이는 범위(`all` 또는 `selected`로 공유)에서 팀원에게 프로젝트 이름으로 보입니다.
 - `project_sources`는 Collector가 만든 장치별 HMAC 지문만 저장합니다. 경로·원격 URL은 저장하지 않습니다.
 - `notification_channels`의 Webhook URL·토큰·SMTP 암호는 `secret_ciphertext`에 암호화해 둡니다(암호화 키 관리는 #67·#70). `instance_settings`에는 비밀을 두지 않습니다. 인스턴스 비밀(SMTP 암호, OAuth client secret)은 `instance_secrets`에 AES-256-GCM 암호문으로 둡니다(#67, 마이그레이션 `0005`).
 - `audit_logs.details`는 허용 목록 키만 담는 요약입니다(#28).

@@ -357,6 +357,7 @@ def _store(
     sessions = schema.agent_sessions
     if event.workspace_name is not None:
         _apply_workspace_name(connection, session_id, event.workspace_name, occurred)
+        _assign_workspace_project(connection, device.owner_user_id, session_id)
     connection.execute(
         update(sessions)
         .where(sessions.c.id == session_id)
@@ -382,6 +383,59 @@ def _apply_workspace_name(
         )
         .values(
             workspace_name=name,
+            change_seq=func.nextval("state_change_seq"),
+            changed_at=func.clock_timestamp(),
+        )
+    )
+
+
+def _assign_workspace_project(
+    connection: Connection, owner_user_id: uuid.UUID, session_id: uuid.UUID
+) -> None:
+    """작업 폴더 이름으로 소유자의 프로젝트를 찾거나 만들어 세션을 넣는다(#197).
+
+    소유자별로 같은 표시 이름의 프로젝트를 다시 쓴다(가장 먼저 만든 것). 사용자가 직접 정한
+    배정(`project_manual`)은 바꾸지 않는다. 폴더 이름이 없으면 아무것도 하지 않는다."""
+    sessions, projects = schema.agent_sessions, schema.projects
+    current = connection.execute(
+        select(
+            sessions.c.workspace_name,
+            sessions.c.project_manual,
+            projects.c.display_name.label("project_name"),
+        )
+        .select_from(sessions.outerjoin(projects, projects.c.id == sessions.c.project_id))
+        .where(sessions.c.id == session_id)
+    ).one()
+    name = (current.workspace_name or "").strip()
+    if current.project_manual or not name or current.project_name == name:
+        return
+    find = (
+        select(projects.c.id)
+        .where(projects.c.owner_user_id == owner_user_id, projects.c.display_name == name)
+        .order_by(projects.c.created_at, projects.c.id)
+        .limit(1)
+    )
+    project_id = connection.execute(find).scalar_one_or_none()
+    if project_id is None:
+        # 같은 소유자·이름의 동시 생성을 트랜잭션 끝까지 직렬화한다(중복 프로젝트 방지).
+        key = f"agent_office.workspace_project:{owner_user_id}:{name}"
+        connection.execute(select(func.pg_advisory_xact_lock(func.hashtextextended(key, 0))))
+        project_id = connection.execute(find).scalar_one_or_none()
+        if project_id is None:
+            project_id = connection.execute(
+                schema.projects.insert()
+                .values(owner_user_id=owner_user_id, display_name=name, origin="workspace")
+                .returning(projects.c.id)
+            ).scalar_one()
+    connection.execute(
+        update(sessions)
+        .where(
+            sessions.c.id == session_id,
+            sessions.c.project_manual.is_(False),
+            sessions.c.project_id.is_distinct_from(project_id),
+        )
+        .values(
+            project_id=project_id,
             change_seq=func.nextval("state_change_seq"),
             changed_at=func.clock_timestamp(),
         )

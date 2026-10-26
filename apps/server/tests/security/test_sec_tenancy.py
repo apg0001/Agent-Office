@@ -49,6 +49,7 @@ def _bodies(world: World, attacker: Actor) -> dict[str, Any]:
         "PATCH /api/v1/teams/{team_id}": {"name": "pwned"},
         "PATCH /api/v1/teams/{team_id}/members/{member_id}": {"role": "MEMBER"},
         "POST /api/v1/teams/{team_id}/transfer": {"user_id": str(attacker.id)},
+        "PUT /api/v1/teams/{team_id}/share-mode": {"share_mode": "all"},
         "POST /api/v1/teams/{team_id}/invitations": {"email": attacker.email, "role": "MANAGER"},
         "PUT /api/v1/office/sessions/{session_id}/project": {"project_id": None},
         "PUT /api/v1/admin/users/{user_id}/role": {"instance_role": "USER"},
