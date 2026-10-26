@@ -18,7 +18,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
-from sqlalchemy import Connection, func, select, update
+from sqlalchemy import Connection, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -81,6 +81,14 @@ RejectionCode = Literal[
 ]
 PlanStatus = Literal["pending", "in_progress", "completed", "unknown"]
 # RFC 3339 시간대(Z 또는 ±HH:MM)가 반드시 붙은 문자열만 받는다.
+# 작업 폴더의 마지막 이름(#181). 경로 구분자·제어·서식 문자를 거부한다(스키마 pattern과 같음).
+WORKSPACE_NAME_PATTERN = (
+    "^[^/\\\\\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e"
+    "\u2060-\u206f\ufeff\ufff9-\ufffb]+$"
+)
+WorkspaceName = Annotated[
+    str, StringConstraints(min_length=1, max_length=64, pattern=WORKSPACE_NAME_PATTERN)
+]
 OccurredAt = Annotated[
     str, StringConstraints(max_length=40, pattern=r"^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$")
 ]
@@ -106,11 +114,15 @@ class EventV1(BaseModel):
     sequence: Annotated[int, Field(strict=True, ge=0, le=MAX_SAFE_INTEGER)]
     # plan.updated에서만: 계획 단계 상태만 순서대로(#38). 단계 문장은 받지 않는다.
     plan_steps: Annotated[tuple[PlanStatus, ...], Field(min_length=1, max_length=50)] | None = None
+    # 작업 폴더의 마지막 이름만(#181). Collector가 PC별 동의를 받았을 때만 보낸다.
+    workspace_name: WorkspaceName | None = None
 
     @model_validator(mode="after")
     def _inferred_source_is_inferred(self) -> EventV1:
         if self.plan_steps is not None and self.event_type != "plan.updated":
             raise ValueError("plan_steps only on plan.updated")
+        if self.workspace_name in {".", ".."}:
+            raise ValueError("workspace_name must be a folder name")
         if self.source == "inferred" and self.confidence != "inferred":
             raise ValueError("inferred source requires inferred confidence")
         if self.parent_agent_id == self.agent_id:
@@ -126,6 +138,9 @@ class EventV1(BaseModel):
         if canonical.get("plan_steps") is None:
             # 계획 필드가 없는 이벤트의 digest는 필드 추가 전과 같아야 재전송이 중복으로 처리된다.
             canonical.pop("plan_steps", None)
+        if canonical.get("workspace_name") is None:
+            # 작업 폴더 이름(#181)이 없는 이벤트도 필드 추가 전과 같은 digest를 유지한다.
+            canonical.pop("workspace_name", None)
         canonical["occurred_at"] = self.occurred_datetime().astimezone(dt.UTC).isoformat()
         return hashlib.sha256(
             json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -340,6 +355,8 @@ def _store(
     if event.plan_steps is not None:
         apply_plan(connection, session_id, agent_id, list(event.plan_steps), occurred)
     sessions = schema.agent_sessions
+    if event.workspace_name is not None:
+        _apply_workspace_name(connection, session_id, event.workspace_name, occurred)
     connection.execute(
         update(sessions)
         .where(sessions.c.id == session_id)
@@ -348,6 +365,27 @@ def _store(
         )
     )
     return "accepted"
+
+
+def _apply_workspace_name(
+    connection: Connection, session_id: uuid.UUID, name: str, occurred: dt.datetime
+) -> None:
+    """세션 작업 폴더 이름을 바꾼다(#181). 마지막 이벤트보다 늦지 않은 이벤트의 이름만 반영하고
+    (지연 도착한 과거 이벤트가 되돌리지 않게), 바뀌었을 때만 실시간 변경 번호를 올린다."""
+    sessions = schema.agent_sessions
+    connection.execute(
+        update(sessions)
+        .where(
+            sessions.c.id == session_id,
+            sessions.c.workspace_name.is_distinct_from(name),
+            or_(sessions.c.last_event_at.is_(None), sessions.c.last_event_at <= occurred),
+        )
+        .values(
+            workspace_name=name,
+            change_seq=func.nextval("state_change_seq"),
+            changed_at=func.clock_timestamp(),
+        )
+    )
 
 
 # 본문 크기(1MiB)는 `agent_office.http_limits.BodySizeLimitMiddleware`가 본문을 읽기 전에 제한한다.

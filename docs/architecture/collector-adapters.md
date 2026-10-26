@@ -133,3 +133,11 @@ Hook payload에는 도구 버전이 없으므로 호출자가 로컬에서 감�
 - #31: Hook 설치·버전 감지로 `Runtime` 채우기
 - #32: 후보 → 이벤트 v1 정규화는 [Collector 이벤트 정규화](collector-normalize.md)의 `internal/normalize`가 맡음
 - #33: SQLite 큐에 키 집합·무작위 `event_id` 영속화
+
+## 작업 폴더 이름(#181)
+
+- `claude.ParseHookWith`·`codex.ParseHookWith`는 `adapter.HookOptions{WorkspaceName: true}`일 때만 Hook payload의 `cwd`를 문자열로 읽고 `adapter.WorkspaceName`으로 마지막 이름만 정리해 `Candidate.WorkspaceName`에 담습니다. `ParseHook`(옵션 없음)은 읽지 않습니다. 알 수 없는 이벤트 후보에는 담지 않습니다.
+- `hook` 명령은 설정 `share_workspace_name`(PC별 동의, 기본 false)이 켜져 있을 때만 옵션을 켜고, 사용자 홈 폴더는 제외 목록으로 넘깁니다.
+- spool 레코드(`workspace_name`)와 Normalizer는 `adapter.ValidWorkspaceName`으로 다시 검증하고, 맞지 않으면 이름 없이 이벤트를 만듭니다(2차 방어선). 이벤트 id·중복 제거 키에는 영향을 주지 않습니다.
+- transcript JSONL의 `cwd`는 읽지 않습니다. 같은 턴을 transcript가 먼저 보고하면 그 `turn.started`에는 이름이 없고, 같은 세션의 다른 Hook 이벤트가 이름을 전달합니다.
+- 테스트: 동의가 꺼져 있으면 상위 폴더 sentinel과 폴더 이름이 spool·큐 DB·이벤트 바이트에 없음, 켜져 있으면 마지막 이름만 있음(`cli/workspace_test.go`), 정리 규칙과 스키마 일치(`adapter/workspace_test.go`, `normalize/schema_test.go`).

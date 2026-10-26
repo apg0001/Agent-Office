@@ -196,6 +196,11 @@ func (n *Normalizer) normalize(in Input) (Record, Outcome) {
 	if eventType == string(adapter.EventPlanUpdated) && c.Plan != nil {
 		planSteps = sanitizePlan(c.Plan.Steps)
 	}
+	workspace := ""
+	if adapter.ValidWorkspaceName(c.WorkspaceName) {
+		// 2차 방어선: 어댑터가 정리한 값과 같을 때만 보낸다. 아니면 이름 없이 보낸다.
+		workspace = c.WorkspaceName
+	}
 	return Record{
 		Event: Event{
 			SchemaVersion: SchemaVersion,
@@ -212,6 +217,7 @@ func (n *Normalizer) normalize(in Input) (Record, Outcome) {
 			OccurredAt:    occurredAt,
 			Sequence:      seq,
 			PlanSteps:     planSteps,
+			WorkspaceName: workspace,
 		},
 		DeterministicID: deterministic,
 	}, OutcomeAccepted
