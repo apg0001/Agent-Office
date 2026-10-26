@@ -85,8 +85,47 @@ def test_event_contract_has_only_reviewed_fields() -> None:
         "sequence",
         # plan.updated에서만 쓰는 선택 필드. 상태 enum 배열이라 원문이 들어갈 수 없다(#38).
         "plan_steps",
+        # 작업 폴더 마지막 이름. PC별 동의 시에만, 경로 구분자·제어 문자 없음(#181).
+        "workspace_name",
     }
     assert EVENT_SCHEMA["additionalProperties"] is False
     plan = EVENT_SCHEMA["properties"]["plan_steps"]
     assert plan["items"] == {"enum": ["pending", "in_progress", "completed", "unknown"]}
     assert "plan_steps" not in EVENT_SCHEMA["required"]
+    workspace = EVENT_SCHEMA["properties"]["workspace_name"]
+    assert workspace["type"] == "string"
+    assert (workspace["minLength"], workspace["maxLength"]) == (1, 64)
+    assert "workspace_name" not in EVENT_SCHEMA["required"]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "/x",
+        "a/b",
+        "a\\b",
+        "a\x00",
+        "a\n",
+        "a\x7f",
+        "a\x85",
+        "a\u200b",
+        "a\u202e",
+        "a\u2028",
+        "a\ufeff",
+        ".",
+        "..",
+    ],
+)
+def test_workspace_name_rejects_paths_and_control_characters(value: str) -> None:
+    event = load_json(FIXTURE_DIRECTORY / "valid" / "event-workspace-name.json")
+    event["workspace_name"] = value
+    assert list(Draft202012Validator(EVENT_SCHEMA).iter_errors(event))
+
+
+@pytest.mark.parametrize(
+    "value", ["Agent-Office", "blog", "team repo", "가" * 64, "emoji😀"]
+)
+def test_workspace_name_accepts_folder_names(value: str) -> None:
+    event = load_json(FIXTURE_DIRECTORY / "valid" / "event-workspace-name.json")
+    event["workspace_name"] = value
+    assert not list(Draft202012Validator(EVENT_SCHEMA).iter_errors(event))

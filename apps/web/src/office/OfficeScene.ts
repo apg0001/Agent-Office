@@ -41,7 +41,8 @@ import {
   wallQuad,
   wallSegments,
 } from "./walls";
-import type { AgentState, OfficeState } from "./types";
+import type { AgentState, OfficeState, SessionState } from "./types";
+import { shortWorkspace, workspaceName } from "./workspace";
 
 const WALK_TILES_PER_SECOND = 2.5;
 /**
@@ -59,6 +60,8 @@ interface Actor {
   sprite: Phaser.GameObjects.Image;
   shirt: number;
   label: Phaser.GameObjects.Text;
+  /** 이름표 아래 작은 세션 이름(#181). 서버가 주지 않으면 숨긴다. */
+  workspace: Phaser.GameObjects.Text;
   marker: Phaser.GameObjects.Text;
   position: Point;
   target: Point;
@@ -207,6 +210,7 @@ export class OfficeScene extends Phaser.Scene {
       if (actor.label.text !== name) {
         actor.label.setText(name);
       }
+      this.showWorkspace(actor, agent, session);
       this.plan(actor, Date.now());
     }
     for (const [id, actor] of this.actors) {
@@ -215,6 +219,16 @@ export class OfficeScene extends Phaser.Scene {
         this.startLeaving(actor);
       }
     }
+  }
+
+  /** 대장 캐릭터 이름표 아래 세션 이름. 검증한 값만 줄여서 그린다(Phaser 글자라 HTML로 해석되지 않음). */
+  private showWorkspace(actor: Actor, agent: AgentState, session: SessionState | undefined): void {
+    const name = agent.role === "lead" ? workspaceName(session?.workspace_name) : null;
+    const text = name ? shortWorkspace(name) : "";
+    if (actor.workspace.text !== text) {
+      actor.workspace.setText(text);
+    }
+    actor.workspace.setVisible(text !== "");
   }
 
   /** 폭주 병합을 거친 표시 구역으로 목적지를 정한다. */
@@ -379,10 +393,20 @@ export class OfficeScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     // 하위 에이전트는 작은 몸과 머리 위 상태로 구분한다. 이름표("하위")까지 달면 겹쳐 보인다.
     label.setVisible(agent.role !== "subagent");
-    for (const text of [label, marker, status]) {
+    // 세션 이름은 이름표 바로 아래에 더 작고 흐리게. 길면 줄여 옆 캐릭터와 덜 겹치게 한다.
+    const workspace = this.add
+      .text(0, 17, "", {
+        fontFamily: MAP_FONT,
+        fontSize: "10px",
+        color: "#c3c8de",
+        backgroundColor: "#00000055",
+      })
+      .setOrigin(0.5, 0)
+      .setVisible(false);
+    for (const text of [label, workspace, marker, status]) {
       crisp(text);
     }
-    container.add([sprite, label, marker, status]);
+    container.add([sprite, label, workspace, marker, status]);
     sprite.setInteractive({ useHandCursor: true });
     sprite.on("pointerup", (pointer: Phaser.Input.Pointer) => {
       // 드래그(카메라 이동)로 끝난 클릭은 선택으로 보지 않는다.
@@ -395,6 +419,7 @@ export class OfficeScene extends Phaser.Scene {
       sprite,
       shirt,
       label,
+      workspace,
       marker,
       status,
       position: start,
@@ -404,6 +429,7 @@ export class OfficeScene extends Phaser.Scene {
       leaving: false,
     };
     this.actors.set(agent.id, actor);
+    this.showWorkspace(actor, agent, session);
     return actor;
   }
 

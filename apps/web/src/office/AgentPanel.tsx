@@ -11,6 +11,7 @@ import {
   type AgentDetail,
 } from "./detail";
 import type { AgentState, DataSource } from "./types";
+import { shortWorkspace, workspaceName } from "./workspace";
 
 interface Props {
   detail: AgentDetail;
@@ -32,6 +33,7 @@ function shortId(id: string): string {
 /** 캐릭터 상세 패널(#51). 사실 상태만 보여 주고 추정은 추정이라고 표시한다. */
 export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
   const { agent, session, device, parent, children, timeline, plan_steps: plan } = detail;
+  const workspace = workspaceName(session.workspace_name);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -71,6 +73,14 @@ export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
           {session.provider} · {label(LIFECYCLE_LABELS, session.lifecycle)} · 마지막 활동{" "}
           {relativeTime(session.last_event_at, now)}
         </dd>
+        {workspace && (
+          <>
+            <dt>세션 이름</dt>
+            <dd className="workspace" title={workspace}>
+              {shortWorkspace(workspace, 40)}
+            </dd>
+          </>
+        )}
         <dt>PC</dt>
         <dd>
           {device.name} · {device.connection === "ONLINE" ? "연결됨" : "연결 끊김"}

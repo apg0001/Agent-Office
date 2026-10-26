@@ -3,7 +3,8 @@
 //
 // 허용 필드만 정확한 키 이름으로 읽는다. prompt, tool_input, tool_response, error,
 // last_assistant_message, cwd, transcript_path, background_tasks, session_crons,
-// message.content의 본문은 어떤 후보 필드에도 복사하지 않는다.
+// message.content의 본문은 어떤 후보 필드에도 복사하지 않는다. 예외로 PC별 동의가 켜진 Hook에서만
+// cwd의 마지막 폴더 이름을 정리해 담는다(ParseHookWith, #181). transcript의 cwd는 읽지 않는다.
 package claude
 
 import (
@@ -70,7 +71,13 @@ var hookEventTypes = map[string]adapter.EventType{
 //   - 도구 이벤트에 tool_use_id가 없으면 ErrMissingRef(참조 구현과 같이 후보 없음).
 //
 // 어떤 입력에서도 panic하지 않는다.
-func ParseHook(data []byte, rt adapter.Runtime) (c adapter.Candidate, err error) {
+func ParseHook(data []byte, rt adapter.Runtime) (adapter.Candidate, error) {
+	return ParseHookWith(data, rt, adapter.HookOptions{})
+}
+
+// ParseHookWith는 ParseHook에 선택 항목을 더한다. opts.WorkspaceName이 켜져 있을 때만 `cwd`의
+// 마지막 폴더 이름을 후보에 담는다(#181). 알 수 없는 이벤트 후보에는 담지 않는다.
+func ParseHookWith(data []byte, rt adapter.Runtime, opts adapter.HookOptions) (c adapter.Candidate, err error) {
 	defer func() {
 		if recover() != nil {
 			c, err = adapter.Candidate{}, adapter.ErrMalformed
@@ -109,6 +116,8 @@ func ParseHook(data []byte, rt adapter.Runtime) (c adapter.Candidate, err error)
 		Activity:   adapter.ActivityUnknown,
 		Confidence: adapter.ConfidenceFor(support),
 		Support:    support,
+		// cwd는 동의가 켜진 경우에만 읽고 마지막 이름만 남긴다(#181).
+		WorkspaceName: opts.Workspace(obj),
 	}
 	if obj.Has("agent_type") {
 		c.AgentType = agentTypeCategory(obj.String("agent_type"))

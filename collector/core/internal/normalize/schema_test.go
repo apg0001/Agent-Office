@@ -8,8 +8,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
+
+	"github.com/apg0001/Agent-Office/collector/core/internal/adapter"
 )
 
 var schemaPath = filepath.Join("..", "..", "..", "..", "packages", "event-schema", "schema", "event-v1.schema.json")
@@ -190,7 +194,7 @@ func TestEventKeySetEqualsSchemaRequiredAndProperties(t *testing.T) {
 	}
 	required := append([]string(nil), s.Required...)
 	sort.Strings(required)
-	// 계획 단계가 없으면 필수 필드만, 있으면 스키마 속성 전부(plan_steps는 선택 필드, #38).
+	// 선택 필드가 없으면 필수 필드만, 있으면 스키마 속성 전부(plan_steps #38, workspace_name #181).
 	for _, ev := range []Event{sampleEvent(), {}} {
 		if got := marshalKeys(ev); fmt.Sprint(got) != fmt.Sprint(required) {
 			t.Fatalf("event keys %v, required %v", got, required)
@@ -198,6 +202,7 @@ func TestEventKeySetEqualsSchemaRequiredAndProperties(t *testing.T) {
 	}
 	withPlan := sampleEvent()
 	withPlan.EventType, withPlan.PlanSteps = "plan.updated", []string{"completed", "pending"}
+	withPlan.WorkspaceName = "Agent-Office" // 선택 필드(#181)
 	if got := marshalKeys(withPlan); fmt.Sprint(got) != fmt.Sprint(keys(s.Properties)) {
 		t.Fatalf("event keys %v, properties %v", got, keys(s.Properties))
 	}
@@ -261,4 +266,50 @@ func mustMarshal(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return raw
+}
+
+// Collector가 만드는 작업 폴더 이름은 모두 스키마 `workspace_name`을 통과하고, 경로·제어 문자는 거부된다(#181).
+func TestWorkspaceNameMatchesSchema(t *testing.T) {
+	var raw struct {
+		Properties map[string]struct {
+			MinLength int `json:"minLength"`
+			MaxLength int `json:"maxLength"`
+			Not       struct {
+				AnyOf []struct {
+					Enum    []string `json:"enum"`
+					Pattern string   `json:"pattern"`
+				} `json:"anyOf"`
+			} `json:"not"`
+		} `json:"properties"`
+	}
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	p, ok := raw.Properties["workspace_name"]
+	if !ok || len(p.Not.AnyOf) != 2 || p.Not.AnyOf[1].Pattern == "" || p.MaxLength != adapter.MaxWorkspaceNameRunes || p.MinLength != 1 {
+		t.Fatal("workspace_name schema mismatch")
+	}
+	forbidden := regexp.MustCompile(p.Not.AnyOf[1].Pattern)
+	valid := func(s string) bool {
+		n := utf8.RuneCountInString(s)
+		return n >= p.MinLength && n <= p.MaxLength && !forbidden.MatchString(s) && !contains(p.Not.AnyOf[0].Enum, s)
+	}
+	for _, in := range []string{
+		"/a/Agent-Office", `C:\x\blog`, "/a/" + strings.Repeat("가", 80), "/a/x\u200by", "/a/\u00adz\ufeff",
+		"/a/ name ", "/a/\u0085w", "/a/\u2066rtl\u2069", "/a/emoji\U0001F600",
+	} {
+		got := adapter.WorkspaceName(in)
+		if got == "" || !valid(got) {
+			t.Errorf("collector output %q rejected by schema", got)
+		}
+	}
+	for _, bad := range []string{"", ".", "..", "a/b", `a\b`, "a\x00", "a\n", "a\u007f", "a\u0085", "a\u200b", "a\u202e", "a\u2028", "a\ufeff", strings.Repeat("x", 65)} {
+		if valid(bad) {
+			t.Errorf("schema accepted %q", bad)
+		}
+	}
 }
