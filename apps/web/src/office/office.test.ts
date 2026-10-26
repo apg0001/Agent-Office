@@ -88,6 +88,12 @@ describe("behavior", () => {
     const seat = seats.get(lead!.session_id)!;
     expect(targetTile(map, lead!, seats)).toEqual(seat);
     expect(targetTile(map, child!, seats)).toEqual({ x: seat.x + 1, y: seat.y });
+    // 둘째·셋째 하위 에이전트는 다른 칸에 선다(#182).
+    const spots = [0, 1, 2, 3].map((i) => targetTile(map, child!, seats, "desk", 0, i));
+    expect(new Set(spots.map((p) => `${p.x},${p.y}`)).size).toBe(4);
+    for (const spot of spots) {
+      expect(isWalkable(map, spot)).toBe(true);
+    }
   });
 
   it("uses the server desk slot and leaves returned desks empty", () => {

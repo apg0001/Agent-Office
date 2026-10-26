@@ -6,7 +6,7 @@
 
 import Phaser from "phaser";
 
-import { assignSeats, targetTile } from "./behavior";
+import { assignSeats, subagentIndexOf, targetTile } from "./behavior";
 import {
   type CameraState,
   focusPoint,
@@ -246,7 +246,14 @@ export class OfficeScene extends Phaser.Scene {
     actor.displayed = nextDisplayedZone(actor.displayed, actor.agent, now);
     // 유휴면 휴게실 안에서 가끔 자리를 옮긴다(생활 연출).
     const variant = actor.displayed.zone === "lounge" ? idleCycle(now, actor.agent.id) : 0;
-    const target = targetTile(this.map, actor.agent, this.seats, actor.displayed.zone, variant);
+    const target = targetTile(
+      this.map,
+      actor.agent,
+      this.seats,
+      actor.displayed.zone,
+      variant,
+      subagentIndexOf(this.state, actor.agent),
+    );
     if (target.x !== actor.target.x || target.y !== actor.target.y || actor.path.length === 0) {
       // 이동 중에 목적지가 바뀌어도 지금 서 있는 칸에서 다시 경로를 찾는다.
       const here = { x: Math.round(actor.position.x), y: Math.round(actor.position.y) };
