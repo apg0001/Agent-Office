@@ -190,6 +190,10 @@ def test_smtp_validation(client: TestClient, admin: dict[str, str]) -> None:
     assert put(client, admin, "/smtp", {**SMTP, "sender": "nope"}).status_code == 400
     assert put(client, admin, "/smtp", {**SMTP, "host": "evil.com/x"}).status_code == 400
     assert put(client, admin, "/smtp", {**SMTP, "port": 0}).status_code == 422
+    # 한글 실명 같은 비ASCII 사용자 이름은 SMTP 로그인을 깨므로 저장 단계에서 거부한다(#198).
+    korean = put(client, admin, "/smtp", {**SMTP, "username": "박기찬"})
+    assert korean.status_code == 400
+    assert "smtp_username_not_ascii" in korean.text
 
 
 class FakeSMTP:
@@ -209,6 +213,8 @@ class FakeSMTP:
         return None
 
     def login(self, username: str, password: str) -> None:
+        # 실제 smtplib처럼 AUTH 문자열을 ASCII로 인코딩한다.
+        (username + password).encode("ascii")
         if FakeSMTP.fail_login:
             raise smtplib.SMTPAuthenticationError(535, b"bad")
 
@@ -234,6 +240,12 @@ def test_smtp_test_sends_to_admin_and_reports_error_codes(
         FakeSMTP.fail_login = False
     assert failed.json() == {"ok": False, "error": "auth_failed"}
     assert SECRET not in failed.text
+
+    # 비ASCII 암호는 500이 아니라 원인 코드로 돌려준다(#198).
+    put(client, admin, "/smtp", {**SMTP, "password": "앱비밀번호"})
+    encoded = client.post(f"{BASE}/smtp/test", headers=admin)
+    assert encoded.status_code == 200
+    assert encoded.json() == {"ok": False, "error": "non_ascii_credentials"}
 
 
 def test_oauth_settings(client: TestClient, admin: dict[str, str]) -> None:

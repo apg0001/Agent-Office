@@ -118,6 +118,9 @@ class SmtpMailer:
                 client.send_message(message)
         except smtplib.SMTPAuthenticationError as error:
             raise SmtpError("auth_failed") from error
+        except UnicodeError as error:
+            # 사용자 이름·암호에 ASCII가 아닌 문자가 있으면 AUTH 인코딩에서 실패한다(#198).
+            raise SmtpError("non_ascii_credentials") from error
         except smtplib.SMTPNotSupportedError as error:
             raise SmtpError("starttls_unsupported") from error
         except ssl.SSLError as error:

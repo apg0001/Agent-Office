@@ -76,6 +76,7 @@ const MESSAGES: Record<string, string> = {
   invalid_public_url: "주소는 https://호스트[:포트] 형식이어야 합니다(경로 없이).",
   invalid_sender: "발신 주소 형식이 올바르지 않습니다.",
   invalid_host: "SMTP 호스트 형식이 올바르지 않습니다.",
+  smtp_username_not_ascii: "SMTP 사용자 이름은 영문 계정이어야 합니다(Gmail은 전체 메일 주소, 예: name@gmail.com).",
   secret_key_missing: "서버에 비밀 암호화 키(AGENT_OFFICE_SECRET_KEY)가 없어 암호를 저장할 수 없습니다.",
   forbidden: "권한이 없습니다.",
   csrf_required: "세션이 바뀌었습니다. 새로고침 후 다시 시도하세요.",
@@ -145,7 +146,8 @@ export function messageFor(code: string | null): string {
 }
 
 const SMTP_ERRORS: Record<string, string> = {
-  auth_failed: "SMTP 로그인 실패(사용자 이름·암호 확인)",
+  auth_failed: "SMTP 로그인 실패(사용자 이름·암호 확인. Gmail은 전체 메일 주소와 앱 비밀번호)",
+  non_ascii_credentials: "사용자 이름·암호에 영문이 아닌 문자가 있음(Gmail은 사용자 이름에 전체 메일 주소)",
   connect_failed: "SMTP 서버에 연결할 수 없음(호스트·포트 확인)",
   timeout: "SMTP 서버 응답 시간 초과",
   tls_failed: "TLS 연결 실패",
