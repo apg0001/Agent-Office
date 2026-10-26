@@ -208,7 +208,7 @@ def main() -> int:
         cx = (codex_dir / "hooks.json").read_text(encoding="utf-8")
         c.record(
             "codex_hooks_point_to_new_core",
-            json_escaped(new_core) in cx and json_escaped(old) not in cx,
+            hook_form(new_core) in hook_text(cx) and hook_form(old) not in hook_text(cx),
         )
         # 명령 경로가 바뀌었으므로 Codex는 한 번 다시 신뢰해야 한다(트레이가 알림으로 안내).
         c.record(
