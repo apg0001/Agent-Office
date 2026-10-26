@@ -289,6 +289,8 @@
 203. #169: Windows 로그온 작업으로 시작한 Collector 콘솔 창이 떠 있음(소유자 실측) → `run`이 혼자 쓰는 콘솔이면 FreeConsole. 0.1.0-beta.1 사용자는 자체 업데이트 불가(#44 수정 미배포)라 다음 Beta를 한 번 수동 설치해야 함. Codex 사용자 Hook 자동 설치는 서브에이전트가 진행 중(맥·윈도우 Codex 미수집 원인).
 204. #166 후속: 사무실 절반 해상도 렌더가 가구·벽·글자를 깨뜨림(소유자 피드백) → 원래 해상도, 가구 그림 선형 필터, 지도 글자 Galmuri11 2배 해상도·선형 필터. Galmuri7 제거. PR #171(#169)·#172 병합.
 205. #170(PR #173, 서브에이전트): `hooks install|uninstall|status --tool codex` — Codex 사용자 Hook 위치 `$CODEX_HOME/hooks.json`(기본 `~/.codex/hooks.json`), Codex는 신뢰(대화형 `codex`의 "Hooks need review"에서 Trust)해야 실행. Pi 실제 Codex CLI 0.163.0 exec + 합성 Responses 서버로 설치→신뢰→수집→서버→제거 실측(`tests/e2e/codex_flow.sh`). 후속: 제거 도우미(uninstall.sh·ps1)에 Codex Hook 제거 추가, GUI의 "Codex 자동 설치 미지원" 문구 교체(#159 영역), macOS·Windows Codex 실기 확인, `hook codex` 버전 기록으로 CLI PostToolUse 승격 여부 결정.
+206. #159(PR #168, 서브에이전트) 병합·종료: 별도 트레이 프로세스 `agent-office-collector-tray`(ADR-0005, 모든 OS), Windows NSIS 설치기·macOS universal pkg(.app + LoginItems 트레이)·Linux `agent-office-collector-desktop` deb/rpm. 러너(windows·macos·ubuntu amd64/arm64)에서 설치→트레이→셀프 테스트→제거 실측. 미검증: 실제 패널 아이콘 클릭, Gatekeeper·SmartScreen, 재로그인 자동 시작, rpm 설치, Windows arm64. 명세 차이: 트레이 "동기화" 대신 전송 대기 건수, 업데이트 OS 알림·주기 확인은 #44 후속.
+207. #175(PR #176): GUI에서 Claude·Codex 도구 선택 Hook 설치·제거, Codex 신뢰 안내, 제거 도우미 Codex Hook 정리. 간헐 실패 #177(Linux 트레이 종료 대기) 기록.
 
 ## 이번 변경 요약(#22)
 
@@ -374,10 +376,11 @@
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
-4. 진행 순서(자율, 2026-10-25 갱신):
-   1. 소유자: 채널 Release 생성 `gh release download collector-v0.1.0-beta.1 -p 'manifest.json*' -D /tmp/ch && gh release create collector-beta --prerelease --title "Collector beta channel" --notes "Collector 자체 업데이트 Beta 채널 manifest" /tmp/ch/manifest.json /tmp/ch/manifest.json.sig`. 그 뒤 리다이렉트 수정이 들어간 다음 Beta(0.1.0-beta.2)를 같은 절차로 낼지 결정.
-   2. 72시간 실행 종료(약 2026-10-27 23시) 후 `cat ~/ao-soak/soak72h.txt` 결과를 `docs/operations/performance.md`·#63에 기록하고 #63 종료. 15:53~15:54 KST 경합 구간 표시. 중단 확인 `docker ps | grep ao-load`.
-   3. 남은 Issue: #42 서명·공증(인증서·Apple 계정 필요), #62 macOS·Windows 실제 Claude·Codex 흐름(소유자 장비, `docs/verification/cross-os-checklist.md`), #87(Windows PC).
+4. 진행 순서(자율, 2026-10-26 갱신):
+   1. 0.1.0-beta.2 릴리스(소유자 승인 필요): 포함 — 업데이트 리다이렉트 수정(#44), 패키지 이름(#42), Windows 콘솔 창(#169), Codex Hook 설치(#170·#175), 모든 OS 트레이·설치 파일(#159), 사무실 UI 개선(#153·#156·#160·#162·#164·#166). 절차 `docs/operations/release.md`(develop→main PR, `publish-images.yml`·`publish-collector.yml` `--ref main -f version=0.1.0-beta.2`, 소유자 Environment 승인, 태그·Release, main 역병합). beta.1 사용자는 자체 업데이트 불가라 한 번 수동 재설치.
+   2. 소유자: 채널 Release `collector-beta` 생성(자동 모드 거부), beta.2 공개 후 manifest 업로드.
+   3. 72시간 실행 종료(약 2026-10-27 23시) 후 `cat ~/ao-soak/soak72h.txt`를 `docs/operations/performance.md`·#63에 기록하고 #63 종료.
+   4. 후속: #177 트레이 종료 간헐 실패, 트레이 "동기화"(Core flush 명령), 업데이트 알림(#44), macOS·Windows Codex 실기 확인, 서명 비용 결정(#42), #62·#87 소유자 장비.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.
