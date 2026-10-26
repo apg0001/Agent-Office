@@ -1,0 +1,17 @@
+#!/bin/sh
+# macOS .pkg postinstall(#180). root로 실행된다. $2는 설치 위치(/Applications)다.
+#
+# 대화형 설치(Installer.app에서 더블클릭)가 끝나면 로그인한 사용자 세션에서 트레이를 띄운다. 트레이는 첫 실행
+# 마법사가 끝나지 않았으면 설정 창을 열고, 이전 버전·명령행 설치에서 옮겨 왔으면 소유 Hook·자동 시작 후처리를 한다.
+# installer(8) 명령행 설치(업데이트 도우미·CI)는 COMMAND_LINE_INSTALL=1이라 아무것도 띄우지 않는다
+# (업데이트 도우미가 설치 뒤 트레이를 다시 띄운다). Hook·서비스는 여기서 바꾸지 않는다(사용자 승인 뒤 트레이·GUI가 함).
+[ -n "${COMMAND_LINE_INSTALL:-}" ] && exit 0
+user=$(/usr/bin/stat -f %Su /dev/console 2>/dev/null || true)
+if [ -z "$user" ] || [ "$user" = root ] || [ "$user" = loginwindow ]; then
+  exit 0
+fi
+uid=$(/usr/bin/id -u "$user" 2>/dev/null) || exit 0
+tray="${2:-/Applications}/Agent Office Collector.app/Contents/Library/LoginItems/Agent Office Collector Tray.app"
+[ -d "$tray" ] || exit 0
+/bin/launchctl asuser "$uid" /usr/bin/sudo -u "$user" /usr/bin/open -g "$tray" >/dev/null 2>&1 || true
+exit 0

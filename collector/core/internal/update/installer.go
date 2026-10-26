@@ -281,7 +281,7 @@ func elevated(elevate string, cmd []string) []string {
 	if elevate == ElevateSudoN {
 		return append([]string{"sudo", "-n", "DEBIAN_FRONTEND=noninteractive"}, cmd...)
 	}
-	return append([]string{"/usr/bin/pkexec", "env", "DEBIAN_FRONTEND=noninteractive"}, cmd...)
+	return append([]string{"/usr/bin/pkexec", "/usr/bin/env", "DEBIAN_FRONTEND=noninteractive"}, cmd...)
 }
 
 // DetectKind는 현재 설치가 어떤 설치 파일로 업데이트되는지다. 알 수 없으면 "".

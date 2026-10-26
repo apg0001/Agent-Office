@@ -144,7 +144,7 @@ func TestInstallCommand(t *testing.T) {
 		{"windows", KindNSIS, "", []string{abs, "/S"}},
 		{"darwin", KindPkg, ElevateSudoN, []string{"sudo", "-n", "/usr/sbin/installer", "-pkg", abs, "-target", "/"}},
 		{"linux", KindDeb, ElevateSudoN, []string{"sudo", "-n", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/apt-get", "install", "-y", "-q", "--no-install-recommends", abs, abs}},
-		{"linux", KindRPM, "", []string{"/usr/bin/pkexec", "env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/dnf", "install", "-y", abs, abs}},
+		{"linux", KindRPM, "", []string{"/usr/bin/pkexec", "/usr/bin/env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/dnf", "install", "-y", abs, abs}},
 	}
 	for _, c := range cases {
 		files := []string{abs}
