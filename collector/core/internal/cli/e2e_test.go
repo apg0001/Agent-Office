@@ -238,10 +238,25 @@ func TestEndToEndRegisterRunCollectSendShutdown(t *testing.T) {
 	// 서버가 받은 뒤 ACK 처리가 끝나기 전에 종료하면 큐에 한 건이 남는다(재전송되므로 정상 동작).
 	// 최종 큐 깊이 0을 확인하려면 ACK 반영을 기다린 뒤 종료한다(CI 간헐 실패 원인).
 	// 상태 파일의 큐 깊이는 마지막 enqueue 직전 값일 수 있으므로, 받아들인 이벤트가 모두 ACK될 때까지 본다.
+	// 한 순간만 보면 직후에 들어온 이벤트(늦게 읽힌 줄 등)가 큐에 남은 채 종료될 수 있다(#213: accepted 8, acked 7).
+	// 같은 조건이 세 번 연속(약 0.6초) 유지되고 개수도 변하지 않을 때 비었다고 본다.
+	stable, last := 0, int64(-1)
 	waitFor(t, "queue drained", func() bool {
 		s := status()
-		return s.QueueDepth == 0 && s.Counters["acked"] > 0 &&
+		ok := s.QueueDepth == 0 && s.Counters["acked"] > 0 &&
 			s.Counters["acked"] == s.Counters["normalize_accepted"]
+		if ok && s.Counters["normalize_accepted"] == last {
+			stable++
+		} else if ok {
+			stable, last = 1, s.Counters["normalize_accepted"]
+		} else {
+			stable, last = 0, -1
+		}
+		if stable >= 3 {
+			return true
+		}
+		time.Sleep(200 * time.Millisecond)
+		return false
 	})
 
 	cancel()
