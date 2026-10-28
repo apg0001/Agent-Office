@@ -3,11 +3,13 @@
  * 같은 ID는 `change_seq`가 더 큰 갱신만 적용해, 순서가 뒤바뀐 메시지가 과거로 되돌리지 않는다.
  */
 
-import type { AgentState, DeviceState, OfficeState, SessionState } from "./types";
+import type { AgentState, DeviceState, OfficeSettings, OfficeState, SessionState } from "./types";
 import { withWorkspaceName } from "./workspace";
 
 export interface SnapshotMessage {
   type: "snapshot";
+  /** 관리자 화면 설정(#245). 이전 서버는 보내지 않는다. 형식은 `parseOfficeSettings`로 검사한다. */
+  settings?: unknown;
   devices: DeviceState[];
   sessions: SessionState[];
   agents: AgentState[];
@@ -20,9 +22,24 @@ export interface DeltaMessage {
   agents: AgentState[];
 }
 
+/** 숨기기 기준 최대값(분, 7일). 서버 검증과 같다. */
+export const MAX_HIDE_IDLE_MINUTES = 10080;
+
+/** 스냅샷의 `settings`. 없거나 형식이 틀리면 숨기지 않는다(0). */
+export function parseOfficeSettings(value: unknown): OfficeSettings {
+  const minutes =
+    typeof value === "object" && value !== null
+      ? (value as Record<string, unknown>).hide_idle_after_minutes
+      : undefined;
+  const valid =
+    typeof minutes === "number" && Number.isInteger(minutes) && minutes >= 0 && minutes <= MAX_HIDE_IDLE_MINUTES;
+  return { hide_idle_after_minutes: valid ? minutes : 0 };
+}
+
 export function applySnapshot(message: SnapshotMessage): OfficeState {
   return {
     source: "server",
+    settings: parseOfficeSettings(message.settings),
     devices: message.devices,
     sessions: message.sessions.map(withWorkspaceName),
     agents: message.agents,
@@ -51,6 +68,8 @@ export function applyDelta(state: OfficeState, message: DeltaMessage): OfficeSta
   }
   return {
     source: "server",
+    // 증분에는 설정이 없다. 설정은 다음 스냅샷까지 유지한다.
+    settings: state.settings,
     devices: [...devices.values()],
     sessions: mergeBySeq(state.sessions, message.sessions.map(withWorkspaceName)),
     agents: mergeBySeq(state.agents, message.agents),

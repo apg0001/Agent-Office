@@ -18,6 +18,7 @@ from sqlalchemy import Connection, Row, func, or_, select, true, union, update
 from sqlalchemy import null as sql_null
 from starlette.concurrency import run_in_threadpool
 
+from agent_office import instance
 from agent_office.api.deps import CsrfDep, DbConnection, UserDep, authenticate_session
 from agent_office.auth.sessions import SESSION_COOKIE
 from agent_office.db import schema
@@ -177,6 +178,7 @@ def build_snapshot(connection: Connection, user_id: uuid.UUID) -> dict[str, Any]
     return {
         "type": "snapshot",
         "server_time": now.isoformat(),
+        "settings": instance.office_settings(connection),
         "devices": [_device_json(d, now) for d in devices],
         "sessions": [_session_json(s, connection_of, now) for s in session_rows],
         "agents": [_agent_json(a) for a in agent_rows],
@@ -322,7 +324,10 @@ def team_update(previous: dict[str, Any], current: dict[str, Any]) -> dict[str, 
     새 스냅샷을, 그렇지 않으면 바뀐 행만 담은 증분을 돌려준다. 변경이 없으면 None.
 
     클라이언트는 change_seq가 커진 행만 받는다. 책상 번호·프로젝트 이름처럼 DB 행이 그대로인데
-    바뀐 값이 있으면 증분으로는 반영되지 않으므로 스냅샷을 보낸다(#231)."""
+    바뀐 값이 있으면 증분으로는 반영되지 않으므로 스냅샷을 보낸다(#231). 화면 설정(#245)이
+    바뀌어도 증분에는 설정이 없으므로 스냅샷을 보낸다."""
+    if previous.get("settings") != current.get("settings"):
+        return current
     for kind in ("sessions", "agents", "devices"):
         if {r["id"] for r in previous[kind]} - {r["id"] for r in current[kind]}:
             return current
@@ -648,6 +653,7 @@ def _scoped_snapshot(
         "type": "snapshot",
         "scope": scope,
         "server_time": now.isoformat(),
+        "settings": instance.office_settings(connection),
         "devices": [
             {
                 "id": str(d.id),
