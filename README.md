@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/apg0001/Agent-Office/releases"><img alt="버전" src="https://img.shields.io/badge/version-0.1.0--beta.5-orange?style=flat-square"></a>
+  <a href="https://github.com/apg0001/Agent-Office/releases"><img alt="버전" src="https://img.shields.io/badge/version-0.1.0--beta.6-orange?style=flat-square"></a>
   <img alt="상태" src="https://img.shields.io/badge/status-Beta-yellow?style=flat-square">
   <a href="https://github.com/apg0001/Agent-Office/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/apg0001/Agent-Office/ci.yml?branch=develop&label=CI&style=flat-square"></a>
   <img alt="셀프 호스팅" src="https://img.shields.io/badge/self--hosted-Docker%20Compose-2496ED?style=flat-square">
