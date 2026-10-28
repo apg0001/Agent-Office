@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { SessionList, activeSessions, whoFor } from "./SessionList";
+import { SessionList, activeSessions, sortSessions, whoFor } from "./SessionList";
 import { createSyntheticOffice } from "./synthetic";
 
 describe("active session list (#162)", () => {
@@ -46,5 +46,43 @@ describe("session list selection", () => {
     const html = renderToStaticMarkup(<SessionList state={state} onSelect={() => undefined} selected={lead} />);
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
     expect(html.match(/aria-pressed="false"/g)).toHaveLength(1);
+  });
+});
+
+describe("session list sort (#244)", () => {
+  const state = createSyntheticOffice({ sessions: 3, subagentsPerSession: 0 });
+  state.devices = ["다", "가", "나"].map((name, i) => ({ id: `d${i}`, name, connection: "ONLINE" as const }));
+  state.sessions = state.sessions.map((s, i) => ({
+    ...s,
+    device_id: `d${i}`,
+    started_at: `2026-10-28T0${i}:00:00Z`,
+    // 가장 늦게 시작한 세션이 가장 최근 활동.
+    last_event_at: `2026-10-28T1${i}:00:00Z`,
+  }));
+  const list = activeSessions(state);
+  const ids = (sort: "status" | "started" | "recent" | "name") => sortSessions(list, sort).map((item) => item.session.id);
+  const [first, second, third] = state.sessions.map((s) => s.id);
+
+  it("keeps rows in start order so they do not jump around", () => {
+    expect(ids("started")).toEqual([first, second, third]);
+  });
+
+  it("can show the most recent activity first", () => {
+    expect(ids("recent")).toEqual([third, second, first]);
+  });
+
+  it("can sort by person or PC name", () => {
+    expect(sortSessions(list, "name").map((item) => item.deviceName)).toEqual(["가", "나", "다"]);
+  });
+
+  it("puts waiting and working sessions above idle ones by default", () => {
+    const leads = state.agents.filter((a) => a.role === "lead");
+    const turn = ["IDLE", "WORKING", "WAITING_USER"] as const;
+    const mixed = {
+      ...state,
+      agents: state.agents.map((a) => (a.role === "lead" ? { ...a, turn_state: turn[leads.indexOf(a)]! } : a)),
+    };
+    const order = sortSessions(activeSessions(mixed), "status").map((item) => item.turnState);
+    expect(order).toEqual(["WAITING_USER", "WORKING", "IDLE"]);
   });
 });
