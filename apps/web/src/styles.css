@@ -194,6 +194,23 @@ code,
   margin-bottom: 0;
 }
 
+.session-bar a[aria-current="page"] {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 팀·PC·계정·관리 화면: 사무실과 같은 상단 바 + 돌아가기 링크 */
+.member-shell {
+  padding-top: 12px;
+}
+
+.back-link {
+  display: inline-block;
+  margin: 12px 0 4px;
+  font-weight: 700;
+}
+
 @media (max-width: 720px) {
   .shell {
     padding: 32px 0;
@@ -608,7 +625,19 @@ code,
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  margin-top: 8px;
+}
+
+/* 표 칸은 flex가 되면 칸이 아니게 되어 행 구분선이 어긋난다. 칸은 그대로 두고 버튼 사이만 띄운다. */
+td.actions {
+  display: table-cell;
+  white-space: nowrap;
+}
+
+td.actions > * + * {
+  margin-left: 8px;
 }
 
 .team-card {
@@ -685,6 +714,7 @@ code,
 .device-table th,
 .device-table td {
   padding: 4px 6px;
+  vertical-align: middle;
   border-bottom: 2px solid var(--ink);
   text-align: left;
 }
