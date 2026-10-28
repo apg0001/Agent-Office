@@ -97,6 +97,9 @@ export class OfficeScene extends Phaser.Scene {
   onCameraChange: (state: CameraState) => void = () => undefined;
   /** 캐릭터를 클릭하면 상세 패널(#51)을 연다. */
   onSelect: (agentId: string) => void = () => undefined;
+  /** 선택한 캐릭터. 자동 초점이 이 캐릭터를 따라가고 발밑에 강조 고리를 그린다. */
+  private focused: string | null = null;
+  private ring?: Phaser.GameObjects.Graphics;
 
   constructor(map: OfficeMap, initial: OfficeState) {
     super("office");
@@ -122,7 +125,22 @@ export class OfficeScene extends Phaser.Scene {
     this.cameras.main.centerOn(center.sx, center.sy);
     this.cameras.main.setZoom(VIEW_SCALE);
     this.bindCameraInput();
+    this.ring = this.add.graphics().setVisible(false);
+    this.ring.fillStyle(0xffcd4a, 0.4).fillEllipse(0, 0, 44, 22);
+    this.ring.lineStyle(3, 0xffcd4a, 1).strokeEllipse(0, 0, 44, 22);
+    this.tweens.add({ targets: this.ring, alpha: 0.55, duration: 600, yoyo: true, repeat: -1 });
     this.applyState(this.state);
+  }
+
+  /** 캐릭터를 선택해 따라가고 강조한다(세션 목록·캐릭터 클릭). null이면 선택을 푼다. */
+  focusAgent(agentId: string | null): void {
+    this.focused = agentId;
+    for (const actor of this.actors.values()) {
+      actor.label.setColor(actor.agent.id === agentId ? "#ffcd4a" : "#ffffff");
+    }
+    if (agentId) {
+      this.setCamera(resumeAutoFocus(this.camera));
+    }
   }
 
   /** 자동 초점을 다시 켠다(버튼·F 키). */
@@ -358,10 +376,19 @@ export class OfficeScene extends Phaser.Scene {
         this.actors.delete(actor.agent.id);
       }
     }
+    const focused = this.focused ? this.actors.get(this.focused) : undefined;
+    if (this.ring) {
+      this.ring.setVisible(focused !== undefined);
+      if (focused) {
+        const feet = gridToScreen(focused.position);
+        this.ring.setPosition(feet.sx, feet.sy - TILE_HEIGHT / 4);
+        this.ring.setDepth(focused.container.depth - 0.001);
+      }
+    }
     if (this.camera.autoFocus) {
-      // 활동 중인 캐릭터들의 중심을 부드럽게 따라간다.
+      // 선택한 캐릭터가 있으면 그 캐릭터를, 없으면 활동 중인 캐릭터들의 중심을 부드럽게 따라간다.
       const focus = gridToScreen(
-        focusPoint(active, { x: this.map.width / 2, y: this.map.height / 2 }),
+        focused ? focused.position : focusPoint(active, { x: this.map.width / 2, y: this.map.height / 2 }),
       );
       const camera = this.cameras.main;
       const smoothing = Math.min(1, deltaMs / 400);

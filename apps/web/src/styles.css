@@ -332,6 +332,11 @@ code,
   background: var(--panel-2);
 }
 
+.session-list button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+
 .session-list button:active:not(:disabled) {
   transform: none;
 }
