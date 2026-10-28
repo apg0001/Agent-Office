@@ -68,6 +68,17 @@ func trayPath() (string, bool) {
 	return corecli.FindSibling(exe, runtime.GOOS, corecli.TrayName)
 }
 
+// launchCompanionTray는 창이 뜰 때 트레이 도우미를 함께 띄운다. 단, 창이 뜨기 전에 트레이 "종료"가 보낸
+// 종료 요청이 이미 와 있으면 띄우지 않는다(#177). WebKit 초기화가 느리면 OnStartup이 트레이 "종료" 뒤에
+// 불리는데, 그때는 원래 트레이가 끝나 잠금이 풀려 있어 새로 띄운 트레이가 잠금을 잡고 남는다.
+func launchCompanionTray(primary *guictl.Primary, launchTray func() error) bool {
+	if primary.Pending() == guictl.Quit {
+		return false
+	}
+	_ = launchTray()
+	return true
+}
+
 func main() {
 	args := os.Args[1:]
 	quitOnly := hasArg(args, QuitArg)
@@ -131,6 +142,11 @@ func main() {
 			mu.Lock()
 			wctx = ctx
 			mu.Unlock()
+			if trayOK {
+				// 트레이는 사용자별 단일 실행이라 이미 떠 있으면 곧바로 끝난다. 실패해도 창은 쓸 수 있다.
+				// Serve가 요청을 읽어 지우기 전에 판단해야 대기 중인 "종료"를 볼 수 있다.
+				launchCompanionTray(primary, func() error { return launch.Detached(tray) })
+			}
 			if primary != nil {
 				go primary.Serve(ctx, func(v guictl.Verb) {
 					c := windowCtx()
@@ -142,10 +158,6 @@ func main() {
 						wruntime.WindowUnminimise(c)
 					}
 				})
-			}
-			if trayOK {
-				// 트레이는 사용자별 단일 실행이라 이미 떠 있으면 곧바로 끝난다. 실패해도 창은 쓸 수 있다.
-				_ = launch.Detached(tray)
 			}
 		},
 		Bind: []interface{}{a},

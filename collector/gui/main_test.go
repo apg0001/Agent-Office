@@ -8,7 +8,42 @@ import (
 	"testing"
 
 	"github.com/apg0001/Agent-Office/collector/gui/internal/app"
+	"github.com/apg0001/Agent-Office/collector/gui/internal/guictl"
 )
+
+// 창이 늦게 떠서 트레이 "종료"가 먼저 도착했으면 트레이를 다시 띄우지 않는다(#177).
+func TestCompanionTraySkippedWhenQuitPending(t *testing.T) {
+	dir := t.TempDir()
+	p, err := guictl.Acquire(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Release()
+	calls := 0
+	launchTray := func() error { calls++; return nil }
+
+	if !launchCompanionTray(p, launchTray) || calls != 1 {
+		t.Fatalf("no request: launched=%d, want 1", calls)
+	}
+	if err := guictl.Send(dir, guictl.Show); err != nil {
+		t.Fatal(err)
+	}
+	if !launchCompanionTray(p, launchTray) || calls != 2 {
+		t.Fatalf("show pending: launched=%d, want 2", calls)
+	}
+	if err := guictl.Send(dir, guictl.Quit); err != nil {
+		t.Fatal(err)
+	}
+	if launchCompanionTray(p, launchTray) || calls != 2 {
+		t.Fatalf("quit pending: launched=%d, want 2", calls)
+	}
+	if p.Pending() != guictl.Quit {
+		t.Fatal("quit request must stay for Serve")
+	}
+	if !launchCompanionTray(nil, launchTray) || calls != 3 {
+		t.Fatalf("no lock: launched=%d, want 3", calls)
+	}
+}
 
 func readAsset(t *testing.T, name string) string {
 	t.Helper()
