@@ -24,7 +24,8 @@ await step("설치 마법사: bootstrap으로 최초 관리자", async () => {
   await page.getByLabel("bootstrap 토큰").fill(token);
   await page.getByLabel("이름").fill("E2E 관리자");
   await page.getByLabel("이메일").fill("admin@example.com");
-  await page.getByLabel(/비밀번호/).fill(password);
+  await page.getByLabel(/비밀번호/).first().fill(password);
+  await page.getByLabel("비밀번호 확인").fill(password);
   await page.getByRole("button", { name: "관리자 만들기" }).click();
   await page.getByRole("heading", { name: "2. 사이트" }).waitFor({ timeout: 15000 });
 });
