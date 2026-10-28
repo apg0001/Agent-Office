@@ -29,6 +29,8 @@ export interface ArtPiece {
 
 /** 서버 랙은 닫힌 책장을 어두운 금속색으로 칠해 쓴다. */
 const RACK_TINT = 0x5a6472;
+/** 실험대는 책상을 차가운 색으로 살짝 눌러 쓴다(tint는 어둡게만 해 흰색은 안 됨). 위 소품은 lab.ts 픽셀 그림(#235). */
+const LAB_TINT = 0xe4ecf2;
 
 export const FURNITURE_ART: Record<Furniture, ArtPiece[]> = {
   desk: [
@@ -44,6 +46,8 @@ export const FURNITURE_ART: Record<Furniture, ArtPiece[]> = {
     { image: "bookcaseClosedDoors_SW", dx: -6, dy: 12, layer: 2, tint: RACK_TINT },
     { image: "bookcaseClosedDoors_SW", dx: 8, dy: 19, layer: 3, tint: RACK_TINT },
   ],
+  labBench: [{ image: "desk_SW", dx: 0, dy: 14, layer: 2, tint: LAB_TINT }],
+  labScope: [{ image: "desk_SW", dx: 0, dy: 14, layer: 2, tint: LAB_TINT }],
   whiteboard: [
     { image: "cabinetTelevision_SW", dx: 0, dy: 14, layer: 2 },
     { image: "televisionModern_SW", dx: 0, dy: -6, layer: 3 },
