@@ -44,7 +44,7 @@ import {
   wallSegments,
 } from "./walls";
 import type { AgentState, OfficeState, SessionState } from "./types";
-import { shortWorkspace, workspaceName } from "./workspace";
+import { sessionName, shortWorkspace } from "./workspace";
 
 const WALK_TILES_PER_SECOND = 2.5;
 /**
@@ -232,9 +232,12 @@ export class OfficeScene extends Phaser.Scene {
     }
   }
 
-  /** 대장 캐릭터 이름표 아래 세션 이름. 검증한 값만 줄여서 그린다(Phaser 글자라 HTML로 해석되지 않음). */
+  /**
+   * 대장 캐릭터 이름표 아래 세션 이름(폴더 이름, 팀 화면은 보이는 프로젝트 이름, #197).
+   * 검증한 값만 줄여서 그린다(Phaser 글자라 HTML로 해석되지 않음).
+   */
   private showWorkspace(actor: Actor, agent: AgentState, session: SessionState | undefined): void {
-    const name = agent.role === "lead" ? workspaceName(session?.workspace_name) : null;
+    const name = agent.role === "lead" && session ? sessionName(session) : null;
     const text = name ? shortWorkspace(name) : "";
     if (actor.workspace.text !== text) {
       actor.workspace.setText(text);

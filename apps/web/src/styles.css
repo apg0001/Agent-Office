@@ -633,6 +633,42 @@ code,
   background: #3a4370;
 }
 
+/* 팀 공유 범위(#197): 동의 상자와 팀별 설정. 픽셀 UI처럼 평면 색 + 2px 테두리. */
+.share-consent,
+.share-settings {
+  margin: 12px 0;
+  padding: 8px 10px;
+  border: 2px solid var(--ink);
+  background: var(--field);
+  box-shadow: inset 2px 2px 0 var(--hi), inset -2px -2px 0 var(--lo);
+}
+
+.share-consent p,
+.share-settings > p {
+  margin: 6px 0 0;
+}
+
+.share-settings legend {
+  padding: 0 4px;
+  color: var(--accent);
+}
+
+.project-checklist {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding-left: 20px;
+  list-style: square;
+}
+
+.origin-chip {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 2px solid var(--ink);
+  background: #2f4a3a;
+  font-size: 0.85em;
+}
+
 .members,
 .device-table {
   width: 100%;
@@ -650,6 +686,18 @@ code,
 
 .device-table th {
   color: var(--accent);
+}
+
+.device-table .row-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.device-table .inline-form input {
+  min-width: 0;
+  width: 14em;
+  max-width: 100%;
 }
 
 .members select,
@@ -750,4 +798,90 @@ textarea.domains {
 
 .agent-panel dd.workspace {
   overflow-wrap: anywhere;
+}
+
+/* 전체 화면(#206) */
+.fullscreen-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+}
+
+.office-stage:fullscreen,
+.office-stage.is-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #2b2d31;
+}
+
+.office-stage.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.office-stage:fullscreen .office-canvas,
+.office-stage.is-fullscreen .office-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.office-stage .agent-panel {
+  top: 48px;
+}
+
+/* Collector 설치 안내(#215) */
+.collector-downloads {
+  margin-top: 20px;
+  padding: 12px 16px 16px;
+  border: 2px solid var(--ink);
+  background: var(--panel);
+  box-shadow:
+    inset 2px 2px 0 var(--hi),
+    inset -2px -2px 0 var(--lo);
+}
+
+.collector-downloads h2 {
+  margin: 0 0 6px;
+  color: var(--accent);
+}
+
+.collector-downloads h3 {
+  margin: 12px 0 4px;
+  color: var(--accent);
+}
+
+.os-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.os-tabs button.selected {
+  background: var(--accent);
+  color: #1a1408;
+}
+
+.os-guide ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.download-link {
+  display: inline-block;
+  margin: 4px 8px 4px 0;
+  font-weight: 700;
+}
+
+.download-link .file {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.download-pair {
+  margin: 4px 0;
 }

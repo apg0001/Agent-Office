@@ -2,6 +2,56 @@
 // 화면에는 Go 백엔드가 고른 코드·개수·한국어 문구만 표시한다. 장치 토큰은 백엔드도 다루지 않는다.
 "use strict";
 
+// 확인 창(#204). macOS WebView(WKWebView, Wails v2)는 window.confirm·alert를 지원하지 않아 표시 없이
+// 바로 "취소"가 된다(소유자 맥 실측: 동의 버튼이 아무 반응 없음). 모든 OS에서 같은 페이지 안 창을 쓴다.
+function ask(text, okLabel = "계속", cancelLabel = "취소") {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "ask-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    const box = document.createElement("div");
+    box.className = "ask-box";
+    const p = document.createElement("p");
+    p.textContent = text;
+    const row = document.createElement("div");
+    row.className = "row";
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.textContent = okLabel;
+    row.appendChild(ok);
+    let cancel = null;
+    if (cancelLabel) {
+      cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "secondary";
+      cancel.textContent = cancelLabel;
+      row.appendChild(cancel);
+    }
+    box.append(p, row);
+    overlay.appendChild(box);
+    const done = (value) => {
+      overlay.remove();
+      document.removeEventListener("keydown", onKey);
+      resolve(value);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") done(false);
+    };
+    ok.addEventListener("click", () => done(true));
+    if (cancel) cancel.addEventListener("click", () => done(false));
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(overlay);
+    ok.focus();
+  });
+}
+
+/** 알림 창(확인 버튼 하나). */
+function tell(text) {
+  return ask(text, "확인", null);
+}
+
+
 const $ = (id) => document.getElementById(id);
 
 function backend() {
@@ -94,7 +144,7 @@ $("logout").addEventListener("click", async () => {
   const text = local
     ? "서버에 알리지 않고 이 PC의 장치 토큰과 등록 정보만 지웁니다. 웹 /devices에서 따로 폐기해야 합니다. 계속할까요?"
     : "서버에서 이 PC를 폐기하고 로컬 장치 토큰과 등록 정보를 지웁니다. 계속할까요?";
-  if (!window.confirm(text)) {
+  if (!await ask(text)) {
     return;
   }
   const r = await call("Logout", local, true);
@@ -169,7 +219,7 @@ $("hook-preview").addEventListener("click", async () => {
 
 $("hook-install").addEventListener("click", async () => {
   const tool = hookTool();
-  const yes = window.confirm("미리보기의 변경을 " + TOOL_NAMES[tool] + " 사용자 설정에 적용합니다. 원본은 백업됩니다. 계속할까요?");
+  const yes = await ask("미리보기의 변경을 " + TOOL_NAMES[tool] + " 사용자 설정에 적용합니다. 원본은 백업됩니다. 계속할까요?");
   if (!yes) {
     return;
   }
@@ -182,7 +232,7 @@ $("hook-install").addEventListener("click", async () => {
 
 $("hook-uninstall").addEventListener("click", async () => {
   const tool = hookTool();
-  if (!window.confirm(TOOL_NAMES[tool] + "에서 Agent Office가 추가한 Hook만 제거합니다. 계속할까요?")) {
+  if (!await ask(TOOL_NAMES[tool] + "에서 Agent Office가 추가한 Hook만 제거합니다. 계속할까요?")) {
     return;
   }
   const r = await call("HookUninstall", tool, true);
@@ -200,7 +250,7 @@ $("service-preview").addEventListener("click", async () => {
 
 $("service-install").addEventListener("click", async () => {
   const activate = $("service-activate").checked;
-  if (!window.confirm(activate ? "자동 시작 정의를 설치하고 바로 활성화합니다. 계속할까요?" : "자동 시작 정의 파일을 설치합니다. 계속할까요?")) {
+  if (!await ask(activate ? "자동 시작 정의를 설치하고 바로 활성화합니다. 계속할까요?" : "자동 시작 정의 파일을 설치합니다. 계속할까요?")) {
     return;
   }
   const r = await call("ServiceInstall", activate, true);
@@ -224,7 +274,7 @@ async function loadGUIAutostart() {
 loaders.service = loadGUIAutostart;
 
 $("gui-autostart-install").addEventListener("click", async () => {
-  if (!window.confirm("로그인 시 트레이 아이콘(agent-office-collector-tray)을 자동으로 띄우는 사용자 정의를 설치합니다. 계속할까요?")) {
+  if (!await ask("로그인 시 트레이 아이콘(agent-office-collector-tray)을 자동으로 띄우는 사용자 정의를 설치합니다. 계속할까요?")) {
     return;
   }
   show("gui-autostart-result", await call("GUIAutostartInstall", true));
@@ -232,7 +282,7 @@ $("gui-autostart-install").addEventListener("click", async () => {
 });
 
 $("gui-autostart-uninstall").addEventListener("click", async () => {
-  if (!window.confirm("Agent Office가 만든 GUI 자동 시작 정의만 지웁니다. Core 수집은 계속됩니다. 계속할까요?")) {
+  if (!await ask("Agent Office가 만든 GUI 자동 시작 정의만 지웁니다. Core 수집은 계속됩니다. 계속할까요?")) {
     return;
   }
   show("gui-autostart-result", await call("GUIAutostartUninstall", true));

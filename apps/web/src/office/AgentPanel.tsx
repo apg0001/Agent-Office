@@ -11,7 +11,7 @@ import {
   type AgentDetail,
 } from "./detail";
 import type { AgentState, DataSource } from "./types";
-import { shortWorkspace, workspaceName } from "./workspace";
+import { projectName, shortWorkspace, workspaceName } from "./workspace";
 
 interface Props {
   detail: AgentDetail;
@@ -34,6 +34,10 @@ function shortId(id: string): string {
 export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
   const { agent, session, device, parent, children, timeline, plan_steps: plan } = detail;
   const workspace = workspaceName(session.workspace_name);
+  const project = projectName(session.project_name);
+  // 팀·통합 화면은 사람 이름(#206). 팀원의 PC 이름은 서버가 보내지 않는다(이름 자리에 표시 이름이 옴).
+  const owner = device.owner_name?.trim() || null;
+  const pc = owner && device.name === device.owner_name ? null : device.name;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -81,9 +85,24 @@ export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
             </dd>
           </>
         )}
+        {project && project !== workspace && (
+          <>
+            <dt>프로젝트</dt>
+            <dd className="workspace" title={project}>
+              {shortWorkspace(project, 40)}
+            </dd>
+          </>
+        )}
+        {owner && (
+          <>
+            <dt>사람</dt>
+            <dd>{owner}</dd>
+          </>
+        )}
         <dt>PC</dt>
         <dd>
-          {device.name} · {device.connection === "ONLINE" ? "연결됨" : "연결 끊김"}
+          {pc && `${pc} · `}
+          {device.connection === "ONLINE" ? "연결됨" : "연결 끊김"}
         </dd>
         <dt>책상</dt>
         <dd>{session.desk_slot === null ? "없음" : `${session.desk_slot + 1}번`}</dd>

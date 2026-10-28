@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activeSessions } from "./SessionList";
+import { activeSessions, whoFor } from "./SessionList";
 import { createSyntheticOffice } from "./synthetic";
 
 describe("active session list (#162)", () => {
@@ -14,5 +14,26 @@ describe("active session list (#162)", () => {
       expect(item.headline.length).toBeGreaterThan(0);
       expect(item.subagents).toBe(1);
     }
+  });
+});
+
+describe("session list person names (#206)", () => {
+  const device = { id: "d", name: "Work PC", connection: "ONLINE" as const };
+
+  it("shows only the PC name in the personal office", () => {
+    expect(whoFor(device)).toBe("Work PC");
+    expect(whoFor(undefined)).toBe("PC");
+  });
+
+  it("shows the person in team and combined views", () => {
+    expect(whoFor({ ...device, name: "Bob", owner_name: "Bob" })).toBe("Bob");
+    expect(whoFor({ ...device, owner_name: "Alice" })).toBe("Alice · Work PC");
+    expect(whoFor({ ...device, name: "", owner_name: "Alice" })).toBe("Alice");
+  });
+
+  it("uses the owner name for rows of the active list", () => {
+    const state = createSyntheticOffice({ sessions: 1, subagentsPerSession: 0 });
+    state.devices = state.devices.map((d) => ({ ...d, name: "Bob", owner_name: "Bob" }));
+    expect(activeSessions(state)[0]!.deviceName).toBe("Bob");
   });
 });

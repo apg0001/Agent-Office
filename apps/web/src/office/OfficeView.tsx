@@ -9,6 +9,7 @@ import { type OfficeScope, PERSONAL, connectLive, hasSession, scopeFromSearch, s
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
 import { SessionList } from "./SessionList";
 import { ZoneLegend } from "./ZoneLegend";
+import { CollectorDownloads } from "./CollectorDownloads";
 import type { DataSource, OfficeState } from "./types";
 
 /**
@@ -70,7 +71,7 @@ export function ScopePicker({ scope }: { scope: OfficeScope }) {
 
 const SCOPE_NOTES: Record<OfficeScope["kind"], string> = {
   personal: "",
-  team: " · 팀 사무실(공유된 프로젝트만)",
+  team: " · 팀 사무실(팀원마다 고른 공유 범위만)",
   combined: " · 통합 사무실(내 것 + 팀에 공유된 것, 중복 없이)",
   side: "",
 };
@@ -85,6 +86,10 @@ interface OfficeViewProps {
 
 export function OfficeView({ scope: given, compact = false, title }: OfficeViewProps = {}) {
   const host = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  /** 게임 캔버스 크기를 바꾼다(전체 화면 전환). 게임이 뜨기 전에는 아무것도 하지 않는다. */
+  const resizeGame = useRef<(width: number, height: number) => void>(() => undefined);
+  const [fullscreen, setFullscreen] = useState(false);
   const [scope] = useState<OfficeScope>(
     () => given ?? (typeof window === "undefined" ? PERSONAL : scopeFromSearch(window.location.search)),
   );
@@ -103,7 +108,9 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       return undefined;
     }
     let disposed = false;
-    let game: { destroy: (removeCanvas: boolean) => void } | undefined;
+    let game:
+      | { destroy: (removeCanvas: boolean) => void; scale: { resize: (width: number, height: number) => void } }
+      | undefined;
     let stop: (() => void) | undefined;
     void (async () => {
       const [{ default: Phaser }, { OfficeScene, RENDER_SCALE }, live] = await Promise.all([
@@ -135,6 +142,8 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
         roundPixels: true,
         scene,
       });
+      resizeGame.current = (width, height) =>
+        game?.scale.resize(Math.round(width / RENDER_SCALE), Math.round(height / RENDER_SCALE));
       let rows = 2;
       const show = (state: Parameters<typeof scene.applyState>[0]) => {
         const needed = deskRowsFor(state);
@@ -167,6 +176,76 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       game?.destroy(true);
     };
   }, []);
+
+  // 전체 화면(#206): 사무실 그래픽·세션 목록·상세 창만 화면을 채운다. Fullscreen API가 없으면(iOS Safari 등)
+  // 페이지 안에서 화면을 덮는다. 들어가고 나올 때 캔버스 크기를 화면·원래 크기로 바꾼다.
+  const fitCanvas = useCallback((on: boolean) => {
+    const element = host.current;
+    if (on) {
+      resizeGame.current(window.innerWidth, window.innerHeight);
+    } else if (element) {
+      resizeGame.current(element.clientWidth || 960, compact ? 320 : 560);
+    }
+  }, [compact]);
+  useEffect(() => {
+    const onChange = () => {
+      const on = document.fullscreenElement === stage.current && stage.current !== null;
+      setFullscreen(on);
+      // 레이아웃이 바뀐 뒤 크기를 잰다.
+      window.requestAnimationFrame(() => fitCanvas(on));
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [fitCanvas]);
+  useEffect(() => {
+    if (!fullscreen) {
+      return undefined;
+    }
+    const onResize = () => fitCanvas(true);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      // 실제 전체 화면은 보통 브라우저가 Esc로 끝내지만, 키가 페이지로 오면 직접 끝낸다(지도 키 처리보다 먼저).
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+        return;
+      }
+      // 페이지 안 전체 화면(Fullscreen API 없음)은 직접 끈다.
+      setFullscreen(false);
+      window.requestAnimationFrame(() => fitCanvas(false));
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [fullscreen, fitCanvas]);
+  const toggleFullscreen = useCallback(() => {
+    const element = stage.current;
+    if (!element) {
+      return;
+    }
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+      return;
+    }
+    if (fullscreen) {
+      setFullscreen(false);
+      window.requestAnimationFrame(() => fitCanvas(false));
+      return;
+    }
+    if (typeof element.requestFullscreen === "function") {
+      element.requestFullscreen().catch(() => {
+        setFullscreen(true);
+        window.requestAnimationFrame(() => fitCanvas(true));
+      });
+    } else {
+      setFullscreen(true);
+      window.requestAnimationFrame(() => fitCanvas(true));
+    }
+  }, [fullscreen, fitCanvas]);
 
   const local = office && selected ? detailFromState(office, selected) : null;
   const changeSeq = local?.agent.change_seq;
@@ -203,6 +282,12 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
           <p className="live-badge" role="status">
             {online ? "실시간 연결됨" : "서버 연결 끊김 — 재접속 중"}
             {SCOPE_NOTES[scope.kind]}
+            {(scope.kind === "team" || scope.kind === "combined") && (
+              <>
+                {" "}
+                <a href="/teams">내 공유 범위 바꾸기</a>
+              </>
+            )}
           </p>
           {!compact && <ScopePicker scope={scope} />}
         </>
@@ -213,15 +298,27 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
           자동 초점 다시 켜기
         </button>
       )}
-      <div className="office-stage">
+      <div ref={stage} className={fullscreen ? "office-stage is-fullscreen" : "office-stage"}>
         <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
-        {!compact && office && <SessionList state={office} onSelect={setSelected} />}
+        {!compact && office && <SessionList state={office} onSelect={setSelected} unnamed={scope.kind !== "personal"} />}
+        {!compact && (
+          <button
+            type="button"
+            className="fullscreen-button"
+            onClick={toggleFullscreen}
+            aria-pressed={fullscreen}
+            title={fullscreen ? "전체 화면 끝내기(Esc)" : "전체 화면"}
+          >
+            {fullscreen ? "전체 화면 끝내기" : "전체 화면"}
+          </button>
+        )}
+        {detail && (
+          <AgentPanel detail={detail} source={source} now={Date.now()} onClose={close} onSelect={setSelected} />
+        )}
       </div>
-      {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점</p>}
+      {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점, 오른쪽 위 버튼으로 전체 화면</p>}
+      {!compact && <CollectorDownloads />}
       {!compact && <ZoneLegend />}
-      {detail && (
-        <AgentPanel detail={detail} source={source} now={Date.now()} onClose={close} onSelect={setSelected} />
-      )}
     </section>
   );
 }

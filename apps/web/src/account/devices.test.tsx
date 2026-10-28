@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { App } from "../App";
 import { messageFor, routeFor } from "./api";
-import { type DeviceSummary, deviceStatus, remaining, sortDevices } from "./devices";
+import { type DeviceSummary, checkDeviceName, deviceStatus, remaining, sortDevices } from "./devices";
 
 const device = (over: Partial<DeviceSummary>): DeviceSummary => ({
   id: "d",
@@ -49,5 +49,16 @@ describe("devices page (#41)", () => {
 
   it("explains the open-code limit", () => {
     expect(messageFor("too_many_open_codes")).toContain("최대 5개");
+  });
+
+  it("checks a new PC name like the server (#206)", () => {
+    expect(checkDeviceName("  새 노트북  ")).toEqual({ name: "새 노트북" });
+    expect(checkDeviceName("   ")).toHaveProperty("error");
+    expect(checkDeviceName("a".repeat(81))).toHaveProperty("error");
+    expect(checkDeviceName("가".repeat(80))).toEqual({ name: "가".repeat(80) });
+    expect(checkDeviceName("a\nb")).toHaveProperty("error");
+    expect(checkDeviceName("a\u0000b")).toHaveProperty("error");
+    expect(messageFor("device_name_conflict")).toContain("같은 이름");
+    expect(messageFor("device_revoked")).toContain("폐기");
   });
 });

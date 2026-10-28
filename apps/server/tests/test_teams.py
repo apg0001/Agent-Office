@@ -201,6 +201,9 @@ def test_project_sharing_requires_owner_and_membership(client: TestClient, engin
     team = make_team(client, owner)
     other_team = make_team(client, outsider, "다른 팀")
     join(client, team, owner, teammate)
+    # 공유한 프로젝트만 보이는 범위(#197). 'all'이면 모든 프로젝트가 보인다(test_share_modes).
+    selected = {"share_mode": "selected"}
+    assert code(client, owner, "PUT", f"/teams/{team}/share-mode", selected) == 200
     project = req(client, owner, "POST", "/projects", {"display_name": "결제 서비스"}).json()["id"]
     share = f"/projects/{project}/shares"
 

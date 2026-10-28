@@ -35,6 +35,13 @@ ROTATION_GRACE = dt.timedelta(minutes=5)
 router = APIRouter(prefix="/api/v1/devices", tags=["devices"])
 
 DeviceName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+# 이름 변경(#206)은 화면 이름표에 바로 쓰이므로 제어 문자(줄바꿈 포함)도 거부한다.
+EditableDeviceName = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=80, pattern=r"^[^\x00-\x1f\x7f-\x9f]+$"
+    ),
+]
 CollectorVersion = Annotated[str, StringConstraints(pattern=r"^[0-9A-Za-z.+-]{1,64}$")]
 Platform = Literal["windows", "macos", "linux", "unknown"]
 
@@ -53,6 +60,10 @@ class RegisterRequest(StrictModel):
     name: DeviceName
     platform: Platform = "unknown"
     collector_version: CollectorVersion | None = None
+
+
+class RenameRequest(StrictModel):
+    name: EditableDeviceName
 
 
 class RegisterResponse(StrictModel):
@@ -327,3 +338,60 @@ def revoke_owned(
         details={"reason": "owner"},
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/{device_id}", response_model=DeviceSummary)
+def rename_device(
+    device_id: Annotated[uuid.UUID, Path()],
+    request: RenameRequest,
+    user: UserDep,
+    _csrf: CsrfDep,
+    connection: DbConnection,
+) -> DeviceSummary:
+    """등록된 PC 이름 변경(#206). 소유자만 바꿀 수 있고 화면 표시는 서버 이름을 쓴다
+    (Collector 로컬 설정의 이름은 바꾸지 않는다)."""
+    devices = schema.devices
+    owned = connection.execute(
+        select(devices.c.id, devices.c.revoked_at)
+        .where(devices.c.id == device_id, devices.c.owner_user_id == user.id)
+        .with_for_update()
+    ).one_or_none()
+    if owned is None:
+        # 다른 사용자의 장치는 존재 여부도 알려주지 않는다(폐기와 같은 규칙).
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+    if owned.revoked_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="device_revoked")
+    try:
+        with connection.begin_nested():
+            row = connection.execute(
+                update(devices)
+                .where(devices.c.id == device_id)
+                .values(name=request.name)
+                .returning(
+                    devices.c.id,
+                    devices.c.name,
+                    devices.c.platform,
+                    devices.c.collector_version,
+                    devices.c.created_at,
+                    devices.c.last_seen_at,
+                    devices.c.revoked_at,
+                )
+            ).one()
+    except IntegrityError:
+        # 같은 사용자의 활성 장치 이름 중복(대소문자 무시, 등록과 같은 규칙).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="device_name_conflict"
+        ) from None
+    # 이름(사용자 입력)은 감사 상세에 남기지 않는다.
+    audit.record(
+        connection,
+        "device.renamed",
+        "success",
+        actor_user_id=user.id,
+        target_type="device",
+        target_id=device_id,
+    )
+    now = connection.execute(select(func.now())).scalar_one()
+    return DeviceSummary.model_validate(
+        {**row._asdict(), "connection": connection_state(row.last_seen_at, now)}
+    )

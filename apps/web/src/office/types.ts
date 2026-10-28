@@ -21,7 +21,13 @@ export type Activity =
 
 export interface DeviceState {
   id: string;
+  /** 개인·통합의 내 장치는 PC 이름, 팀 화면·남의 장치는 소유자 표시 이름. */
   name: string;
+  /**
+   * 사람 이름표(#206): 장치 소유자의 표시 이름. 팀·통합 화면에만 온다(통합의 내 장치는 내 이름).
+   * 개인 사무실과 이전 서버는 보내지 않는다(없음 = 사람 이름 표시 안 함).
+   */
+  owner_name?: string | null;
   connection: Connection;
 }
 
@@ -35,8 +41,10 @@ export interface SessionState {
   last_event_at: string | null;
   /** 개인 사무실 책상 번호(서버가 배정·재사용, #48). 퇴근 후 반납되면 null. */
   desk_slot: number | null;
-  /** 사용자가 지정한 프로젝트. 팀에 공유된 프로젝트의 세션만 팀 사무실에 나온다(#54). */
+  /** 세션의 프로젝트(직접 지정 또는 폴더 이름 자동, #54·#197). 팀 사무실 범위는 팀원별 공유 범위로 정한다. */
   project_id?: string | null;
+  /** 프로젝트 표시 이름(#197). 그 화면 범위에 보이는 프로젝트일 때만 온다. 이전 서버는 보내지 않는다. */
+  project_name?: string | null;
   /**
    * 세션 이름: 작업 폴더의 마지막 이름(#181). 사용자가 그 PC에서 켰을 때만 오고, 본인 장치 세션에만 있다.
    * 이전 서버는 보내지 않는다(없음 = null).

@@ -156,7 +156,7 @@ def test_team_timeline_requires_shared_session(client: TestClient, engine: Engin
     agent = stream.agent_id()
     team = client.post(
         "/api/v1/teams",
-        json={"name": "t"},
+        json={"name": "t", "share_mode": "selected"},
         headers={**session_cookie(stream.session), "X-CSRF-Token": _csrf(stream.session)},
     ).json()["id"]
     # 공유하지 않은 세션은 팀 타임라인에 없다.

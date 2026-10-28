@@ -94,6 +94,8 @@ services:
     environment:
       # 비우면 :8080(HTTP). 공개 도메인(예: office.example.com)을 넣으면 Caddy가 인증서를 자동 발급한다.
       AGENT_OFFICE_SITE_ADDRESS: ${AGENT_OFFICE_SITE_ADDRESS:-:8080}
+      # 앞단 프록시의 X-Forwarded-For를 믿을 출발지 대역(공백 구분, #209). 기본 루프백만.
+      AGENT_OFFICE_TRUSTED_PROXIES: ${AGENT_OFFICE_TRUSTED_PROXIES:-127.0.0.1/32 ::1/128}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

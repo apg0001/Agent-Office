@@ -54,6 +54,10 @@ INSTANCE_ROLES = ("SUPER_ADMIN", "ADMIN", "USER")
 USER_STATUSES = ("pending", "active", "disabled")
 TEAM_ROLES = ("OWNER", "MANAGER", "MEMBER")
 INVITABLE_TEAM_ROLES = ("MANAGER", "MEMBER")
+# 팀원별 공유 범위(#197): 모두 공유 / 공유한 프로젝트만 / 공유 안 함.
+SHARE_MODES = ("all", "selected", "none")
+# 프로젝트 출처(#197): 사용자가 만든 것 / 작업 폴더 이름으로 자동 생성한 것.
+PROJECT_ORIGINS = ("manual", "workspace")
 OAUTH_PROVIDERS = ("google", "github")
 DEVICE_PLATFORMS = ("windows", "macos", "linux", "unknown")
 PROVIDERS = ("codex", "claude", "unknown")
@@ -222,8 +226,12 @@ team_members = Table(
     _fk("user_id", "users.id", ondelete="CASCADE"),
     Column("role", String(16), nullable=False),
     Column("joined_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # 이 구성원이 팀에 보여 줄 범위(#197). 새 구성원은 가입·생성 화면의 동의로 정한다.
+    # 0009 이전 구성원은 마이그레이션이 'selected'(기존 규칙)로 둔다.
+    Column("share_mode", String(16), nullable=False, server_default="all"),
     PrimaryKeyConstraint("team_id", "user_id"),
     CheckConstraint(_in("role", TEAM_ROLES), name="role"),
+    CheckConstraint(_in("share_mode", SHARE_MODES), name="share_mode"),
 )
 # 팀당 OWNER는 최대 1명(인덱스)이고, 최소 1명은 지연 제약 트리거가 보장한다.
 Index(
@@ -347,8 +355,11 @@ projects = Table(
     _uuid_pk(),
     _fk("owner_user_id", "users.id", ondelete="CASCADE"),
     Column("display_name", String(120), nullable=False),
+    # 작업 폴더 이름으로 자동 생성한 프로젝트는 'workspace'(#197).
+    Column("origin", String(16), nullable=False, server_default="manual"),
     _created_at(),
     CheckConstraint("length(btrim(display_name)) > 0", name="display_name_not_blank"),
+    CheckConstraint(_in("origin", PROJECT_ORIGINS), name="origin"),
 )
 Index("ix_projects_owner_user_id", projects.c.owner_user_id)
 
@@ -393,6 +404,8 @@ agent_sessions = Table(
     Column("last_event_at", DateTime(timezone=True), nullable=True),
     # 작업 폴더의 마지막 이름(#181). PC별 동의 시에만 온다. 전체 경로는 받지 않는다.
     Column("workspace_name", String(64), nullable=True),
+    # 사용자가 직접 프로젝트를 정했는지(#197). 참이면 폴더 이름 자동 배정이 바꾸지 않는다.
+    Column("project_manual", Boolean, nullable=False, server_default="false"),
     _created_at(),
     Column(
         "change_seq",

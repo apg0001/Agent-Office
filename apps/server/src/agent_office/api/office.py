@@ -1,7 +1,7 @@
 """개인 사무실 스냅샷과 실시간 증분(#37).
 
 스냅샷과 증분에는 서버 ID, enum, 시각, 사용자가 붙인 장치 이름만 담는다. 원문은 없다.
-팀 범위(공유 프로젝트)는 #54·#55에서 같은 권한 재검사 구조로 추가한다.
+팀 범위는 #54·#55의 재검사 구조에 팀원별 공유 범위(#197)를 더해 거른다.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def _devices(connection: Connection, user_id: uuid.UUID) -> list[Any]:
 
 
 def _session_rows(connection: Connection, device_ids: list[uuid.UUID], extra: Any) -> list[Any]:
-    sessions, slots = schema.agent_sessions, schema.office_slots
+    sessions, slots, projects = schema.agent_sessions, schema.office_slots, schema.projects
     if not device_ids:
         return []
     return list(
@@ -75,9 +75,14 @@ def _session_rows(connection: Connection, device_ids: list[uuid.UUID], extra: An
                 sessions.c.last_event_at,
                 sessions.c.change_seq,
                 sessions.c.project_id,
+                projects.c.display_name.label("project_name"),
                 sessions.c.workspace_name,
             )
-            .select_from(sessions.outerjoin(slots, slots.c.session_id == sessions.c.id))
+            .select_from(
+                sessions.outerjoin(slots, slots.c.session_id == sessions.c.id).outerjoin(
+                    projects, projects.c.id == sessions.c.project_id
+                )
+            )
             .where(sessions.c.device_id.in_(device_ids), extra)
         ).all()
     )
@@ -137,6 +142,8 @@ def _session_json(
         "desk_slot": row.desk_slot,
         # 사용자가 지정한 프로젝트(서버 ID). 팀 공유 범위를 정한다(#54).
         "project_id": str(row.project_id) if row.project_id else None,
+        # 프로젝트 표시 이름(#197). 보이는 세션의 프로젝트만 담기므로 그 범위에 보이는 프로젝트다.
+        "project_name": row.project_name,
         # 작업 폴더의 마지막 이름(#181). 장치 소유자에게만 보인다(팀 화면은 null).
         "workspace_name": row.workspace_name if show_workspace else None,
         "change_seq": row.change_seq,
@@ -391,7 +398,8 @@ async def live(websocket: WebSocket) -> None:
     for kind in ("sessions", "agents"):
         for row in snapshot[kind]:
             sent[(kind, row["id"])] = row["change_seq"]
-    connections = {d["id"]: d["connection"] for d in snapshot["devices"]}
+    # 연결 상태나 이름(#206 이름 변경)이 바뀐 장치만 증분으로 보낸다.
+    connections = {d["id"]: (d["connection"], d["name"]) for d in snapshot["devices"]}
 
     receiver = asyncio.create_task(websocket.receive())
     loop = asyncio.get_running_loop()
@@ -415,8 +423,9 @@ async def live(websocket: WebSocket) -> None:
             changes = await run_in_threadpool(_with_connection, load_changes, user.id)
             delta: dict[str, Any] = {"type": "delta", "devices": [], "sessions": [], "agents": []}
             for device in changes["devices"]:
-                if connections.get(device["id"]) != device["connection"]:
-                    connections[device["id"]] = device["connection"]
+                seen = (device["connection"], device["name"])
+                if connections.get(device["id"]) != seen:
+                    connections[device["id"]] = seen
                     delta["devices"].append(device)
             for kind in ("sessions", "agents"):
                 for row in changes[kind]:
@@ -474,6 +483,8 @@ def assign_project(
         .where(sessions.c.id == session_id)
         .values(
             project_id=body.project_id,
+            # 직접 정한 배정(없음 포함)은 폴더 이름 자동 배정보다 우선한다(#197).
+            project_manual=True,
             change_seq=func.nextval("state_change_seq"),
             changed_at=func.clock_timestamp(),
         )
@@ -494,31 +505,42 @@ def team_member(connection: Connection, team_id: uuid.UUID, user_id: uuid.UUID) 
 
 
 def _team_session_ids(connection: Connection, team_id: uuid.UUID, now: dt.datetime) -> Any:
-    """팀에 보이는 세션: 소유자가 공유한 프로젝트의 세션이고, 소유자가 지금도 팀 구성원이며,
-    세션이 소유자 본인의 (폐기되지 않은) 장치에서 온 것."""
+    """팀에 보이는 세션(#54, #197). 세션이 지금도 팀 구성원인 사람의 (폐기되지 않은) 장치에서 왔고,
+    그 구성원의 공유 범위가
+
+    - 'all'이면 모든 세션(프로젝트가 없어도),
+    - 'selected'면 본인 프로젝트이면서 이 팀에 공유한 프로젝트의 세션만,
+    - 'none'이면 아무것도 보이지 않는다.
+    """
     sessions, projects, shares = schema.agent_sessions, schema.projects, schema.project_shares
     members, devices = schema.team_members, schema.devices
+    shared_project = (
+        select(shares.c.project_id)
+        .select_from(shares.join(projects, projects.c.id == shares.c.project_id))
+        .where(
+            shares.c.team_id == team_id,
+            shares.c.project_id == sessions.c.project_id,
+            projects.c.owner_user_id == devices.c.owner_user_id,
+        )
+        .exists()
+    )
     return (
         select(sessions.c.id)
         .select_from(
-            sessions.join(projects, projects.c.id == sessions.c.project_id)
-            .join(
-                shares,
-                (shares.c.project_id == projects.c.id) & (shares.c.team_id == team_id),
-            )
-            .join(
-                members,
-                (members.c.team_id == team_id) & (members.c.user_id == projects.c.owner_user_id),
-            )
-            .join(
+            sessions.join(
                 devices,
-                (devices.c.id == sessions.c.device_id)
-                & (devices.c.owner_user_id == projects.c.owner_user_id)
-                & devices.c.revoked_at.is_(None),
+                (devices.c.id == sessions.c.device_id) & devices.c.revoked_at.is_(None),
+            ).join(
+                members,
+                (members.c.team_id == team_id) & (members.c.user_id == devices.c.owner_user_id),
             )
         )
         .where(
-            or_(sessions.c.lifecycle != "ENDED", sessions.c.ended_at > now - ENDED_SESSION_GRACE)
+            or_(sessions.c.lifecycle != "ENDED", sessions.c.ended_at > now - ENDED_SESSION_GRACE),
+            or_(
+                members.c.share_mode == "all",
+                (members.c.share_mode == "selected") & shared_project,
+            ),
         )
     )
 
@@ -533,6 +555,7 @@ def _scoped_snapshot(
     """보이는 세션 집합으로 만든 스냅샷. 남의 장치는 PC 이름 대신 소유자 표시 이름을 쓰고,
     책상은 화면용 순번(시작 순서)이다. 세션은 한 번만 나온다(여러 팀에 공유돼도)."""
     sessions, devices, users = schema.agent_sessions, schema.devices, schema.users
+    projects = schema.projects
     session_rows = list(
         connection.execute(
             select(
@@ -546,8 +569,10 @@ def _scoped_snapshot(
                 sessions.c.last_event_at,
                 sessions.c.change_seq,
                 sessions.c.project_id,
+                projects.c.display_name.label("project_name"),
                 sessions.c.workspace_name,
             )
+            .select_from(sessions.outerjoin(projects, projects.c.id == sessions.c.project_id))
             .where(sessions.c.id.in_(visible))
             .order_by(sessions.c.started_at, sessions.c.id)
         ).all()
@@ -595,6 +620,8 @@ def _scoped_snapshot(
             {
                 "id": str(d.id),
                 "name": d.device_name if d.owner_user_id == viewer_id else d.display_name,
+                # 팀·통합 화면의 사람 이름표(#206). 내 장치도 내 표시 이름. 이메일은 담지 않는다.
+                "owner_name": d.display_name,
                 "connection": connection_state(d.last_seen_at, now),
             }
             for d in device_rows
@@ -685,9 +712,11 @@ def team_agent_detail(
     # 작업 폴더 이름(#181)은 팀 화면에 보이지 않는다(팀 스냅샷과 같게 소유자 본인에게도 null).
     detail["session"]["workspace_name"] = None
     # 팀원에게는 PC 이름 대신 소유자 표시 이름을 보여 준다.
-    detail["device"]["name"] = connection.execute(
+    owner_name = connection.execute(
         select(schema.users.c.display_name).where(schema.users.c.id == owner)
     ).scalar_one()
+    detail["device"]["name"] = owner_name
+    detail["device"]["owner_name"] = owner_name
     return detail
 
 
@@ -698,6 +727,10 @@ def combined_agent_detail(
     """통합 사무실의 상세: 내 에이전트면 개인 상세, 아니면 그것이 보이는 팀의 상세."""
     own = build_agent_detail(connection, user.id, agent_id)
     if own is not None:
+        # 통합 화면은 사람 이름을 함께 보여 준다(#206). 내 에이전트면 내 표시 이름.
+        own["device"]["owner_name"] = connection.execute(
+            select(schema.users.c.display_name).where(schema.users.c.id == user.id)
+        ).scalar_one()
         return own
     members = schema.team_members
     for team_id in connection.execute(

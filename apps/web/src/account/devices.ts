@@ -53,3 +53,23 @@ export function sortDevices(devices: DeviceSummary[]): DeviceSummary[] {
     return a.name.localeCompare(b.name, "ko");
   });
 }
+
+export const MAX_DEVICE_NAME = 80;
+
+/**
+ * PC 이름 변경(#206) 입력 검사. 서버와 같은 규칙(앞뒤 공백 제거 후 1~80자, 제어 문자 없음).
+ * 맞으면 다듬은 이름, 아니면 오류 문구.
+ */
+export function checkDeviceName(input: string): { name: string } | { error: string } {
+  const name = input.trim();
+  if (name.length === 0) {
+    return { error: "이름을 입력하세요." };
+  }
+  if (Array.from(name).length > MAX_DEVICE_NAME) {
+    return { error: `이름은 ${MAX_DEVICE_NAME}자 이하로 입력하세요.` };
+  }
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(name)) {
+    return { error: "줄바꿈이나 제어 문자는 쓸 수 없습니다." };
+  }
+  return { name };
+}
