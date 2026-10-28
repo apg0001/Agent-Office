@@ -11,7 +11,10 @@ import { OfficeView } from "./office/OfficeView";
 import { SideBySide } from "./office/SideBySide";
 import { scopeFromSearch } from "./office/liveSource";
 
-function SessionBar() {
+/** 로그인한 사람이 쓰는 화면. 사무실과 같은 상단 바와 "사무실로" 링크를 보여 준다. */
+const MEMBER_PAGES = new Set(["teams", "devices", "admin", "account"]);
+
+function SessionBar({ current = "office" }: { current?: string }) {
   const [session, setSession] = useState<SessionInfo | null | undefined>(undefined);
 
   useEffect(() => {
@@ -32,12 +35,26 @@ function SessionBar() {
     await call("POST", "/api/v1/auth/logout", undefined, session.csrf_token);
     window.location.assign("/login");
   };
+  const here = (page: string) => (page === current ? ("page" as const) : undefined);
   return (
     <nav className="session-bar" aria-label="계정">
-      <a href="/teams">팀</a>
-      <a href="/devices">PC</a>
-      <a href="/account">계정</a>
-      {["SUPER_ADMIN", "ADMIN"].includes(session.user.instance_role) && <a href="/admin">관리</a>}
+      <a href="/" aria-current={here("office")}>
+        사무실
+      </a>
+      <a href="/teams" aria-current={here("teams")}>
+        팀
+      </a>
+      <a href="/devices" aria-current={here("devices")}>
+        PC
+      </a>
+      <a href="/account" aria-current={here("account")}>
+        계정
+      </a>
+      {["SUPER_ADMIN", "ADMIN"].includes(session.user.instance_role) && (
+        <a href="/admin" aria-current={here("admin")}>
+          관리
+        </a>
+      )}
       <span>{session.user.display_name}</span>
       <button type="button" onClick={() => void logout()}>
         로그아웃
@@ -63,11 +80,26 @@ export function App({ pathname }: { pathname?: string }) {
       account: AccountPage,
     };
     const Page = pages[route];
+    const member = MEMBER_PAGES.has(route);
     return (
-      <main className={`shell account-shell${route === "teams" || route === "devices" || route === "admin" ? " wide" : ""}`}>
-        <p className="eyebrow">
-          <a href="/">AGENT OFFICE</a>
-        </p>
+      <main className={`shell account-shell${route === "teams" || route === "devices" || route === "admin" ? " wide" : ""}${member ? " member-shell" : ""}`}>
+        {member ? (
+          <>
+            <header className="topbar">
+              <a className="brand" href="/">
+                Agent Office
+              </a>
+              <SessionBar current={route} />
+            </header>
+            <a className="back-link" href="/">
+              ← 사무실로 돌아가기
+            </a>
+          </>
+        ) : (
+          <p className="eyebrow">
+            <a href="/">AGENT OFFICE</a>
+          </p>
+        )}
         <Page />
       </main>
     );
