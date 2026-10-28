@@ -76,6 +76,7 @@ const MESSAGES: Record<string, string> = {
   invalid_public_url: "주소는 https://호스트[:포트] 형식이어야 합니다(경로 없이).",
   invalid_sender: "발신 주소 형식이 올바르지 않습니다.",
   invalid_host: "SMTP 호스트 형식이 올바르지 않습니다.",
+  password_mismatch: "비밀번호와 비밀번호 확인이 다릅니다.",
   smtp_username_not_ascii: "SMTP 사용자 이름은 영문 계정이어야 합니다(Gmail은 전체 메일 주소, 예: name@gmail.com).",
   secret_key_missing: "서버에 비밀 암호화 키(AGENT_OFFICE_SECRET_KEY)가 없어 암호를 저장할 수 없습니다.",
   forbidden: "권한이 없습니다.",

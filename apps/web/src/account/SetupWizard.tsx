@@ -17,6 +17,7 @@ export function SetupWizard() {
   const [token, setToken] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [serviceName, setServiceName] = useState("Agent Office");
   const [publicUrl, setPublicUrl] = useState(() => window.location.origin);
@@ -96,6 +97,9 @@ export function SetupWizard() {
         <form
           onSubmit={submit(
             async () => {
+              if (password !== confirmPassword) {
+                return { ok: false, error: "password_mismatch" };
+              }
               const result = await call<SessionInfo>("POST", "/api/v1/setup/admin", {
                 bootstrap_token: token.trim(),
                 email,
@@ -119,6 +123,14 @@ export function SetupWizard() {
             type="password"
             value={password}
             onChange={setPassword}
+            autoComplete="new-password"
+          />
+          <Field
+            label="비밀번호 확인"
+            name="password-confirm"
+            type="password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
             autoComplete="new-password"
           />
           <Notice error={error} />
