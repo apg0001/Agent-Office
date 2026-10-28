@@ -47,6 +47,7 @@ def _values(world: World, route_key: str) -> dict[str, str]:
 def _bodies(world: World, attacker: Actor) -> dict[str, Any]:
     return {
         "PATCH /api/v1/teams/{team_id}": {"name": "pwned"},
+        "PATCH /api/v1/devices/{device_id}": {"name": "pwned"},
         "PATCH /api/v1/teams/{team_id}/members/{member_id}": {"role": "MEMBER"},
         "POST /api/v1/teams/{team_id}/transfer": {"user_id": str(attacker.id)},
         "PUT /api/v1/teams/{team_id}/share-mode": {"share_mode": "all"},

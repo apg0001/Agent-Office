@@ -27,8 +27,9 @@ CSRF 토큰은 #25에서 도입했습니다. #26 초기의 임시 `X-Agent-Offic
 | `POST /api/v1/devices/revoke` | 장치 | 없음 | `204`. Collector 로그아웃·제거 시 자기 장치와 모든 토큰 폐기 |
 | `GET /api/v1/devices` | 세션 | 없음 | `200 [{id, name, platform, collector_version, created_at, last_seen_at, revoked_at, connection}]`. 자기 장치만. `connection`은 마지막 heartbeat 기준 `ONLINE`/`DISCONNECTED`(120초, #36). 폐기된 장치는 항상 `DISCONNECTED` |
 | `POST /api/v1/devices/{device_id}/revoke` | 세션 + CSRF | 없음 | `204`. 다른 사용자의 장치는 존재 여부와 무관하게 `404 not_found` |
+| `PATCH /api/v1/devices/{device_id}` | 세션 + CSRF | `{name}` | `200` 장치 요약(`GET /devices`의 한 항목). PC 이름 변경(#206). 장치 소유자만 가능(관리자도 남의 장치는 불가, 폐기와 같은 규칙). 다른 사용자·없는 장치는 `404 not_found`, 폐기된 장치는 `409 device_revoked`, 같은 사용자의 활성 장치 이름 중복(대소문자 무시)은 `409 device_name_conflict` |
 
-입력 제약: `name` 1~80자(앞뒤 공백 제거), `platform`은 `windows`/`macos`/`linux`/`unknown`, `collector_version`은 `^[0-9A-Za-z.+-]{1,64}$`, `queue_depth` 0~10,000,000. 알 수 없는 필드는 `422`.
+입력 제약: `name` 1~80자(앞뒤 공백 제거, 이름 변경은 줄바꿈 등 제어 문자도 `422`), `platform`은 `windows`/`macos`/`linux`/`unknown`, `collector_version`은 `^[0-9A-Za-z.+-]{1,64}$`, `queue_depth` 0~10,000,000. 알 수 없는 필드는 `422`.
 
 등록 코드 입력은 대소문자·공백·하이픈을 정리해 비교합니다(`abcd efgh` = `ABCD-EFGH`). 알파벳은 혼동 문자(0/O, 1/I/L, U)를 뺀 30자입니다.
 
@@ -39,9 +40,15 @@ CSRF 토큰은 #25에서 도입했습니다. #26 초기의 임시 `X-Agent-Offic
 - Collector는 장치 토큰을 하나만 OS 보안 저장소에 보관합니다(#41). 다른 사용자로 바꾸려면 `POST /api/v1/devices/revoke`로 로그아웃한 뒤 새 코드로 다시 등록합니다.
 - 서버는 같은 PC인지 판정하지 않습니다. 등록할 때마다 새 장치가 생기고, 같은 사용자의 활성 장치 이름만 중복을 막습니다.
 
+## PC 이름 변경(#206)
+
+- 웹 `/devices`의 "이름 바꾸기"로 고칩니다. 사무실 화면(개인 이름표·세션 목록·상세)은 서버의 장치 이름을 쓰므로 바로 반영됩니다(개인 실시간은 이름이 바뀐 장치를 증분으로 보냄).
+- Collector 로컬 설정에 저장된 이름은 바꾸지 않으며 바꿀 필요도 없습니다. Collector는 등록할 때만 이름을 보내고, 그 뒤에는 서버 이름이 표시 기준입니다. 다시 등록하면 그때 입력한 이름으로 새 장치가 생깁니다.
+- 팀 화면에는 여전히 PC 이름 대신 소유자 표시 이름이 보입니다.
+
 ## 감사 로그
 
-`device.registration_code.created`, `device.registered`, `device.token.rotated`, `device.revoked`를 기록합니다. 상세에는 `platform`·`reason` 같은 허용 키만 남기고, 토큰·코드 원문은 넣지 않습니다(테스트로 확인).
+`device.registration_code.created`, `device.registered`, `device.token.rotated`, `device.revoked`, `device.renamed`(#206, 이름 자체는 남기지 않음)를 기록합니다. 상세에는 `platform`·`reason` 같은 허용 키만 남기고, 토큰·코드 원문은 넣지 않습니다(테스트로 확인).
 
 ## 알려진 제한
 

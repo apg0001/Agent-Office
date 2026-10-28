@@ -688,6 +688,18 @@ code,
   color: var(--accent);
 }
 
+.device-table .row-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.device-table .inline-form input {
+  min-width: 0;
+  width: 14em;
+  max-width: 100%;
+}
+
 .members select,
 .inline-form select {
   padding: 2px 4px;

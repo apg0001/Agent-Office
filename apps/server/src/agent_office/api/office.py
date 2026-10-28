@@ -398,7 +398,8 @@ async def live(websocket: WebSocket) -> None:
     for kind in ("sessions", "agents"):
         for row in snapshot[kind]:
             sent[(kind, row["id"])] = row["change_seq"]
-    connections = {d["id"]: d["connection"] for d in snapshot["devices"]}
+    # 연결 상태나 이름(#206 이름 변경)이 바뀐 장치만 증분으로 보낸다.
+    connections = {d["id"]: (d["connection"], d["name"]) for d in snapshot["devices"]}
 
     receiver = asyncio.create_task(websocket.receive())
     loop = asyncio.get_running_loop()
@@ -422,8 +423,9 @@ async def live(websocket: WebSocket) -> None:
             changes = await run_in_threadpool(_with_connection, load_changes, user.id)
             delta: dict[str, Any] = {"type": "delta", "devices": [], "sessions": [], "agents": []}
             for device in changes["devices"]:
-                if connections.get(device["id"]) != device["connection"]:
-                    connections[device["id"]] = device["connection"]
+                seen = (device["connection"], device["name"])
+                if connections.get(device["id"]) != seen:
+                    connections[device["id"]] = seen
                     delta["devices"].append(device)
             for kind in ("sessions", "agents"):
                 for row in changes[kind]:
@@ -618,6 +620,8 @@ def _scoped_snapshot(
             {
                 "id": str(d.id),
                 "name": d.device_name if d.owner_user_id == viewer_id else d.display_name,
+                # 팀·통합 화면의 사람 이름표(#206). 내 장치도 내 표시 이름. 이메일은 담지 않는다.
+                "owner_name": d.display_name,
                 "connection": connection_state(d.last_seen_at, now),
             }
             for d in device_rows
@@ -708,9 +712,11 @@ def team_agent_detail(
     # 작업 폴더 이름(#181)은 팀 화면에 보이지 않는다(팀 스냅샷과 같게 소유자 본인에게도 null).
     detail["session"]["workspace_name"] = None
     # 팀원에게는 PC 이름 대신 소유자 표시 이름을 보여 준다.
-    detail["device"]["name"] = connection.execute(
+    owner_name = connection.execute(
         select(schema.users.c.display_name).where(schema.users.c.id == owner)
     ).scalar_one()
+    detail["device"]["name"] = owner_name
+    detail["device"]["owner_name"] = owner_name
     return detail
 
 
@@ -721,6 +727,10 @@ def combined_agent_detail(
     """통합 사무실의 상세: 내 에이전트면 개인 상세, 아니면 그것이 보이는 팀의 상세."""
     own = build_agent_detail(connection, user.id, agent_id)
     if own is not None:
+        # 통합 화면은 사람 이름을 함께 보여 준다(#206). 내 에이전트면 내 표시 이름.
+        own["device"]["owner_name"] = connection.execute(
+            select(schema.users.c.display_name).where(schema.users.c.id == user.id)
+        ).scalar_one()
         return own
     members = schema.team_members
     for team_id in connection.execute(

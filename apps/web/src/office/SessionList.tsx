@@ -1,5 +1,6 @@
 import { headlineFor } from "./headline";
-import type { OfficeState, SessionState } from "./types";
+import { shortLabel } from "./sprites";
+import type { DeviceState, OfficeState, SessionState } from "./types";
 import { sessionName, shortWorkspace } from "./workspace";
 
 const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
@@ -10,10 +11,21 @@ const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
 
 export interface ActiveSession {
   session: SessionState;
+  /** 행 맨 앞의 "누구" 이름. 팀·통합은 사람 이름(통합의 내 PC는 "내 이름 · PC 이름", #206), 개인은 PC 이름. */
   deviceName: string;
   leadId: string | null;
   headline: string;
   subagents: number;
+}
+
+/** 세션 목록 행의 "누구". 사람 이름이 있으면 앞에 두고, PC 이름이 따로 있으면(통합의 내 장치) 뒤에 붙인다. */
+export function whoFor(device: DeviceState | undefined): string {
+  const pc = shortLabel(device?.name, 24);
+  const owner = shortLabel(device?.owner_name, 16);
+  if (!owner) {
+    return pc || "PC";
+  }
+  return pc && pc !== owner ? `${owner} · ${pc}` : owner;
 }
 
 /** 지금 활성(종료되지 않은) 세션 목록. 최근 활동 순(#162). */
@@ -25,7 +37,7 @@ export function activeSessions(state: OfficeState): ActiveSession[] {
       const lead = agents.find((agent) => agent.role === "lead") ?? null;
       return {
         session,
-        deviceName: state.devices.find((device) => device.id === session.device_id)?.name ?? "PC",
+        deviceName: whoFor(state.devices.find((device) => device.id === session.device_id)),
         leadId: lead?.id ?? null,
         headline: lead ? headlineFor(lead) : "",
         subagents: agents.filter((agent) => agent.role === "subagent").length,

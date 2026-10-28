@@ -72,6 +72,18 @@ describe("labelFor", () => {
 
   it("labels subagents by role only", () => {
     expect(labelFor(sub, device("Work PC"))).toBe("하위");
+    expect(labelFor(sub, { ...device("Work PC"), owner_name: "Bob" })).toBe("하위");
+  });
+
+  it("shows the person in team and combined views (#206)", () => {
+    // 팀 화면: 서버가 이름 자리에도 표시 이름을 보낸다.
+    expect(labelFor(lead, { ...device("Bob"), owner_name: "Bob" })).toBe("Bob");
+    // 통합의 내 장치: PC 이름 대신 내 이름.
+    expect(labelFor(lead, { ...device("alice-pc"), owner_name: "Alice" })).toBe("Alice");
+    expect(labelFor(lead, { ...device("pc"), owner_name: "아주 긴 이름의 팀원 사용자" })).toBe("아주 긴 이름의…");
+    // 개인 사무실(사람 이름 없음)·빈 이름은 PC 이름으로.
+    expect(labelFor(lead, { ...device("Work PC"), owner_name: null })).toBe("Work PC");
+    expect(labelFor(lead, { ...device("Work PC"), owner_name: " \n " })).toBe("Work PC");
   });
 });
 

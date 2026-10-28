@@ -251,3 +251,56 @@ def test_malformed_device_tokens_are_rejected(client: TestClient) -> None:
             headers={"Authorization": header} if header else {},
         )
         assert response.status_code == 401
+
+
+def test_owner_renames_device(client: TestClient, engine: Engine) -> None:
+    """PC 이름 변경(#206): 소유자만, 등록과 같은 검증, 감사 로그에 이름을 남기지 않는다."""
+    _, session = sign_in(engine)
+    _, other_session = sign_in(engine)
+    first = register(client, new_code(client, session), name="pc-1")
+    register(client, new_code(client, session), name="pc-2")
+    path = f"/api/v1/devices/{first['device_id']}"
+    owner = {**csrf(session), **session_cookie(session)}
+
+    renamed = client.patch(path, json={"name": "  새 노트북  "}, headers=owner)
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "새 노트북"
+    listed = client.get("/api/v1/devices", headers=session_cookie(session)).json()
+    assert {d["name"] for d in listed} == {"새 노트북", "pc-2"}
+
+    # CSRF 없이는 거부, 다른 사용자·없는 장치는 같은 404.
+    no_csrf = client.patch(path, json={"name": "x"}, headers=session_cookie(session))
+    assert no_csrf.status_code == 403
+    other = {**csrf(other_session), **session_cookie(other_session)}
+    assert client.patch(path, json={"name": "x"}, headers=other).status_code == 404
+    missing = f"/api/v1/devices/{uuid.uuid4()}"
+    assert client.patch(missing, json={"name": "x"}, headers=owner).status_code == 404
+
+    # 빈 이름·80자 초과·제어 문자·알 수 없는 필드는 422, 이름 중복(대소문자 무시)은 409.
+    for body in (
+        {"name": "   "},
+        {"name": "a" * 81},
+        {"name": "a\nb"},
+        {"name": "a\u0000b"},
+        {"name": "ok", "owner_user_id": str(uuid.uuid4())},
+        {},
+    ):
+        assert client.patch(path, json=body, headers=owner).status_code == 422, body
+    conflict = client.patch(path, json={"name": "PC-2"}, headers=owner)
+    assert conflict.status_code == 409 and conflict.json()["detail"] == "device_name_conflict"
+
+    with engine.connect() as connection:
+        rows = [
+            dict(r._mapping)
+            for r in connection.execute(
+                select(schema.audit_logs).where(schema.audit_logs.c.action == "device.renamed")
+            )
+        ]
+    assert len(rows) == 1 and rows[0]["target_id"] == uuid.UUID(first["device_id"])
+    assert "노트북" not in json.dumps(rows, default=str)
+
+    # 폐기된 장치는 이름을 바꾸지 않는다.
+    revoke = f"/api/v1/devices/{first['device_id']}/revoke"
+    assert client.post(revoke, headers=owner).status_code == 204
+    gone = client.patch(path, json={"name": "다른 이름"}, headers=owner)
+    assert gone.status_code == 409 and gone.json()["detail"] == "device_revoked"
