@@ -285,6 +285,9 @@ func printReport(w io.Writer, r Report, diagnose bool) {
 		for _, e := range r.Run.Errors {
 			fmt.Fprintf(w, "오류 %s: %d회, 마지막 %s\n", e.Code, e.Count, e.LastAt.Format(time.RFC3339))
 		}
+		if deniedEACCES(r.Run.Counters) {
+			fmt.Fprintln(w, "조치: 읽을 수 없는 Claude 기록 파일이 있습니다(다른 사용자, 예: sudo로 실행한 세션 소유일 수 있음). Hook 수집은 영향 없음. 해결 방법은 문서 '읽을 수 없는 기록 파일'을 보세요")
+		}
 		if r.Run.State == runner.StateDeviceRevoked {
 			fmt.Fprintln(w, "조치: 서버가 장치 토큰을 거부했습니다. 웹에서 새 코드를 받아 `register --force`로 다시 등록하세요")
 		}
@@ -304,4 +307,14 @@ func printReport(w io.Writer, r Report, diagnose bool) {
 		}
 		fmt.Fprintf(w, "서버 도달: %s\n", r.Server)
 	}
+}
+
+// deniedEACCES는 파일 권한(EACCES)으로 기록 파일을 열지 못한 적이 있는지다(#184).
+func deniedEACCES(counters map[string]int64) bool {
+	for k, n := range counters {
+		if n > 0 && strings.HasPrefix(k, "tail_denied_") && strings.HasSuffix(k, "_eacces") {
+			return true
+		}
+	}
+	return false
 }
