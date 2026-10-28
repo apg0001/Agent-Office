@@ -107,6 +107,8 @@ const MESSAGES: Record<string, string> = {
   identity_in_use: "이 제공자 계정은 이미 다른 사용자에 연결되어 있습니다.",
   provider_already_linked: "이 제공자의 다른 계정이 이미 연결되어 있습니다. 먼저 연결을 해제하세요.",
   too_many_open_codes: "아직 쓰지 않은 등록 코드가 너무 많습니다(최대 5개). 기존 코드가 만료(10분)된 뒤 다시 시도하세요.",
+  device_name_conflict: "같은 이름의 PC가 이미 있습니다. 다른 이름을 쓰세요.",
+  device_revoked: "폐기된 PC는 이름을 바꿀 수 없습니다.",
   last_login_method: "비밀번호가 없는 계정의 마지막 로그인 수단은 해제할 수 없습니다.",
 };
 

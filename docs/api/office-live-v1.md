@@ -10,7 +10,7 @@
 
 | 배열 | 필드 |
 |---|---|
-| `devices` | `id`, `name`, `connection`(`ONLINE`/`DISCONNECTED`) |
+| `devices` | `id`, `name`, `owner_name`(팀·통합 화면만, 아래 "사람 이름표" 참고, #206), `connection`(`ONLINE`/`DISCONNECTED`) |
 | `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(개인 사무실 책상 번호, 반납되면 `null`, #48), `project_id`, `project_name`(프로젝트 표시 이름, 없으면 `null`, #197), `workspace_name`(작업 폴더 마지막 이름, 동의하지 않았거나 팀 화면이면 `null`, #181), `change_seq` |
 | `agents` | `id`, `session_id`, `parent_agent_id`, `role`(`lead`/`subagent`), `turn_state`, `activity`, `confidence`(현재 활동을 만든 이벤트의 `observed`/`inferred`, #47), `state_version`, `started_at`, `ended_at`, `change_seq` |
 
@@ -43,7 +43,7 @@
 |---|---|
 | 연결 | 세션 쿠키로 인증. 브라우저가 보낸 `Origin`은 요청 `Host`와 같거나 `AGENT_OFFICE_ALLOWED_ORIGINS`(쉼표 구분)에 있어야 함(교차 사이트 WebSocket 하이재킹 방지) |
 | 첫 메시지 | 스냅샷(`type: "snapshot"`) |
-| 이후 | 변경이 있을 때 `{type: "delta", devices, sessions, agents}`. 장치는 연결 상태가 바뀔 때만 포함 |
+| 이후 | 변경이 있을 때 `{type: "delta", devices, sessions, agents}`. 장치는 연결 상태나 이름(#206 이름 변경)이 바뀔 때만 포함 |
 | 유휴 | 25초마다 `{type: "ping"}` |
 | 권한 철회 | 매 주기(1초) 세션을 다시 검증. 로그아웃·세션 폐기·사용자 비활성화 시 즉시 종료 |
 
@@ -122,6 +122,22 @@
 
 - 이벤트·세션은 한 번만 저장되고, 여러 팀에 공유된 세션도 SQL `UNION`으로 한 번만 나옵니다. 화면 배치(책상 순번)만 범위마다 따로 계산합니다.
 - 내 장치는 PC 이름을, 남의 장치는 소유자 표시 이름을 보여 줍니다.
+
+### 사람 이름표(#206)
+
+팀에는 사용자가 여럿이므로 팀·통합 화면은 세션마다 누구의 작업인지 보여 줍니다. 장치(`devices[]`, 상세의 `device`)에 `owner_name`(장치 소유자의 표시 이름)을 담습니다. 이메일은 어디에도 담지 않습니다.
+
+| 화면 | `devices[].name` | `devices[].owner_name` | 캐릭터 이름표 | 왼쪽 위 세션 목록 |
+|---|---|---|---|---|
+| 개인 사무실(`/office`, 개인 상세) | PC 이름 | 없음(필드 생략) | PC 이름 | PC 이름 |
+| 팀 사무실(스냅샷·실시간·팀 상세) | 소유자 표시 이름(내 장치 포함) | 소유자 표시 이름 | 사람 이름 | 사람 이름 |
+| 통합 사무실, 남의 장치 | 소유자 표시 이름 | 소유자 표시 이름 | 사람 이름 | 사람 이름 |
+| 통합 사무실, 내 장치 | PC 이름 | 내 표시 이름 | 내 이름 | `내 이름 · PC 이름` |
+
+- 통합 화면의 내 세션도 사람 이름표를 내 이름으로 달아 팀원 세션과 같은 기준으로 구분합니다. 내 PC 이름은 내게만 보이므로 세션 목록과 상세 패널에 함께 보여 줍니다.
+- 이름표는 기존 규칙대로 제어 문자를 지우고 10자로 줄입니다(넘치면 `…`). 줄 수가 같아 상태 말풍선·세션 이름과의 배치는 바뀌지 않습니다.
+- 표시 이름이 바뀌면 팀·통합 실시간은 다음 주기 스냅샷 비교에서 바뀐 장치를 증분으로 보냅니다.
+- 이전 서버는 `owner_name`을 보내지 않습니다. 클라이언트는 없으면 PC 이름(`name`)으로 그립니다.
 
 ### 웹
 

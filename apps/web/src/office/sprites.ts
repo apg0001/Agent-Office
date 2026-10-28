@@ -142,21 +142,23 @@ export function walkFrame(moving: boolean, time: number): Frame {
 
 const MAX_LABEL = 10;
 
+/** 제어 문자를 지우고 공백을 하나로 모은 뒤 `max`자로 줄인다(넘치면 "…"). */
+export function shortLabel(raw: string | null | undefined, max = MAX_LABEL): string {
+  const name = (raw ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+    .trim();
+  const chars = Array.from(name);
+  return chars.length > max ? `${chars.slice(0, max - 1).join("").trimEnd()}…` : name;
+}
+
 /**
- * 머리 위 짧은 이름. 사용자가 붙인 PC 이름만 쓰며, 제어 문자를 지우고 10자로 줄인다.
- * 프롬프트·경로·명령은 서버에 없으므로 라벨에도 나올 수 없다.
+ * 머리 위 짧은 이름. 팀·통합 화면은 사람(장치 소유자 표시 이름, #206), 개인 사무실은 사용자가 붙인
+ * PC 이름을 쓴다. 제어 문자를 지우고 10자로 줄인다. 프롬프트·경로·명령은 서버에 없으므로 라벨에도 나올 수 없다.
  */
 export function labelFor(agent: AgentState, device: DeviceState | undefined): string {
   if (agent.role === "subagent") {
     return "하위";
   }
-  const name = (device?.name ?? "")
-    .replace(/\s+/g, " ")
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
-    .trim();
-  const chars = Array.from(name);
-  if (chars.length === 0) {
-    return "리드";
-  }
-  return chars.length > MAX_LABEL ? `${chars.slice(0, MAX_LABEL - 1).join("").trimEnd()}…` : name;
+  return shortLabel(device?.owner_name) || shortLabel(device?.name) || "리드";
 }

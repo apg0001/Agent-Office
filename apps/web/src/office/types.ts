@@ -21,7 +21,13 @@ export type Activity =
 
 export interface DeviceState {
   id: string;
+  /** 개인·통합의 내 장치는 PC 이름, 팀 화면·남의 장치는 소유자 표시 이름. */
   name: string;
+  /**
+   * 사람 이름표(#206): 장치 소유자의 표시 이름. 팀·통합 화면에만 온다(통합의 내 장치는 내 이름).
+   * 개인 사무실과 이전 서버는 보내지 않는다(없음 = 사람 이름 표시 안 함).
+   */
+  owner_name?: string | null;
   connection: Connection;
 }
 
