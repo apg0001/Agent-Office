@@ -298,6 +298,7 @@
 212. #206(PR #212) 팀·통합 사무실 사람 이름표·PC 이름 변경, #213(PR #214) e2e 큐 비움 대기, #215(PR #216) 비밀번호 확인·메인 화면 OS별 Collector 설치 안내·공유 범위 링크. 운영 Pi는 정식 0.1.0-beta.2(DB 0008). #217 0.1.0-beta.3 릴리스 노트 작성.
 213. 0.1.0-beta.3 게시·운영 반영(2026-10-28, main `0a10eb5`, DB 0009, server-v 태그·Release는 소유자 생성 대기). 이후 #221(폴더 이름 기본 켜짐), #223(세션 선택 초점), #225(Windows Codex Hook이 PowerShell로 실행돼 실패 → 짧은 경로·따옴표 없는 명령. Codex는 `build_hooks_config`에서 세션 셸로 Hook 실행), #227(계정 화면 상단 바·표), #229(README), #231(팀 책상 겹침: change_seq 같은 값 변경을 클라이언트가 버림), #233(쉬는 연출), #235(실험실). Pi Collector beta.3. 커밋 형식은 `[type] 설명 (#N)`.
 214. 0.1.0-beta.4 게시·운영 반영(main `6cb9e2d`, Release 소유자 생성). 소유자 Windows Codex 수집 확인(#225 종료), 코드 서명 안 함(#42 종료). 이후 #184(권한 오류 재시도 간격·진단), #244(상태순 정렬), #245(활동 없는 세션 숨기기, 서브에이전트), #247(지도 이름 10자), #177(트레이 재실행 경합, 서브에이전트). 소유자: 이메일 승인 옵션·주소 변경·SMTP는 신경 쓰지 않아도 됨.
+215. 0.1.0-beta.5 게시·운영 반영(main `bcf92fa`, DB 0009, Pi Collector beta.5). 열린 Issue 0개로 정리(#62 실사용 근거 기록 후 종료, #87 보류 종료, #184 원인=sudo로 실행한 세션의 root 소유 transcript, PR #254 status 안내). #255 PWA: 매니페스트·최소 서비스 워커(`/assets/` 등 정적 파일만 캐시, `/api/`·HTML 캐시 안 함)·픽셀 캐릭터 아이콘(`apps/web/scripts/icons.mjs`로 생성)·반응형(캔버스가 ResizeObserver·회전·전체 화면에 맞춰 크기 조정, 높이 `mapHeight` 300~560px, 720px 이하·높이 500px 이하에서 세션 목록 지도 아래, 핀치 확대, 폰 표 가로 스크롤). 320×568·390×844·844×390·768×1024·1400×1000 스크린샷과 전체 화면 전환에서 가로 넘침 0. headless Chromium `Page.getInstallabilityErrors` 오류 0 확인, 실기기(Android·iPhone·Windows·macOS) 설치는 미확인.
 
 ## 이번 변경 요약(#22)
 
@@ -384,7 +385,7 @@
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
 4. 진행 순서(자율, 2026-10-26 갱신):
-   1. 0.1.0-beta.5 릴리스(#250): 같은 절차(main PR → publish-images 승인 + 소유자 publish-collector 실행·승인 → 검증 → `deploy/upgrade.sh` → 소유자 `gh release create server-v0.1.0-beta.5 …` → 역병합). 배포 후 `/admin`에서 숨기기 1분으로 바꿔 퇴근·재출근 연출 확인 뒤 60분으로 되돌림. 맥 `status`의 `tail_denied_*`로 #184 원인 확인.
+   1. #255 PWA 병합 뒤 0.1.0-beta.6 릴리스(#184 status 안내 포함): 같은 절차(릴리스 노트 PR → `[release]` main PR → `gh workflow run publish-images.yml --ref main -f version=0.1.0-beta.6` 승인 + 소유자 publish-collector 실행·승인 → `sha256sum -c SHA256SUMS` → `./deploy/upgrade.sh --server … --web … --env-file deploy/.env.production --yes` → 소유자 `gh release create server-v0.1.0-beta.6 …` → 역병합). 배포 후 소유자 폰·PC에서 PWA 설치 확인을 받아 실기기 확인 범위를 기록.
    2. 소유자 결정(2026-10-28): 이메일 확인 없이 승인 옵션·주소 변경·SMTP는 하지 않음(신경 쓰지 않아도 됨).
    3. macOS 사용자는 beta.3 설치 파일로 GUI 마법사(#204 수정) 실사용 확인.
    4. 후속: #177 트레이 종료 간헐 실패, 트레이 "동기화"(Core flush 명령), 업데이트 알림(#44), macOS·Windows Codex 실기 확인, 서명 비용 결정(#42), #62·#87 소유자 장비.

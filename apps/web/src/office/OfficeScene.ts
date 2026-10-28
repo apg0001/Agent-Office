@@ -12,6 +12,7 @@ import {
   focusPoint,
   initialCamera,
   onManualControl,
+  pinchZoom,
   resumeAutoFocus,
   zoomBy,
 } from "./camera";
@@ -94,6 +95,8 @@ export class OfficeScene extends Phaser.Scene {
   private seats = new Map<string, Point>();
   private sinceReplan = 0;
   private camera: CameraState = initialCamera;
+  /** 직전 핀치의 두 손가락 거리(px). 0이면 핀치 중이 아님. */
+  private pinchDistance = 0;
   /** 자동 초점 상태가 바뀌면 화면(React)에 알린다. */
   onCameraChange: (state: CameraState) => void = () => undefined;
   /** 캐릭터를 클릭하면 상세 패널(#51)을 연다. */
@@ -160,6 +163,15 @@ export class OfficeScene extends Phaser.Scene {
 
   private bindCameraInput(): void {
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      // 두 손가락이면 핀치로 확대·축소만 한다(#255).
+      const { pointer1: first, pointer2: second } = this.input;
+      if (first?.isDown && second?.isDown) {
+        const distance = Phaser.Math.Distance.Between(first.x, first.y, second.x, second.y);
+        this.setCamera(pinchZoom(this.camera, this.pinchDistance, distance));
+        this.pinchDistance = distance;
+        return;
+      }
+      this.pinchDistance = 0;
       if (!pointer.isDown) {
         return;
       }

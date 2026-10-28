@@ -5,7 +5,9 @@ import {
   MIN_ZOOM,
   focusPoint,
   initialCamera,
+  mapHeight,
   onManualControl,
+  pinchZoom,
   resumeAutoFocus,
   zoomBy,
 } from "./camera";
@@ -72,6 +74,21 @@ describe("camera", () => {
       state = zoomBy(state, 0.5);
     }
     expect(state.zoom).toBe(MIN_ZOOM);
+  });
+
+  it("zooms by the change in pinch distance", () => {
+    expect(pinchZoom(initialCamera, 0, 120)).toBe(initialCamera);
+    const wider = pinchZoom(initialCamera, 100, 150);
+    expect(wider.zoom).toBeCloseTo(1.5);
+    expect(wider.autoFocus).toBe(false);
+    expect(pinchZoom(wider, 150, 100).zoom).toBeCloseTo(1);
+  });
+
+  it("sizes the map to the viewport height within bounds", () => {
+    expect(mapHeight(false, 1000)).toBe(560);
+    expect(mapHeight(false, 390)).toBe(300);
+    expect(mapHeight(false, 600)).toBe(432);
+    expect(mapHeight(true, 1000)).toBe(320);
   });
 
   it("focuses on the centroid of active characters", () => {

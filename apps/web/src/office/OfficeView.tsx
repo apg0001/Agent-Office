@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentPanel } from "./AgentPanel";
 
 import { deskRowsFor } from "./behavior";
+import { mapHeight } from "./camera";
 import { detailFromState, fetchAgentDetail, type AgentDetail } from "./detail";
 import { createDefaultOffice } from "./grid";
 import { type OfficeScope, PERSONAL, connectLive, hasSession, scopeFromSearch, searchFor } from "./liveSource";
@@ -141,8 +142,10 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
         type: Phaser.AUTO,
         parent: element,
         width: Math.round((element.clientWidth || 960) / RENDER_SCALE),
-        height: (compact ? 320 : 560) / RENDER_SCALE,
+        height: Math.round(mapHeight(compact, window.innerHeight) / RENDER_SCALE),
         zoom: RENDER_SCALE,
+        // 폰 핀치 확대에 두 번째 손가락이 필요하다(#255).
+        input: { activePointers: 2 },
         backgroundColor: "#2b2d31",
         pixelArt: true,
         roundPixels: true,
@@ -214,9 +217,33 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
     if (on) {
       resizeGame.current(window.innerWidth, window.innerHeight);
     } else if (element) {
-      resizeGame.current(element.clientWidth || 960, compact ? 320 : 560);
+      resizeGame.current(element.clientWidth || 960, mapHeight(compact, window.innerHeight));
     }
   }, [compact]);
+  // 반응형(#255): 창 크기·화면 회전·레이아웃이 바뀌면 캔버스를 다시 맞춘다(전체 화면이면 화면 전체).
+  const fullscreenNow = useRef(false);
+  fullscreenNow.current = fullscreen;
+  useEffect(() => {
+    const element = host.current;
+    if (!element) {
+      return undefined;
+    }
+    let frame = 0;
+    const refit = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => fitCanvas(fullscreenNow.current));
+    };
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(refit);
+    observer?.observe(element);
+    window.addEventListener("resize", refit);
+    window.addEventListener("orientationchange", refit);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener("resize", refit);
+      window.removeEventListener("orientationchange", refit);
+    };
+  }, [fitCanvas]);
   useEffect(() => {
     const onChange = () => {
       const on = document.fullscreenElement === stage.current && stage.current !== null;
@@ -231,7 +258,6 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
     if (!fullscreen) {
       return undefined;
     }
-    const onResize = () => fitCanvas(true);
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") {
         return;
@@ -245,10 +271,8 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       setFullscreen(false);
       window.requestAnimationFrame(() => fitCanvas(false));
     };
-    window.addEventListener("resize", onResize);
     window.addEventListener("keydown", onKey, true);
     return () => {
-      window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKey, true);
     };
   }, [fullscreen, fitCanvas]);
