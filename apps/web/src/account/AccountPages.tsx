@@ -155,6 +155,7 @@ export function LoginPage() {
 export function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   // 사람에게는 보이지 않는 입력란. 자동 가입 봇이 채우면 서버가 조용히 무시한다(#28).
   const [website, setWebsite] = useState("");
@@ -164,6 +165,10 @@ export function SignupPage() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
+      // 비밀번호 확인은 화면에서만 비교한다(서버에는 비밀번호 하나만 보낸다, #215).
+      if (password !== confirmPassword) {
+        return "password_mismatch";
+      }
       const invite = pendingInvite();
       const result = await call("POST", "/api/v1/auth/signup", {
         email,
@@ -205,6 +210,14 @@ export function SignupPage() {
           type="password"
           value={password}
           onChange={setPassword}
+          autoComplete="new-password"
+        />
+        <Field
+          label="비밀번호 확인"
+          name="password-confirm"
+          type="password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
           autoComplete="new-password"
         />
         <Notice error={error} />
@@ -255,6 +268,7 @@ export function ResetPage() {
   const [token] = useState(() => tokenFromHash(window.location.hash));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [info, setInfo] = useState<string | null>(null);
   const { busy, error, run } = useSubmit();
 
@@ -277,6 +291,9 @@ export function ResetPage() {
   const confirm = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
+      if (password !== confirmPassword) {
+        return "password_mismatch";
+      }
       const result = await call("POST", "/api/v1/auth/password-reset/confirm", { token, password });
       if (result.ok) {
         setInfo("비밀번호를 바꿨습니다. 다른 기기의 로그인은 모두 끊겼습니다.");
@@ -295,6 +312,14 @@ export function ResetPage() {
             type="password"
             value={password}
             onChange={setPassword}
+            autoComplete="new-password"
+          />
+          <Field
+            label="새 비밀번호 확인"
+            name="password-confirm"
+            type="password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
             autoComplete="new-password"
           />
           <Notice error={error} info={info} />

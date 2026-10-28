@@ -833,3 +833,55 @@ textarea.domains {
 .office-stage .agent-panel {
   top: 48px;
 }
+
+/* Collector 설치 안내(#215) */
+.collector-downloads {
+  margin-top: 20px;
+  padding: 12px 16px 16px;
+  border: 2px solid var(--ink);
+  background: var(--panel);
+  box-shadow:
+    inset 2px 2px 0 var(--hi),
+    inset -2px -2px 0 var(--lo);
+}
+
+.collector-downloads h2 {
+  margin: 0 0 6px;
+  color: var(--accent);
+}
+
+.collector-downloads h3 {
+  margin: 12px 0 4px;
+  color: var(--accent);
+}
+
+.os-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.os-tabs button.selected {
+  background: var(--accent);
+  color: #1a1408;
+}
+
+.os-guide ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.download-link {
+  display: inline-block;
+  margin: 4px 8px 4px 0;
+  font-weight: 700;
+}
+
+.download-link .file {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.download-pair {
+  margin: 4px 0;
+}

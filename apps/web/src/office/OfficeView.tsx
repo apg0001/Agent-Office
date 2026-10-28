@@ -9,6 +9,7 @@ import { type OfficeScope, PERSONAL, connectLive, hasSession, scopeFromSearch, s
 import { advanceSynthetic, createSyntheticOffice } from "./synthetic";
 import { SessionList } from "./SessionList";
 import { ZoneLegend } from "./ZoneLegend";
+import { CollectorDownloads } from "./CollectorDownloads";
 import type { DataSource, OfficeState } from "./types";
 
 /**
@@ -281,6 +282,12 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
           <p className="live-badge" role="status">
             {online ? "실시간 연결됨" : "서버 연결 끊김 — 재접속 중"}
             {SCOPE_NOTES[scope.kind]}
+            {(scope.kind === "team" || scope.kind === "combined") && (
+              <>
+                {" "}
+                <a href="/teams">내 공유 범위 바꾸기</a>
+              </>
+            )}
           </p>
           {!compact && <ScopePicker scope={scope} />}
         </>
@@ -310,6 +317,7 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
         )}
       </div>
       {!compact && <p className="office-help">드래그·방향키로 이동, 휠·+/−로 확대, F로 자동 초점, 오른쪽 위 버튼으로 전체 화면</p>}
+      {!compact && <CollectorDownloads />}
       {!compact && <ZoneLegend />}
     </section>
   );
