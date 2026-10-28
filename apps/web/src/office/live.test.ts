@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyDelta, applySnapshot, isOfficeMessage } from "./liveStore";
+import { applyDelta, applySnapshot, isOfficeMessage, parseOfficeSettings } from "./liveStore";
 import { MIN_DWELL_MS, nextDisplayedZone } from "./smoothing";
 import type { AgentState } from "./types";
 
@@ -51,6 +51,31 @@ describe("live store", () => {
   it("never mixes server deltas into synthetic state", () => {
     const synthetic = { source: "synthetic" as const, devices: [], sessions: [], agents: [] };
     expect(applyDelta(synthetic, { type: "delta", ...empty, agents: [agent()] })).toBe(synthetic);
+  });
+
+  it("reads office settings from snapshots and keeps them across deltas", () => {
+    const state = applySnapshot({ type: "snapshot", settings: { hide_idle_after_minutes: 45 }, ...empty, agents: [] });
+    expect(state.settings).toEqual({ hide_idle_after_minutes: 45 });
+    const next = applyDelta(state, { type: "delta", ...empty, agents: [agent()] });
+    expect(next.settings).toEqual({ hide_idle_after_minutes: 45 });
+    // 이전 서버(설정 없음)는 숨기지 않는다.
+    expect(applySnapshot({ type: "snapshot", ...empty, agents: [] }).settings).toEqual({ hide_idle_after_minutes: 0 });
+  });
+
+  it("treats malformed office settings as off", () => {
+    const bad = [
+      null,
+      "60",
+      {},
+      { hide_idle_after_minutes: -1 },
+      { hide_idle_after_minutes: 1.5 },
+      { hide_idle_after_minutes: "60" },
+      { hide_idle_after_minutes: 10081 },
+    ];
+    for (const value of bad) {
+      expect(parseOfficeSettings(value)).toEqual({ hide_idle_after_minutes: 0 });
+    }
+    expect(parseOfficeSettings({ hide_idle_after_minutes: 10080 })).toEqual({ hide_idle_after_minutes: 10080 });
   });
 
   it("validates message shape", () => {

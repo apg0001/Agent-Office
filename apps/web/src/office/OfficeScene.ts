@@ -234,6 +234,10 @@ export class OfficeScene extends Phaser.Scene {
       alive.add(agent.id);
       const actor = this.actors.get(agent.id) ?? this.spawn(agent);
       actor.agent = agent;
+      if (actor.leaving && presenceOf(agent, state).presence === "present") {
+        // 숨겼다가(#245) 새 활동으로 돌아온 캐릭터는 나가던 길을 멈추고 다시 자리로 간다.
+        actor.leaving = false;
+      }
       const session = state.sessions.find((s) => s.id === agent.session_id);
       const name = labelFor(agent, state.devices.find((d) => d.id === session?.device_id));
       if (actor.label.text !== name) {

@@ -37,6 +37,8 @@ export interface Metrics {
 export interface AdminSettings {
   site: { service_name: string; public_url: string | null };
   signup_policy: string;
+  /** 사무실 화면 설정(#245). 활동 없는 세션을 숨길 때까지의 분, 0이면 끔. */
+  office: { hide_idle_after_minutes: number };
   smtp: {
     host: string;
     port: number;
@@ -49,6 +51,19 @@ export interface AdminSettings {
   oauth: Record<string, { enabled: boolean; client_id: string; client_secret_set: boolean }>;
   secret_storage_available: boolean;
   blocked_email_domains: string[];
+}
+
+/** 활동 없는 세션 숨기기 최대값(분, 7일). 서버 검증과 같다. */
+export const MAX_HIDE_IDLE_MINUTES = 10080;
+
+/** 관리 화면 입력 → 분. 0~10080 정수가 아니면 null. */
+export function parseHideIdleMinutes(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+  const value = Number(trimmed);
+  return value <= MAX_HIDE_IDLE_MINUTES ? value : null;
 }
 
 export function formatBytes(bytes: number | null | undefined): string {

@@ -162,6 +162,26 @@ def test_team_update_sends_snapshot_when_value_changes_without_seq() -> None:
     assert office.team_update(base, moved) is moved
 
 
+def test_team_update_sends_snapshot_when_settings_change() -> None:
+    # 화면 설정(#245)은 증분에 없으므로 바뀌면 스냅샷을 보낸다.
+    base = {
+        "devices": [],
+        "sessions": [],
+        "agents": [],
+        "settings": {"hide_idle_after_minutes": 60},
+    }
+    off = {**base, "settings": {"hide_idle_after_minutes": 0}}
+    assert office.team_update(base, json.loads(json.dumps(base))) is None
+    assert office.team_update(base, off) is off
+
+
+def test_team_snapshot_carries_office_settings(client: TestClient, engine: Engine) -> None:
+    alice = Person(client, engine, "Alice")
+    team = team_with(alice)
+    snapshot = alice.call("GET", f"/teams/{team}/office").json()
+    assert snapshot["settings"] == {"hide_idle_after_minutes": 60}
+
+
 def _session(session_id: str, lifecycle: str = "OPEN") -> dict[str, Any]:
     return {"id": session_id, "lifecycle": lifecycle, "desk_slot": None}
 

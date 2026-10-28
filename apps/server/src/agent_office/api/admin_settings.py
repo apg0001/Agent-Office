@@ -48,6 +48,12 @@ class SignupPolicyBody(StrictModel):
     policy: accounts.SignupPolicy
 
 
+class OfficeSettings(StrictModel):
+    """사무실 화면 설정(#245). 0이면 활동 없는 세션을 숨기지 않는다."""
+
+    hide_idle_after_minutes: int = Field(ge=0, le=instance.MAX_HIDE_IDLE_MINUTES, strict=True)
+
+
 class SmtpSettingsBody(StrictModel):
     host: str = Field(min_length=1, max_length=253)
     port: int = Field(ge=1, le=65535)
@@ -83,6 +89,7 @@ class OAuthView(StrictModel):
 class SettingsView(StrictModel):
     site: SiteSettings
     signup_policy: accounts.SignupPolicy
+    office: OfficeSettings
     smtp: SmtpView | None
     smtp_source: Literal["settings", "environment", "none"]
     oauth: dict[str, OAuthView]
@@ -138,6 +145,7 @@ def _view(connection: Connection) -> SettingsView:
     return SettingsView(
         site=_site(connection),
         signup_policy=accounts.signup_policy(connection),
+        office=OfficeSettings(hide_idle_after_minutes=instance.hide_idle_after_minutes(connection)),
         smtp=smtp_view,
         smtp_source=source,
         oauth=oauth,
@@ -211,6 +219,23 @@ def update_signup_policy(
         "success",
         actor_user_id=admin.id,
         details={"reason": body.policy},
+    )
+    return _view(connection)
+
+
+@router.put("/office", response_model=SettingsView)
+def update_office(
+    body: OfficeSettings, admin: AdminDep, _csrf: CsrfDep, connection: DbConnection
+) -> SettingsView:
+    """활동 없는 세션 숨기기(#245). 열린 사무실 화면에는 다음 스냅샷(재접속·팀/통합은 1초 안)에
+    반영된다."""
+    instance.put_value(connection, instance.HIDE_IDLE_KEY, body.hide_idle_after_minutes, admin.id)
+    audit.record(
+        connection,
+        "settings.office",
+        "success",
+        actor_user_id=admin.id,
+        details={"reason": f"hide_idle_after_minutes={body.hide_idle_after_minutes}"},
     )
     return _view(connection)
 
