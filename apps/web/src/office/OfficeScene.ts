@@ -15,6 +15,7 @@ import {
   resumeAutoFocus,
   zoomBy,
 } from "./camera";
+import { BUBBLE_ORIGIN, LAB_PIXEL_ART, type PixelPiece, labColor, pixelTextureKey } from "./lab";
 import { findPath } from "./pathfinding";
 import { headlineFor } from "./headline";
 import { BADGE_LABELS, idleCycle, presenceOf } from "./presence";
@@ -31,7 +32,7 @@ import {
   walkFrame,
 } from "./sprites";
 import { ART_BASE_URL, ART_SCALE, type ArtPiece, FURNITURE_ART, SEAT_ART, artImages } from "./furnitureArt";
-import type { OfficeMap, Point, ZoneKind } from "./grid";
+import type { Furniture, OfficeMap, Point, ZoneKind } from "./grid";
 import { ZONE_COLORS, ZONE_LABELS } from "./grid";
 import { type ScreenPoint, TILE_HEIGHT, depthOf, gridToScreen, tileDiamond } from "./iso";
 import {
@@ -503,7 +504,9 @@ export class OfficeScene extends Phaser.Scene {
     for (const tile of this.map.tiles) {
       const points = tileDiamond(tile).map((p) => new Phaser.Math.Vector2(p.sx, p.sy));
       const color = tile.zone ? ZONE_COLORS[tile.zone] : 0x6a6a6a;
-      graphics.fillStyle(tile.walkable || tile.furniture ? color : 0x5a5a5a, 1);
+      // 실험실(#235)은 밝은 체크 무늬 바닥.
+      const lab = tile.zone === "testing" ? ((tile.x + tile.y) % 2 === 0 ? 0xdfe6ec : 0xc3ccd5) : color;
+      graphics.fillStyle(tile.walkable || tile.furniture ? lab : 0x5a5a5a, 1);
       graphics.fillPoints(points, true);
       graphics.lineStyle(1, 0x000000, 0.08);
       graphics.strokePoints(points, true);
@@ -529,11 +532,86 @@ export class OfficeScene extends Phaser.Scene {
     this.scenery.push(image);
   }
 
+  /** 문자 격자 픽셀 그림(lab.ts)을 텍스처로 한 번 만들어 칸 위에 놓는다. */
+  private placePixelArt(tile: Point, furniture: Furniture, index: number, piece: PixelPiece): void {
+    const key = pixelTextureKey(furniture, index);
+    if (!this.textures.exists(key)) {
+      const graphics = this.make.graphics({}, false);
+      piece.rows.forEach((row, y) => {
+        Array.from(row).forEach((code, x) => {
+          const color = labColor(code);
+          if (color !== null) {
+            graphics.fillStyle(color, 1).fillRect(x * PIXEL, y * PIXEL, PIXEL, PIXEL);
+          }
+        });
+      });
+      graphics.generateTexture(key, piece.rows[0]!.length * PIXEL, piece.rows.length * PIXEL);
+      graphics.destroy();
+    }
+    const screen = gridToScreen(tile);
+    const image = this.add
+      .image(screen.sx + piece.dx, screen.sy + piece.dy, key)
+      .setOrigin(0.5, 1)
+      .setDepth(depthOf(tile, piece.layer));
+    this.scenery.push(image);
+  }
+
+  /** 플라스크에서 거품이 올라와 사라진다(연출). */
+  private addBubbles(tile: Point): void {
+    const screen = gridToScreen(tile);
+    for (let i = 0; i < 3; i += 1) {
+      const x = screen.sx + BUBBLE_ORIGIN.dx + (i - 1) * 3;
+      const y = screen.sy + BUBBLE_ORIGIN.dy;
+      const bubble = this.add
+        .rectangle(x, y, PIXEL * 1.5, PIXEL * 1.5, 0x9cf5aa)
+        .setDepth(depthOf(tile, 4))
+        .setAlpha(0);
+      this.tweens.add({
+        targets: bubble,
+        y: y - 18,
+        alpha: { from: 0.9, to: 0 },
+        duration: 1400,
+        delay: i * 450,
+        repeat: -1,
+      });
+      this.scenery.push(bubble);
+    }
+  }
+
+  /** 서버 랙 앞면의 LED가 엇갈려 깜빡인다(연출). */
+  private addRackLights(tile: Point): void {
+    const screen = gridToScreen(tile);
+    const colors = [0x56e070, 0x56e070, 0xffd84a, 0xe0503a];
+    colors.forEach((color, i) => {
+      const led = this.add
+        .rectangle(screen.sx - 14 + (i % 2) * 5, screen.sy - 30 + Math.floor(i / 2) * 9 + (i % 2) * 2, PIXEL, PIXEL, color)
+        .setDepth(depthOf(tile, 4));
+      this.tweens.add({
+        targets: led,
+        alpha: { from: 1, to: 0.15 },
+        duration: 300 + i * 170,
+        yoyo: true,
+        repeat: -1,
+        delay: i * 220,
+      });
+      this.scenery.push(led);
+    });
+  }
+
   private drawFurniture(): void {
     for (const tile of this.map.tiles) {
       if (tile.furniture) {
         for (const piece of FURNITURE_ART[tile.furniture]) {
           this.placeArt(tile, piece);
+        }
+        (LAB_PIXEL_ART[tile.furniture] ?? []).forEach((piece, index) =>
+          this.placePixelArt(tile, tile.furniture!, index, piece),
+        );
+        if (tile.furniture === "labBench") {
+          this.addBubbles(tile);
+        }
+        if (tile.furniture === "rack") {
+          this.addRackLights(tile);
         }
       }
     }
