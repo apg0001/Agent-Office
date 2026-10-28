@@ -295,6 +295,7 @@
 209. #181(PR #186, 서브에이전트): 세션 이름 = 작업 폴더 마지막 이름, PC별 `settings workspace-name on` 동의 시에만, 이벤트 v1 선택 필드 `workspace_name`, 마이그레이션 0008. #182(PR #183): 하위 에이전트 겹침. #187(PR #188): 덤프 64KB 초과 시 백업 항상 실패(운영 Pi에서 10-25 17:36 KST 뒤 백업 없음) 수정. 운영 Pi를 `deploy/upgrade.sh`로 dev-2a82a71(DB 0008)로 올림. #184 macOS tail 권한 오류 기록. #189(PR #190) 22.04 arm GUI 단일 실행 판정 완화.
 210. 0.1.0-beta.2 게시(2026-10-26): main `2adc37c`, 태그 `server-v0.1.0-beta.2`, GHCR server `sha256:0ce282e2…`·web `sha256:2a68a9da…`, Collector Release·채널 `collector-beta`(manifest 서명 확인). 운영 Pi 정식 이미지 업그레이드는 소유자 승인 대기. #197(PR #200) 팀 공유 범위·폴더 프로젝트 자동 생성(마이그레이션 0009), #198 SMTP 비ASCII, #202 Linux apt 안내, #204 macOS GUI 확인 창·도구 감지, #207 전체 화면, #209 공개 접속 실제 IP. Tailscale Funnel로 운영 주소 공개(가입 정책 ADMIN_APPROVAL). 서브에이전트 #206(팀 화면 사람 이름·PC 이름 수정) 진행 중.
 211. #63: 72시간 실행 완료 — 129,600라운드(이벤트 약 1,166만), 표시 p95 1.51초, 실패·누락 0, 처음·마지막 10% p95 1.447→1.478초, 서버 메모리 91→76MB. `docs/operations/performance.md` 기록.
+212. #206(PR #212) 팀·통합 사무실 사람 이름표·PC 이름 변경, #213(PR #214) e2e 큐 비움 대기, #215(PR #216) 비밀번호 확인·메인 화면 OS별 Collector 설치 안내·공유 범위 링크. 운영 Pi는 정식 0.1.0-beta.2(DB 0008). #217 0.1.0-beta.3 릴리스 노트 작성.
 
 ## 이번 변경 요약(#22)
 
@@ -381,9 +382,9 @@
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
 4. 진행 순서(자율, 2026-10-26 갱신):
-   1. 0.1.0-beta.2 릴리스(소유자 승인 필요): 포함 — 업데이트 리다이렉트 수정(#44), 패키지 이름(#42), Windows 콘솔 창(#169), Codex Hook 설치(#170·#175), 모든 OS 트레이·설치 파일(#159), 사무실 UI 개선(#153·#156·#160·#162·#164·#166). 절차 `docs/operations/release.md`(develop→main PR, `publish-images.yml`·`publish-collector.yml` `--ref main -f version=0.1.0-beta.2`, 소유자 Environment 승인, 태그·Release, main 역병합). beta.1 사용자는 자체 업데이트 불가라 한 번 수동 재설치.
-   2. 소유자: 채널 Release `collector-beta` 생성(자동 모드 거부), beta.2 공개 후 manifest 업로드.
-   3. 72시간 실행 종료(약 2026-10-27 23시) 후 `cat ~/ao-soak/soak72h.txt`를 `docs/operations/performance.md`·#63에 기록하고 #63 종료.
+   1. 0.1.0-beta.3 릴리스(#217): develop→main PR 병합 → `gh workflow run publish-images.yml --ref main -f version=0.1.0-beta.3`(소유자 `image-publish` 승인)과 동시에 소유자가 `gh workflow run publish-collector.yml --ref main -f version=0.1.0-beta.3 -f publish_channel=true` 실행·`collector-publish` 승인 → Release `collector-v0.1.0-beta.3` 자산·SHA256SUMS·채널 manifest 서명 확인 → 소유자 승인 후 `deploy/upgrade.sh --server …:0.1.0-beta.3@sha256:… --web …:0.1.0-beta.3@sha256:… --env-file deploy/.env.production --yes`(DB 0009) → `server-v0.1.0-beta.3` 태그·Release → main→develop 역병합, #215·#217 종료 확인.
+   2. 소유자 결정 대기: 관리자 "이메일 확인 없이 승인" 옵션, 주소(Tailscale 이름 변경 vs 도메인+Cloudflare Tunnel), 운영 SMTP 계정·앱 비밀번호 수정.
+   3. macOS 사용자는 beta.3 설치 파일로 GUI 마법사(#204 수정) 실사용 확인.
    4. 후속: #177 트레이 종료 간헐 실패, 트레이 "동기화"(Core flush 명령), 업데이트 알림(#44), macOS·Windows Codex 실기 확인, 서명 비용 결정(#42), #62·#87 소유자 장비.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
