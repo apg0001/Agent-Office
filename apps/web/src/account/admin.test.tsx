@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { App } from "../App";
-import { type AdminSettings, type Metrics, formatBytes, warningsFor } from "./admin";
+import { type AdminSettings, type Metrics, formatBytes, parseHideIdleMinutes, warningsFor } from "./admin";
 import { routeFor } from "./api";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
@@ -43,6 +43,7 @@ function metrics(overrides: Partial<Metrics> = {}): Metrics {
 const settings: AdminSettings = {
   site: { service_name: "Agent Office", public_url: "https://office.example" },
   signup_policy: "INVITE_ONLY",
+  office: { hide_idle_after_minutes: 60 },
   smtp: null,
   smtp_source: "none",
   oauth: {},
@@ -103,6 +104,20 @@ describe("admin warnings", () => {
     expect(warningsFor(metrics({ backup: { configured: false } }), settings, NOW)[0]?.text).toContain(
       "AGENT_OFFICE_BACKUP_KEY",
     );
+  });
+});
+
+describe("parseHideIdleMinutes", () => {
+  it("accepts whole minutes from 0 to 7 days", () => {
+    expect(parseHideIdleMinutes("0")).toBe(0);
+    expect(parseHideIdleMinutes(" 60 ")).toBe(60);
+    expect(parseHideIdleMinutes("10080")).toBe(10080);
+  });
+
+  it("rejects negatives, fractions, blanks and too large values", () => {
+    for (const bad of ["", "-1", "1.5", "abc", "10081", "1e3"]) {
+      expect(parseHideIdleMinutes(bad)).toBeNull();
+    }
   });
 });
 

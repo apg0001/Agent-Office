@@ -11,6 +11,10 @@ import { SessionList } from "./SessionList";
 import { ZoneLegend } from "./ZoneLegend";
 import { CollectorDownloads } from "./CollectorDownloads";
 import type { DataSource, OfficeState } from "./types";
+import { hiddenKey, hiddenSessionIds, withoutHidden } from "./visibility";
+
+/** 활동 없는 세션 숨기기(#245)를 다시 따져 보는 주기. */
+const HIDE_RECHECK_MS = 30_000;
 
 /**
  * 사무실 화면. 로그인 세션이 있으면 서버 실시간 상태를, 없으면 합성 데이터를 그린다.
@@ -147,20 +151,41 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       resizeGame.current = (width, height) =>
         game?.scale.resize(Math.round(width / RENDER_SCALE), Math.round(height / RENDER_SCALE));
       let rows = 2;
-      const show = (state: Parameters<typeof scene.applyState>[0]) => {
+      let latest: OfficeState | undefined;
+      let shownHidden = "";
+      const show = (state: OfficeState) => {
+        latest = state;
+        // 책상 줄 수는 숨기기 전 상태로 정한다(숨겼던 세션이 돌아와도 지도가 바뀌지 않게).
         const needed = deskRowsFor(state);
         if (needed !== rows) {
           // 책상이 모자랄 때만 사무실을 넓힌다. 기존 자리 좌표는 바뀌지 않는다.
           rows = needed;
           scene.setMap(createDefaultOffice(rows));
         }
-        scene.applyState(state);
-        setOffice(state);
+        // 활동 없는 세션 숨기기(#245): 목록과 지도에 넘기기 전에 거른다. 숨긴 캐릭터는 퇴근하듯 나간다.
+        const hidden = hiddenSessionIds(state, state.settings?.hide_idle_after_minutes, Date.now());
+        shownHidden = hiddenKey(hidden);
+        const visible = withoutHidden(state, hidden);
+        scene.applyState(visible);
+        setOffice(visible);
       };
+      // 새 메시지가 없어도 시간이 흐르면 숨길 세션이 생긴다. 숨김 집합이 바뀔 때만 다시 그린다.
+      const recheck = window.setInterval(() => {
+        if (!latest) {
+          return;
+        }
+        const hidden = hiddenSessionIds(latest, latest.settings?.hide_idle_after_minutes, Date.now());
+        if (hiddenKey(hidden) !== shownHidden) {
+          show(latest);
+        }
+      }, HIDE_RECHECK_MS);
       if (live) {
         setSource("server");
         const handle = connectLive(show, setOnline, scope);
-        stop = handle.close;
+        stop = () => {
+          window.clearInterval(recheck);
+          handle.close();
+        };
         return;
       }
       let tick = 0;
@@ -170,7 +195,10 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
         current = advanceSynthetic(current, tick);
         show(current);
       }, 2500);
-      stop = () => window.clearInterval(timer);
+      stop = () => {
+        window.clearInterval(recheck);
+        window.clearInterval(timer);
+      };
     })();
     return () => {
       disposed = true;

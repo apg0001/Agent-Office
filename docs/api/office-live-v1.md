@@ -20,7 +20,9 @@
 
 ## `GET /api/v1/office`
 
-세션 쿠키 인증. `200 {type: "snapshot", server_time, devices, sessions, agents}`.
+세션 쿠키 인증. `200 {type: "snapshot", server_time, settings, devices, sessions, agents}`.
+
+`settings`는 관리자가 정한 화면 설정입니다(#245). 지금은 `hide_idle_after_minutes`(활동 없는 세션을 숨길 때까지의 분, 0이면 끔)만 있습니다. 팀·통합 스냅샷에도 같은 모양으로 실리고, 증분에는 없습니다. 팀·통합 실시간은 설정이 바뀌면 새 스냅샷을 보냅니다. 서버는 세션을 거르지 않고, 웹이 화면에 넘기기 전에 숨깁니다([관리자 설정](admin-settings-v1.md#활동-없는-세션-숨기기245)).
 
 ## `GET /api/v1/office/agents/{agent_id}` (#51)
 

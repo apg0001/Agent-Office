@@ -144,6 +144,58 @@ def test_site_and_signup_policy(client: TestClient, admin: dict[str, str]) -> No
     assert put(client, admin, "/signup-policy", {"policy": "OPEN"}).status_code == 422
 
 
+def test_office_hide_idle_setting(
+    client: TestClient, admin: dict[str, str], engine: Engine
+) -> None:
+    """활동 없는 세션 숨기기(#245): 기본 60분, 0~10080 정수만, 감사 로그와 사무실 스냅샷에 반영."""
+    assert client.get(BASE, headers=admin).json()["office"] == {"hide_idle_after_minutes": 60}
+    assert client.get("/api/v1/office", headers=admin).json()["settings"] == {
+        "hide_idle_after_minutes": 60
+    }
+
+    saved = put(client, admin, "/office", {"hide_idle_after_minutes": 0})
+    assert saved.status_code == 200
+    assert saved.json()["office"] == {"hide_idle_after_minutes": 0}
+    assert put(client, admin, "/office", {"hide_idle_after_minutes": 10080}).status_code == 200
+    for bad in (-1, 10081, "30", 1.5, None, True):
+        assert put(client, admin, "/office", {"hide_idle_after_minutes": bad}).status_code == 422
+    assert put(client, admin, "/office", {"hide_idle_after_minutes": 5, "x": 1}).status_code == 422
+    assert put(client, admin, "/office", {"hide_idle_after_minutes": 90}).status_code == 200
+
+    for path in ("/api/v1/office", "/api/v1/office/combined"):
+        assert client.get(path, headers=admin).json()["settings"] == {"hide_idle_after_minutes": 90}
+    with engine.connect() as connection:
+        actions = list(
+            connection.execute(
+                select(schema.audit_logs.c.action).where(
+                    schema.audit_logs.c.action == "settings.office"
+                )
+            ).scalars()
+        )
+    assert len(actions) == 3
+
+
+def test_office_setting_requires_admin_and_csrf(
+    client: TestClient, admin: dict[str, str], engine: Engine
+) -> None:
+    _, session = sign_in(engine)
+    user = {**session_cookie(session), **csrf(session)}
+    assert put(client, user, "/office", {"hide_idle_after_minutes": 0}).status_code == 403
+    no_csrf = {"Cookie": admin["Cookie"]}
+    assert put(client, no_csrf, "/office", {"hide_idle_after_minutes": 0}).status_code == 403
+
+
+def test_hide_idle_falls_back_to_default_for_bad_stored_values(engine: Engine) -> None:
+    from agent_office import instance
+
+    with engine.begin() as connection:
+        for stored in ("60", 99999, -5, True, {"x": 1}):
+            instance.put_value(connection, instance.HIDE_IDLE_KEY, stored)
+            assert instance.hide_idle_after_minutes(connection) == 60
+        instance.put_value(connection, instance.HIDE_IDLE_KEY, 15)
+        assert instance.office_settings(connection) == {"hide_idle_after_minutes": 15}
+
+
 def test_smtp_password_is_encrypted_and_never_returned(
     client: TestClient, admin: dict[str, str], engine: Engine
 ) -> None:

@@ -57,7 +57,8 @@ export function createSyntheticOffice(options: SyntheticOptions): OfficeState {
       agents.push(agentAt(syntheticId("agent", s * 100 + c), sessionId, leadId, s + c, 0));
     }
   }
-  return { source: "synthetic", devices: [device], sessions, agents };
+  // 합성 데모는 활동 없는 세션을 숨기지 않는다(#245).
+  return { source: "synthetic", settings: { hide_idle_after_minutes: 0 }, devices: [device], sessions, agents };
 }
 
 function agentAt(
