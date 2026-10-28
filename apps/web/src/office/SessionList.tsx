@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { headlineFor } from "./headline";
 import { shortLabel } from "./sprites";
-import type { DeviceState, OfficeState, SessionState } from "./types";
+import type { AgentState, DeviceState, OfficeState, SessionState } from "./types";
 import { sessionName, shortWorkspace } from "./workspace";
 
 const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
@@ -16,6 +16,8 @@ export interface ActiveSession {
   /** 행 맨 앞의 "누구" 이름. 팀·통합은 사람 이름(통합의 내 PC는 "내 이름 · PC 이름", #206), 개인은 PC 이름. */
   deviceName: string;
   leadId: string | null;
+  /** 대장의 턴 상태(상태순 정렬용). 대장이 없으면 null. */
+  turnState: AgentState["turn_state"] | null;
   headline: string;
   subagents: number;
 }
@@ -30,9 +32,13 @@ export function whoFor(device: DeviceState | undefined): string {
   return pc && pc !== owner ? `${owner} · ${pc}` : owner;
 }
 
-/** 목록 정렬(#244). 시작 순은 자리가 고정돼 누르려던 항목이 움직이지 않는다. */
-export type SessionSort = "started" | "recent" | "name";
+/**
+ * 목록 정렬(#244). 기본 상태순: 승인 대기 → 일하는 중 → 쉬는 중, 같은 무리 안은 시작 순이라
+ * 상태가 바뀔 때만 움직인다. 시작 순은 자리가 완전히 고정된다.
+ */
+export type SessionSort = "status" | "started" | "recent" | "name";
 export const SESSION_SORT_LABELS: Record<SessionSort, string> = {
+  status: "상태순",
   started: "시작 순",
   recent: "최근 활동",
   name: "이름순",
@@ -43,24 +49,41 @@ function byStart(a: ActiveSession, b: ActiveSession): number {
   return (a.session.started_at ?? "").localeCompare(b.session.started_at ?? "") || a.session.id.localeCompare(b.session.id);
 }
 
+function statusRank(turnState: AgentState["turn_state"] | null): number {
+  switch (turnState) {
+    case "WAITING_USER":
+      return 0;
+    case "IDLE":
+      return 2;
+    case null:
+      return 3;
+    default:
+      return 1;
+  }
+}
+
 export function sortSessions(list: ActiveSession[], sort: SessionSort): ActiveSession[] {
   const sorted = [...list];
   switch (sort) {
+    case "status":
+      return sorted.sort((a, b) => statusRank(a.turnState) - statusRank(b.turnState) || byStart(a, b));
+    case "started":
+      return sorted.sort(byStart);
     case "recent":
       return sorted.sort((a, b) => (b.session.last_event_at ?? "").localeCompare(a.session.last_event_at ?? "") || byStart(a, b));
     case "name":
       return sorted.sort((a, b) => a.deviceName.localeCompare(b.deviceName, "ko") || byStart(a, b));
     default:
-      return sorted.sort(byStart);
+      return sorted;
   }
 }
 
 function savedSort(): SessionSort {
   try {
     const value = window.localStorage.getItem(SORT_STORAGE_KEY);
-    return value === "recent" || value === "name" || value === "started" ? value : "started";
+    return value === "recent" || value === "name" || value === "started" || value === "status" ? value : "status";
   } catch {
-    return "started";
+    return "status";
   }
 }
 
@@ -75,6 +98,7 @@ export function activeSessions(state: OfficeState): ActiveSession[] {
         session,
         deviceName: whoFor(state.devices.find((device) => device.id === session.device_id)),
         leadId: lead?.id ?? null,
+        turnState: lead?.turn_state ?? null,
         headline: lead ? headlineFor(lead) : "",
         subagents: agents.filter((agent) => agent.role === "subagent").length,
       };
@@ -98,7 +122,7 @@ export function SessionList({
   unnamed?: boolean;
   selected?: string | null;
 }) {
-  const [sort, setSort] = useState<SessionSort>(() => (typeof window === "undefined" ? "started" : savedSort()));
+  const [sort, setSort] = useState<SessionSort>(() => (typeof window === "undefined" ? "status" : savedSort()));
   const sessions = sortSessions(activeSessions(state), sort);
   const choose = (next: SessionSort) => {
     setSort(next);

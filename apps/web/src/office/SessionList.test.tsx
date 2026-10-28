@@ -60,7 +60,7 @@ describe("session list sort (#244)", () => {
     last_event_at: `2026-10-28T1${i}:00:00Z`,
   }));
   const list = activeSessions(state);
-  const ids = (sort: "started" | "recent" | "name") => sortSessions(list, sort).map((item) => item.session.id);
+  const ids = (sort: "status" | "started" | "recent" | "name") => sortSessions(list, sort).map((item) => item.session.id);
   const [first, second, third] = state.sessions.map((s) => s.id);
 
   it("keeps rows in start order so they do not jump around", () => {
@@ -73,5 +73,16 @@ describe("session list sort (#244)", () => {
 
   it("can sort by person or PC name", () => {
     expect(sortSessions(list, "name").map((item) => item.deviceName)).toEqual(["가", "나", "다"]);
+  });
+
+  it("puts waiting and working sessions above idle ones by default", () => {
+    const leads = state.agents.filter((a) => a.role === "lead");
+    const turn = ["IDLE", "WORKING", "WAITING_USER"] as const;
+    const mixed = {
+      ...state,
+      agents: state.agents.map((a) => (a.role === "lead" ? { ...a, turn_state: turn[leads.indexOf(a)]! } : a)),
+    };
+    const order = sortSessions(activeSessions(mixed), "status").map((item) => item.turnState);
+    expect(order).toEqual(["WAITING_USER", "WORKING", "IDLE"]);
   });
 });
