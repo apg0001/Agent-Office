@@ -291,7 +291,7 @@ func TestPostInstallMigratesOwnedEntries(t *testing.T) {
 		t.Fatalf("hooks %+v", rep.Hooks)
 	}
 	data, _ := os.ReadFile(settings)
-	// Hook 명령 안의 경로 표기(Windows는 슬래시, hooks.Command).
+	// Hook 명령 안의 경로 표기(Windows는 짧은 경로·슬래시, hookExe·hooks.Command, #225).
 	esc := func(p string) string {
 		if runtime.GOOS == "windows" {
 			return strings.ReplaceAll(p, `\`, "/")
@@ -299,7 +299,7 @@ func TestPostInstallMigratesOwnedEntries(t *testing.T) {
 		b, _ := json.Marshal(p)
 		return strings.Trim(string(b), `"`)
 	}
-	if strings.Contains(string(data), esc(old)) || !strings.Contains(string(data), esc(core)) || !strings.Contains(string(data), "echo user") {
+	if strings.Contains(string(data), esc(old)) || !strings.Contains(string(data), esc(hookExe(core))) || !strings.Contains(string(data), "echo user") {
 		t.Fatalf("settings not migrated: %s", data)
 	}
 	if strings.Contains(te.stdout.String(), te.home) {
