@@ -48,6 +48,9 @@ const (
 	maxPollsPerTick = 64
 	maxSpoolPerTick = 500
 	retryAfterError = 30 * time.Second
+	// 읽기 권한이 없는 transcript는 2초마다 다시 열지 않고 간격을 두 배씩 늘린다(최대 10분, #184).
+	deniedBackoffMin = 30 * time.Second
+	deniedBackoffMax = 10 * time.Minute
 )
 
 var (
@@ -368,6 +371,9 @@ type watched struct {
 	size      int64
 	mtime     time.Time
 	checked   bool
+	// 권한 오류 뒤 다시 시도할 때까지 건너뛴다(#184).
+	deniedUntil time.Time
+	deniedWait  time.Duration
 }
 
 type collector struct {
@@ -583,6 +589,9 @@ func (c *collector) pollAll(ctx context.Context) {
 // poll은 바뀐 파일만 읽는다. 파일이 사라졌으면 true다.
 func (c *collector) poll(ctx context.Context, w *watched) bool {
 	now := c.r.o.Now()
+	if now.Before(w.deniedUntil) {
+		return false
+	}
 	fi, statErr := os.Stat(w.path)
 	if statErr == nil && w.checked && fi.Size() == w.size && fi.ModTime().Equal(w.mtime) {
 		if now.Sub(w.mtime) > idleCloseAfter {
@@ -618,10 +627,16 @@ func (c *collector) poll(ctx context.Context, w *watched) bool {
 		}
 		switch res.Status {
 		case tail.StatusOK:
+			w.deniedWait = 0
 		case tail.StatusMissing:
 			return true
 		case tail.StatusPermissionDenied:
 			c.r.m.fail(ErrCodeTailPermission)
+			if res.Denied != "" {
+				c.r.m.add("tail_denied_"+res.Denied, 1)
+			}
+			w.deniedWait = nextDeniedWait(w.deniedWait)
+			w.deniedUntil = now.Add(w.deniedWait)
 			return false
 		case tail.StatusUnsupported:
 			c.r.m.fail(ErrCodeTailUnsupported)
@@ -638,6 +653,11 @@ func (c *collector) poll(ctx context.Context, w *watched) bool {
 		w.size, w.mtime, w.checked = fi.Size(), fi.ModTime(), true
 	}
 	return false
+}
+
+// nextDeniedWait는 권한 오류가 이어질 때 다음 재시도까지의 간격이다(30초부터 두 배, 최대 10분).
+func nextDeniedWait(prev time.Duration) time.Duration {
+	return min(max(prev*2, deniedBackoffMin), deniedBackoffMax)
 }
 
 func sameCheckpoint(a, b tail.Checkpoint) bool {

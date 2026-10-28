@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"syscall"
 	"unicode/utf8"
 )
 
@@ -91,6 +92,8 @@ type Result struct {
 	PendingPartialBytes int64
 	// More면 읽기 상한 때문에 아직 읽지 않은 바이트가 남아 있다. 곧바로 다시 Poll하면 된다.
 	More bool
+	// Denied는 StatusPermissionDenied일 때 단계와 오류 종류다(예: "open_eperm"). 경로는 담지 않는다(#184).
+	Denied string
 }
 
 // Tailer는 경로 하나를 tail한다. 같은 파일을 읽는 동안 읽기 전용 핸들을 열어 두고,
@@ -145,6 +148,7 @@ func (t *Tailer) Poll() (res Result) {
 		// 경로가 사라져도 열린 핸들의 이전 파일에서 남은 완결 줄은 읽는다.
 		t.drain(&res)
 		res.Status = classify(err)
+		res.Denied = deniedKind("open", err)
 		res.Checkpoint = t.cp
 		return res
 	}
@@ -152,6 +156,7 @@ func (t *Tailer) Poll() (res Result) {
 	if err != nil {
 		f.Close()
 		res.Status = classify(err)
+		res.Denied = deniedKind("stat", err)
 		return res
 	}
 	id, err := fileIdentity(f, info)
@@ -240,6 +245,22 @@ func classify(err error) Status {
 		return StatusPermissionDenied
 	default:
 		return StatusError
+	}
+}
+
+// deniedKind는 권한 오류의 단계·종류다. EACCES는 파일 권한, EPERM은 macOS 개인정보 보호(TCC)나
+// 플래그처럼 권한 비트 밖의 거부인 경우가 많다(#184). 권한 오류가 아니면 "".
+func deniedKind(stage string, err error) string {
+	if !errors.Is(err, fs.ErrPermission) {
+		return ""
+	}
+	switch {
+	case errors.Is(err, syscall.EPERM):
+		return stage + "_eperm"
+	case errors.Is(err, syscall.EACCES):
+		return stage + "_eacces"
+	default:
+		return stage + "_other"
 	}
 }
 

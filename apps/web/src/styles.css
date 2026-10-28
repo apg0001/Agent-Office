@@ -316,6 +316,12 @@ code,
   color: var(--accent);
 }
 
+.session-list .session-sort {
+  float: right;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
 .session-list .count {
   display: inline-block;
   min-width: 2em;
