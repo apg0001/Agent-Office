@@ -32,7 +32,7 @@
 Agent Office는 여러 컴퓨터에서 돌아가는 AI 코딩 에이전트(Claude Code, Codex)의 **활동 상태**를 아이소메트릭 픽셀 사무실로 보여 주는 셀프 호스팅 서비스입니다. 각 PC에 설치한 Collector가 Hook으로 "지금 무엇을 하는 중인지"만 서버에 보내면, 에이전트 캐릭터가 파일을 읽을 땐 도서관으로, 테스트를 돌릴 땐 테스트 구역으로, 턴이 끝나면 휴게실로 걸어갑니다. 혼자 쓰는 개인 사무실뿐 아니라 팀원끼리 함께 보는 팀·통합 사무실도 있습니다.
 
 > [!NOTE]
-> 현재 **0.1.0-beta.3**(2026-10-28)입니다. Stable 릴리스는 아직 없으며, 아래 [지원 범위](#-지원-범위)에 적은 것만 실제로 검증했습니다.
+> 현재 **0.1.0-beta.4**(2026-10-28)입니다. Stable 릴리스는 아직 없으며, 아래 [지원 범위](#-지원-범위)에 적은 것만 실제로 검증했습니다.
 
 ## 🗺️ 사무실 구역
 
@@ -109,7 +109,7 @@ Python 3.13+, Node.js 24+, npm 11+, Go 1.24+, Docker Compose가 필요합니다.
 
 ## ✅ 지원 범위
 
-**Beta**입니다. 검증하지 않은 조합은 지원한다고 하지 않습니다. 0.1.0-beta.3 기준 근거는 [릴리스 노트](docs/releases/0.1.0-beta.3.md)와 [호환성 행렬](docs/compatibility/matrix.md)에 있습니다.
+**Beta**입니다. 검증하지 않은 조합은 지원한다고 하지 않습니다. 0.1.0-beta.4 기준 근거는 [릴리스 노트](docs/releases/0.1.0-beta.4.md)와 [호환성 행렬](docs/compatibility/matrix.md)에 있습니다.
 
 | 항목 | 상태 |
 |---|---|
@@ -138,7 +138,7 @@ docs/                    📚 아키텍처, 설치, 운영, 호환성, 의사결
 
 | 분류 | 문서 |
 |---|---|
-| 시작 | [문서 목차](docs/README.md) · [프로젝트 상태](docs/project-status.md) · [변경 기록](CHANGELOG.md) · [릴리스 노트](docs/releases/0.1.0-beta.3.md) |
+| 시작 | [문서 목차](docs/README.md) · [프로젝트 상태](docs/project-status.md) · [변경 기록](CHANGELOG.md) · [릴리스 노트](docs/releases/0.1.0-beta.4.md) |
 | 설치 | [설치 방식](docs/installation/install-methods.md) · [Docker 이미지](docs/installation/docker-images.md) · [원격 접속](docs/installation/remote-access.md) · [Collector GUI](docs/installation/collector-gui.md) |
 | 운영 | [배포·롤백](docs/operations/deploy.md) · [백업·복원](docs/operations/backup-restore.md) · [모니터링](docs/operations/monitoring.md) · [알림](docs/operations/notifications.md) · [런북](docs/operations/runbook.md) |
 | 설계 | [아키텍처 개요](docs/architecture/overview.md) · [상태 엔진](docs/architecture/state-engine.md) · [사무실 렌더러](docs/architecture/office-renderer.md) · [API](docs/api/README.md) · [ADR](docs/decisions/) |
