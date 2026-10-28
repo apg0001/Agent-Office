@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- Collector(Windows): Hook 명령을 따옴표 없는 짧은 경로로 만들어 PowerShell·cmd·Git Bash 어디서나 실행. Codex가 PowerShell로 Hook을 실행해 "hook exited with code 1"로 실패하던 문제. 업데이트 후 Codex에서 한 번 다시 신뢰 필요(#225)
 - Collector: 작업 폴더 이름 보내기 기본 켜짐(팀 사무실 "(이름 없음)" 해소). 업데이트한 PC도 켜지며 `settings workspace-name off`로 끕니다(#221)
 
 ## 0.1.0-beta.3 (2026-10-28)

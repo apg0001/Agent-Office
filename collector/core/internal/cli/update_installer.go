@@ -367,7 +367,7 @@ func cmdPostInstall(args []string, env Env) int {
 }
 
 func reapplyHooks(env Env, dirs paths.Dirs, exe, tool string) string {
-	spec, err := hooks.Generate(hooks.Params{Tool: tool, GOOS: env.GOOS, Exe: exe})
+	spec, err := hooks.Generate(hooks.Params{Tool: tool, GOOS: env.GOOS, Exe: hookExe(exe)})
 	if err != nil {
 		return "failed"
 	}
