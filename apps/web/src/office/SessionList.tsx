@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { headlineFor } from "./headline";
 import { shortLabel } from "./sprites";
 import type { DeviceState, OfficeState, SessionState } from "./types";
@@ -28,7 +30,41 @@ export function whoFor(device: DeviceState | undefined): string {
   return pc && pc !== owner ? `${owner} · ${pc}` : owner;
 }
 
-/** 지금 활성(종료되지 않은) 세션 목록. 최근 활동 순(#162). */
+/** 목록 정렬(#244). 시작 순은 자리가 고정돼 누르려던 항목이 움직이지 않는다. */
+export type SessionSort = "started" | "recent" | "name";
+export const SESSION_SORT_LABELS: Record<SessionSort, string> = {
+  started: "시작 순",
+  recent: "최근 활동",
+  name: "이름순",
+};
+const SORT_STORAGE_KEY = "agentOffice.sessionSort";
+
+function byStart(a: ActiveSession, b: ActiveSession): number {
+  return (a.session.started_at ?? "").localeCompare(b.session.started_at ?? "") || a.session.id.localeCompare(b.session.id);
+}
+
+export function sortSessions(list: ActiveSession[], sort: SessionSort): ActiveSession[] {
+  const sorted = [...list];
+  switch (sort) {
+    case "recent":
+      return sorted.sort((a, b) => (b.session.last_event_at ?? "").localeCompare(a.session.last_event_at ?? "") || byStart(a, b));
+    case "name":
+      return sorted.sort((a, b) => a.deviceName.localeCompare(b.deviceName, "ko") || byStart(a, b));
+    default:
+      return sorted.sort(byStart);
+  }
+}
+
+function savedSort(): SessionSort {
+  try {
+    const value = window.localStorage.getItem(SORT_STORAGE_KEY);
+    return value === "recent" || value === "name" || value === "started" ? value : "started";
+  } catch {
+    return "started";
+  }
+}
+
+/** 지금 활성(종료되지 않은) 세션 목록. 최근 활동 순(#162). 화면 정렬은 sortSessions(#244). */
 export function activeSessions(state: OfficeState): ActiveSession[] {
   return state.sessions
     .filter((session) => session.lifecycle !== "ENDED" && session.ended_at === null)
@@ -62,11 +98,27 @@ export function SessionList({
   unnamed?: boolean;
   selected?: string | null;
 }) {
-  const sessions = activeSessions(state);
+  const [sort, setSort] = useState<SessionSort>(() => (typeof window === "undefined" ? "started" : savedSort()));
+  const sessions = sortSessions(activeSessions(state), sort);
+  const choose = (next: SessionSort) => {
+    setSort(next);
+    try {
+      window.localStorage.setItem(SORT_STORAGE_KEY, next);
+    } catch {
+      // 저장할 수 없으면 이번 화면에서만 쓴다.
+    }
+  };
   return (
     <aside className="session-list" aria-label="활성 세션">
       <h2>
         활성 세션 <span className="count">{sessions.length}</span>
+        <select className="session-sort" aria-label="세션 정렬" value={sort} onChange={(event) => choose(event.target.value as SessionSort)}>
+          {(Object.keys(SESSION_SORT_LABELS) as SessionSort[]).map((key) => (
+            <option key={key} value={key}>
+              {SESSION_SORT_LABELS[key]}
+            </option>
+          ))}
+        </select>
       </h2>
       {sessions.length === 0 ? (
         <p className="empty">지금 작업 중인 세션이 없습니다</p>
