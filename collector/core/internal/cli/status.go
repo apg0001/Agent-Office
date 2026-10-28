@@ -119,7 +119,7 @@ func buildReport(env Env, dirs paths.Dirs, diagnose bool) (Report, *config.Confi
 		if cfg.InKeyring() {
 			rep.TokenStorage = "os_keyring"
 		}
-		rep.WorkspaceNameSharing = cfg.ShareWorkspaceName
+		rep.WorkspaceNameSharing = cfg.WorkspaceNameSharing()
 		cfgOut = &cfg
 	case errors.Is(err, config.ErrNotRegistered):
 		rep.Registration = "not_registered"
@@ -242,9 +242,9 @@ func printReport(w io.Writer, r Report, diagnose bool) {
 		fmt.Fprintln(w, "장치 토큰 보관: 설정 파일(0600, 대체 경로: OS 보안 저장소를 쓸 수 없음)")
 	}
 	if r.Registration == "registered" {
-		share := "꺼짐(기본)"
+		share := "꺼짐"
 		if r.WorkspaceNameSharing {
-			share = "켜짐(마지막 폴더 이름만)"
+			share = "켜짐(기본, 마지막 폴더 이름만)"
 		}
 		fmt.Fprintf(w, "작업 폴더 이름 보내기: %s\n", share)
 	}

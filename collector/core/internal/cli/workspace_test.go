@@ -91,9 +91,12 @@ func pipelineBytes(t *testing.T, te *testEnv) (string, []normalize.Event) {
 	return all.String(), events
 }
 
-func TestWorkspaceNameIsNotReadWithoutConsent(t *testing.T) {
+func TestWorkspaceNameIsNotReadWhenTurnedOff(t *testing.T) {
 	te := newTestEnv(t, "u")
 	te.register("https://office.example")
+	if code := te.run("", "settings", "workspace-name", "off"); code != ExitOK {
+		t.Fatal(code)
+	}
 	for _, h := range workspaceHooks("/srv/" + sentinelParent + "/Agent-Office") {
 		if code := te.run(h, "hook", "claude", "--tool-version", "2.1.308", "--mode", "print"); code != ExitOK {
 			t.Fatal(code)
@@ -105,17 +108,14 @@ func TestWorkspaceNameIsNotReadWithoutConsent(t *testing.T) {
 	}
 	for _, bad := range []string{sentinelParent, "Agent-Office", "workspace_name", "/srv/", sentinelPrompt} {
 		if strings.Contains(out, bad) {
-			t.Fatalf("consent off: %q leaked", bad)
+			t.Fatalf("turned off: %q leaked", bad)
 		}
 	}
 }
 
-func TestWorkspaceNameSendsOnlyBasenameWithConsent(t *testing.T) {
+func TestWorkspaceNameSendsOnlyBasenameByDefault(t *testing.T) {
 	te := newTestEnv(t, "u")
 	te.register("https://office.example")
-	if code := te.run("", "settings", "workspace-name", "on"); code != ExitOK {
-		t.Fatalf("settings on: %d %s", code, te.stderr)
-	}
 	for _, h := range workspaceHooks("/srv/" + sentinelParent + "/Agent-Office/") {
 		if code := te.run(h, "hook", "claude", "--tool-version", "2.1.308", "--mode", "print"); code != ExitOK {
 			t.Fatal(code)
@@ -132,7 +132,7 @@ func TestWorkspaceNameSendsOnlyBasenameWithConsent(t *testing.T) {
 	}
 	for _, bad := range []string{sentinelParent, "/srv/", "Users", sentinelPrompt} {
 		if strings.Contains(out, bad) {
-			t.Fatalf("consent on: %q leaked", bad)
+			t.Fatalf("default on: %q leaked", bad)
 		}
 	}
 	names := map[string]int{}
@@ -190,18 +190,18 @@ func TestSettingsWorkspaceNameCommand(t *testing.T) {
 		}
 		return *v.Sharing
 	}
-	if statusJSON() {
-		t.Fatal("default must be off")
-	}
-	if code := te.run("", "settings", "workspace-name", "on"); code != ExitOK || !statusJSON() {
-		t.Fatal("on failed")
-	}
-	cfg, err := config.Load(te.dirs.ConfigFile())
-	if err != nil || !cfg.ShareWorkspaceName || cfg.DeviceToken != sentinelToken {
-		t.Fatalf("config after on: %v", err)
+	if !statusJSON() {
+		t.Fatal("default must be on (#221)")
 	}
 	if code := te.run("", "settings", "workspace-name", "off"); code != ExitOK || statusJSON() {
 		t.Fatal("off failed")
+	}
+	cfg, err := config.Load(te.dirs.ConfigFile())
+	if err != nil || cfg.ShareWorkspaceName == nil || *cfg.ShareWorkspaceName || cfg.DeviceToken != sentinelToken {
+		t.Fatalf("config after off must keep an explicit false: %v", err)
+	}
+	if code := te.run("", "settings", "workspace-name", "on"); code != ExitOK || !statusJSON() {
+		t.Fatal("on failed")
 	}
 	for _, bad := range [][]string{
 		{"settings"}, {"settings", "workspace-name"}, {"settings", "workspace-name", "maybe"},

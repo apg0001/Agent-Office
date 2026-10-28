@@ -238,7 +238,7 @@ func usage(w io.Writer) {
   run                                                          수집·전송 실행(포그라운드, SIGINT/SIGTERM으로 종료)
   hook claude|codex                                            Hook stdin을 실행 중인 Collector에 전달(항상 종료 코드 0)
   pause | resume                                               수집·전송 일시중지/재개
-  settings workspace-name on|off|status [--json]               작업 폴더 마지막 이름(예: Agent-Office)을 서버에 보낼지(PC별, 기본 꺼짐)
+  settings workspace-name on|off|status [--json]               작업 폴더 마지막 이름(예: Agent-Office)을 서버에 보낼지(PC별, 기본 켜짐)
   status [--json]                                              로컬 상태 요약
   diagnose [--json] [--offline]                                안전한 진단 정보(경로·토큰·내용 없음)
   service install|uninstall [--activate]                       OS 사용자 자동 시작 정의 설치/제거

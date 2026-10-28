@@ -55,10 +55,16 @@ type Config struct {
 	// 비어 있으면 미검증(unverified) 런타임으로 보고 confidence를 inferred로 낮춘다.
 	ClaudeVersion string `json:"claude_version,omitempty"`
 	ClaudeMode    string `json:"claude_mode,omitempty"`
-	// ShareWorkspaceName은 이 PC에서 작업 폴더의 마지막 이름(basename)을 서버에 보낼지에 대한 사용자 동의다
-	// (#181). 기본 꺼짐이다. 꺼져 있으면 Hook은 payload의 cwd를 읽지 않는다. 전체 경로·상위 폴더는 켜져
-	// 있어도 보내지 않는다. Hook 프로세스가 매번 읽으므로 run 재시작이 필요 없다(Same 비교 대상 아님).
-	ShareWorkspaceName bool `json:"share_workspace_name,omitempty"`
+	// ShareWorkspaceName은 이 PC에서 작업 폴더의 마지막 이름(basename)을 서버에 보낼지다(#181).
+	// 값이 없으면 켜짐(기본, #221), `settings workspace-name off`로 끈 PC만 false가 저장된다. 꺼져 있으면
+	// Hook은 payload의 cwd를 읽지 않는다. 전체 경로·상위 폴더는 켜져 있어도 보내지 않는다. Hook 프로세스가
+	// 매번 읽으므로 run 재시작이 필요 없다(Same 비교 대상 아님). WorkspaceNameSharing으로 읽는다.
+	ShareWorkspaceName *bool `json:"share_workspace_name,omitempty"`
+}
+
+// WorkspaceNameSharing은 작업 폴더 이름을 보낼지다. 명시적으로 끄지 않았으면 켜짐이다(#221).
+func (c Config) WorkspaceNameSharing() bool {
+	return c.ShareWorkspaceName == nil || *c.ShareWorkspaceName
 }
 
 // Load는 config.json을 읽는다. 파일이 없으면 ErrNotRegistered다.

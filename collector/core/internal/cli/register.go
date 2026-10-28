@@ -161,8 +161,10 @@ func cmdRegister(args []string, env Env) int {
 	}
 	if prevErr == nil {
 		cfg.ClaudeProjectsDir, cfg.ClaudeVersion, cfg.ClaudeMode = prev.ClaudeProjectsDir, prev.ClaudeVersion, prev.ClaudeMode
-		// 작업 폴더 이름 동의(#181)는 같은 서버에 다시 등록할 때만 유지한다. 다른 서버는 새로 동의받는다.
-		cfg.ShareWorkspaceName = prev.ShareWorkspaceName && prev.ServerURL == base
+		// 작업 폴더 이름 설정(#181)은 같은 서버에 다시 등록할 때만 유지한다. 다른 서버는 기본값(켜짐, #221).
+		if prev.ServerURL == base {
+			cfg.ShareWorkspaceName = prev.ShareWorkspaceName
+		}
 	}
 	token := config.Secret(out.DeviceToken)
 	check := cfg

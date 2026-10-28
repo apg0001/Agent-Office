@@ -31,7 +31,7 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 | `run` | 포그라운드 장기 실행. SIGINT/SIGTERM(Windows는 Ctrl+C)으로 정상 종료(큐 보존, 종료 코드 0). 사용자당 1개만 실행(잠금 파일) |
 | `hook claude\|codex [--product codex-desktop] [--tool-version V] [--mode M]` | Hook stdin JSON 한 건을 받아 실행 중인 `run`에 spool로 넘깁니다. **항상 종료 코드 0**, stdout·stderr 출력 없음 |
 | `pause` / `resume` | 일시중지 상태를 설정 디렉터리 `pause.json`에 저장합니다. 실행 중인 `run`이 다음 주기(기본 2초)에 반영합니다 |
-| `settings workspace-name on\|off\|status [--json]` | 작업 폴더의 마지막 이름을 서버에 보낼지 정합니다(PC별, 기본 꺼짐, #181). [작업 폴더 이름 보내기](#작업-폴더-이름-보내기181) |
+| `settings workspace-name on\|off\|status [--json]` | 작업 폴더의 마지막 이름을 서버에 보낼지 정합니다(PC별, 기본 켜짐, #181·#221). [작업 폴더 이름 보내기](#작업-폴더-이름-보내기181) |
 | `status [--json]` | 로컬 상태 요약. `--json`에는 항상 `workspace_name_sharing`(불리언)이 있습니다 |
 | `diagnose [--json] [--offline]` | `status` + Go 런타임 버전, 기호 위치, 서버 health 도달 여부 |
 | `service install\|uninstall [--activate]` | 자동 시작 정의 설치·제거. `--activate`가 없으면 파일만 쓰고 실행할 명령을 안내합니다 |
@@ -87,12 +87,12 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 
 ## 작업 폴더 이름 보내기(#181)
 
-사무실 캐릭터 이름표 아래에 세션 이름을 작게 보여 주는 기능입니다. 세션 이름은 **에이전트가 실행된 작업 폴더의 마지막 이름**(예: `/home/me/src/Agent-Office` → `Agent-Office`)입니다. **PC마다 따로 켜며 기본은 꺼짐**입니다.
+사무실 캐릭터 이름표 아래에 세션 이름을 작게 보여 주는 기능입니다. 세션 이름은 **에이전트가 실행된 작업 폴더의 마지막 이름**(예: `/home/me/src/Agent-Office` → `Agent-Office`)입니다. **기본은 켜짐**이고 PC마다 끌 수 있습니다(0.1.0-beta.4부터, #221). 이전 버전에서 업데이트한 PC도 켜집니다. 원하지 않으면 아래 `off`로 끕니다.
 
 | 상태 | Collector가 하는 일 | 서버에 가는 값 |
 |---|---|---|
-| 꺼짐(기본) | Hook payload의 `cwd`를 읽지 않습니다(문자열로 꺼내지도 않음) | 없음 |
-| 켜짐 | Claude·Codex Hook payload의 `cwd`에서 마지막 이름만 꺼내 정리한 뒤 그 Hook 이벤트에 `workspace_name`으로 붙입니다 | 마지막 폴더 이름 하나(1~64자) |
+| 꺼짐(`off`) | Hook payload의 `cwd`를 읽지 않습니다(문자열로 꺼내지도 않음) | 없음 |
+| 켜짐(기본) | Claude·Codex Hook payload의 `cwd`에서 마지막 이름만 꺼내 정리한 뒤 그 Hook 이벤트에 `workspace_name`으로 붙입니다 | 마지막 폴더 이름 하나(1~64자) |
 
 - 보내지 않는 것: 전체 경로, 상위 폴더, 드라이브 문자, 사용자 이름이 든 홈 경로, 대화 제목, 프롬프트, 파일 이름·본문, 도구 입출력. transcript JSONL의 `cwd`는 켜져 있어도 읽지 않습니다.
 - 정리 규칙: `/`와 `\`를 모두 구분자로 보고 마지막 조각만 남깁니다. 제어·서식 문자(줄바꿈, NUL, 방향 제어 문자 등)를 지우고 앞뒤 공백을 자른 뒤 64자로 자릅니다. 빈 값, `.`, `..`, 드라이브 루트(`C:`)는 보내지 않습니다.
@@ -100,7 +100,7 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 - 서버는 이름을 세션에 하나만 저장하고(마지막으로 받은 값), **장치 소유자 본인의 개인·통합 사무실에서만** 보여 줍니다. 팀 사무실에서는 세션 이름(`workspace_name`) 자체는 팀원과 소유자 모두에게 보이지 않습니다(`null`).
 - 다만 서버는 이 이름으로 내 프로젝트를 자동으로 만들고 세션을 넣습니다(#197, 직접 고른 프로젝트가 우선). 그 프로젝트가 팀에 보이는 경우(팀 공유 범위가 "모두 공유"이거나 "선택한 프로젝트만"에서 그 프로젝트를 체크) 팀원에게 **프로젝트 이름**으로 보입니다. 팀마다 공유 범위는 `/teams`에서 바꿉니다.
 - 끄면 그 뒤 Hook 이벤트에는 이름이 붙지 않습니다. 서버에 이미 저장된 세션 이름은 지워지지 않고 세션이 끝나 보존 기간(30일)이 지나면 함께 삭제됩니다.
-- Hook 프로세스가 매번 설정을 읽으므로 `run`을 다시 시작할 필요가 없습니다. `register --force`로 **같은 서버**에 다시 등록하면 설정이 유지되고, 다른 서버로 등록하거나 `logout`하면 꺼집니다.
+- Hook 프로세스가 매번 설정을 읽으므로 `run`을 다시 시작할 필요가 없습니다. `register --force`로 **같은 서버**에 다시 등록하면 설정이 유지되고, 다른 서버로 등록하거나 `logout` 뒤 다시 등록하면 기본값(켜짐)으로 돌아갑니다.
 - 호환성: 이 필드를 모르는 이전 서버(#181 이전)는 이름이 붙은 이벤트 배치를 `422`로 거부합니다. **서버를 먼저 올린 뒤** 켜세요.
 
 켜기·끄기·확인(설치 위치가 다르면 경로만 바꿉니다):
@@ -108,23 +108,23 @@ GUI(#40~#44)와 분리된 headless 실행 파일 `agent-office-collector`입니�
 Linux(`PATH`에 있을 때):
 
 ```bash
-agent-office-collector settings workspace-name on
 agent-office-collector settings workspace-name status
 agent-office-collector settings workspace-name off
+agent-office-collector settings workspace-name on
 ```
 
 macOS(앱 설치, zsh):
 
 ```zsh
-"/Applications/Agent Office Collector.app/Contents/MacOS/agent-office-collector" settings workspace-name on
 "/Applications/Agent Office Collector.app/Contents/MacOS/agent-office-collector" settings workspace-name status
+"/Applications/Agent Office Collector.app/Contents/MacOS/agent-office-collector" settings workspace-name off
 ```
 
 Windows(설치 프로그램, PowerShell):
 
 ```powershell
-& "$env:LOCALAPPDATA\Programs\Agent Office Collector\agent-office-collector.exe" settings workspace-name on
 & "$env:LOCALAPPDATA\Programs\Agent Office Collector\agent-office-collector.exe" settings workspace-name status
+& "$env:LOCALAPPDATA\Programs\Agent Office Collector\agent-office-collector.exe" settings workspace-name off
 ```
 
 `status --json`·`settings workspace-name status --json`은 `{"workspace_name_sharing": true}`처럼 불리언만 출력합니다. GUI 토글은 후속 작업입니다.
