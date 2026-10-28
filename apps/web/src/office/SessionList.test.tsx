@@ -1,6 +1,7 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { activeSessions, whoFor } from "./SessionList";
+import { SessionList, activeSessions, whoFor } from "./SessionList";
 import { createSyntheticOffice } from "./synthetic";
 
 describe("active session list (#162)", () => {
@@ -35,5 +36,15 @@ describe("session list person names (#206)", () => {
     const state = createSyntheticOffice({ sessions: 1, subagentsPerSession: 0 });
     state.devices = state.devices.map((d) => ({ ...d, name: "Bob", owner_name: "Bob" }));
     expect(activeSessions(state)[0]!.deviceName).toBe("Bob");
+  });
+});
+
+describe("session list selection", () => {
+  it("marks only the selected session's lead as pressed", () => {
+    const state = createSyntheticOffice({ sessions: 2, subagentsPerSession: 0 });
+    const lead = activeSessions(state)[1]!.leadId!;
+    const html = renderToStaticMarkup(<SessionList state={state} onSelect={() => undefined} selected={lead} />);
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(html.match(/aria-pressed="false"/g)).toHaveLength(1);
   });
 });
