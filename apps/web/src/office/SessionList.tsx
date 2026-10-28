@@ -1,6 +1,8 @@
+import { useState } from "react";
+
 import { headlineFor } from "./headline";
 import { shortLabel } from "./sprites";
-import type { DeviceState, OfficeState, SessionState } from "./types";
+import type { AgentState, DeviceState, OfficeState, SessionState } from "./types";
 import { sessionName, shortWorkspace } from "./workspace";
 
 const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
@@ -14,6 +16,8 @@ export interface ActiveSession {
   /** 행 맨 앞의 "누구" 이름. 팀·통합은 사람 이름(통합의 내 PC는 "내 이름 · PC 이름", #206), 개인은 PC 이름. */
   deviceName: string;
   leadId: string | null;
+  /** 대장의 턴 상태(상태순 정렬용). 대장이 없으면 null. */
+  turnState: AgentState["turn_state"] | null;
   headline: string;
   subagents: number;
 }
@@ -28,7 +32,62 @@ export function whoFor(device: DeviceState | undefined): string {
   return pc && pc !== owner ? `${owner} · ${pc}` : owner;
 }
 
-/** 지금 활성(종료되지 않은) 세션 목록. 최근 활동 순(#162). */
+/**
+ * 목록 정렬(#244). 기본 상태순: 승인 대기 → 일하는 중 → 쉬는 중, 같은 무리 안은 시작 순이라
+ * 상태가 바뀔 때만 움직인다. 시작 순은 자리가 완전히 고정된다.
+ */
+export type SessionSort = "status" | "started" | "recent" | "name";
+export const SESSION_SORT_LABELS: Record<SessionSort, string> = {
+  status: "상태순",
+  started: "시작 순",
+  recent: "최근 활동",
+  name: "이름순",
+};
+const SORT_STORAGE_KEY = "agentOffice.sessionSort";
+
+function byStart(a: ActiveSession, b: ActiveSession): number {
+  return (a.session.started_at ?? "").localeCompare(b.session.started_at ?? "") || a.session.id.localeCompare(b.session.id);
+}
+
+function statusRank(turnState: AgentState["turn_state"] | null): number {
+  switch (turnState) {
+    case "WAITING_USER":
+      return 0;
+    case "IDLE":
+      return 2;
+    case null:
+      return 3;
+    default:
+      return 1;
+  }
+}
+
+export function sortSessions(list: ActiveSession[], sort: SessionSort): ActiveSession[] {
+  const sorted = [...list];
+  switch (sort) {
+    case "status":
+      return sorted.sort((a, b) => statusRank(a.turnState) - statusRank(b.turnState) || byStart(a, b));
+    case "started":
+      return sorted.sort(byStart);
+    case "recent":
+      return sorted.sort((a, b) => (b.session.last_event_at ?? "").localeCompare(a.session.last_event_at ?? "") || byStart(a, b));
+    case "name":
+      return sorted.sort((a, b) => a.deviceName.localeCompare(b.deviceName, "ko") || byStart(a, b));
+    default:
+      return sorted;
+  }
+}
+
+function savedSort(): SessionSort {
+  try {
+    const value = window.localStorage.getItem(SORT_STORAGE_KEY);
+    return value === "recent" || value === "name" || value === "started" || value === "status" ? value : "status";
+  } catch {
+    return "status";
+  }
+}
+
+/** 지금 활성(종료되지 않은) 세션 목록. 최근 활동 순(#162). 화면 정렬은 sortSessions(#244). */
 export function activeSessions(state: OfficeState): ActiveSession[] {
   return state.sessions
     .filter((session) => session.lifecycle !== "ENDED" && session.ended_at === null)
@@ -39,6 +98,7 @@ export function activeSessions(state: OfficeState): ActiveSession[] {
         session,
         deviceName: whoFor(state.devices.find((device) => device.id === session.device_id)),
         leadId: lead?.id ?? null,
+        turnState: lead?.turn_state ?? null,
         headline: lead ? headlineFor(lead) : "",
         subagents: agents.filter((agent) => agent.role === "subagent").length,
       };
@@ -62,11 +122,27 @@ export function SessionList({
   unnamed?: boolean;
   selected?: string | null;
 }) {
-  const sessions = activeSessions(state);
+  const [sort, setSort] = useState<SessionSort>(() => (typeof window === "undefined" ? "status" : savedSort()));
+  const sessions = sortSessions(activeSessions(state), sort);
+  const choose = (next: SessionSort) => {
+    setSort(next);
+    try {
+      window.localStorage.setItem(SORT_STORAGE_KEY, next);
+    } catch {
+      // 저장할 수 없으면 이번 화면에서만 쓴다.
+    }
+  };
   return (
     <aside className="session-list" aria-label="활성 세션">
       <h2>
         활성 세션 <span className="count">{sessions.length}</span>
+        <select className="session-sort" aria-label="세션 정렬" value={sort} onChange={(event) => choose(event.target.value as SessionSort)}>
+          {(Object.keys(SESSION_SORT_LABELS) as SessionSort[]).map((key) => (
+            <option key={key} value={key}>
+              {SESSION_SORT_LABELS[key]}
+            </option>
+          ))}
+        </select>
       </h2>
       {sessions.length === 0 ? (
         <p className="empty">지금 작업 중인 세션이 없습니다</p>

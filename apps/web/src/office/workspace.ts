@@ -7,8 +7,8 @@ import type { SessionState } from "./types";
 
 /** 이벤트 v1 `workspace_name` 최대 길이(코드 포인트). */
 export const MAX_WORKSPACE_NAME = 64;
-/** 사무실 캐릭터 아래에 그릴 최대 글자 수. 넘으면 말줄임표로 줄인다. */
-export const MAX_WORKSPACE_LABEL = 20;
+/** 사무실 캐릭터 아래에 그릴 최대 글자 수(소유자 결정 10자, #247). 넘으면 말줄임표로 줄인다. */
+export const MAX_WORKSPACE_LABEL = 10;
 
 // 제어 문자, 경로 구분자, 줄 구분자, 보이지 않는 서식 문자(방향 바꿈 등).
 const FORBIDDEN = /[\u0000-\u001f\u007f-\u009f/\\\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb]/u;

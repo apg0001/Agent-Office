@@ -107,3 +107,41 @@ func TestNoPrimaryAndInvalid(t *testing.T) {
 		t.Fatal("invalid verb accepted")
 	}
 }
+
+// Pending은 요청을 지우지 않고 보여 준다. Serve는 그 뒤에도 같은 요청을 받는다(#177).
+func TestPendingPeeksWithoutConsuming(t *testing.T) {
+	dir := t.TempDir()
+	p, err := Acquire(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Release()
+	if v := p.Pending(); v != "" {
+		t.Fatalf("pending before send: %q", v)
+	}
+	if err := Send(dir, Quit); err != nil {
+		t.Fatal(err)
+	}
+	if v := p.Pending(); v != Quit {
+		t.Fatalf("pending = %q, want quit", v)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	got := make(chan Verb, 1)
+	go p.Serve(ctx, func(v Verb) { got <- v; cancel() })
+	select {
+	case v := <-got:
+		if v != Quit {
+			t.Fatalf("served %q", v)
+		}
+	case <-ctx.Done():
+		t.Fatal("Serve did not receive the request Pending peeked")
+	}
+	if v := p.Pending(); v != "" {
+		t.Fatalf("pending after serve: %q", v)
+	}
+	var nilP *Primary
+	if v := nilP.Pending(); v != "" {
+		t.Fatalf("nil primary: %q", v)
+	}
+}

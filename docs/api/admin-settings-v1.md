@@ -9,6 +9,7 @@
 | `GET` | 전체 설정 보기(아래 모양) |
 | `PUT /site {service_name, public_url}` | 서비스명과 기준 주소. 주소는 `http(s)://호스트[:포트]`만(경로·쿼리·자격 증명 거부, `400 invalid_public_url`) |
 | `PUT /signup-policy {policy}` | `PUBLIC_VERIFIED_EMAIL`·`INVITE_ONLY`·`ADMIN_APPROVAL`·`CLOSED` |
+| `PUT /office {hide_idle_after_minutes}` | 활동 없는 세션 숨기기(#245). 정수 0~10080분, 0이면 끔, 기본 60. 범위·형식이 틀리면 `422` |
 | `PUT /smtp {host, port, username, sender, starttls, password}` | `password`: 생략·`null`이면 유지, `""`이면 삭제 |
 | `DELETE /smtp` | 저장한 SMTP 설정과 암호 삭제(환경 변수 설정으로 돌아감) |
 | `POST /smtp/test` | 요청한 관리자 본인 주소로 시험 메일. `{ok, error}`, 오류는 `auth_failed`·`connect_failed`·`timeout`·`tls_failed`·`starttls_unsupported`·`recipient_refused`·`smtp_error`·`not_configured` 코드만 |
@@ -20,6 +21,7 @@
 {
   "site": {"service_name": "Agent Office", "public_url": "https://office.example.com"},
   "signup_policy": "CLOSED",
+  "office": {"hide_idle_after_minutes": 60},
   "smtp": {"host": "…", "port": 587, "username": "…", "sender": "…", "starttls": true, "password_set": true},
   "smtp_source": "settings",
   "oauth": {"google": {"enabled": false, "client_id": "", "client_secret_set": false}, "github": {…}},
@@ -78,8 +80,18 @@
 관리자(SUPER_ADMIN·ADMIN)만 들어갈 수 있고 사무실 상단에 "관리" 링크가 보입니다.
 
 - **상태·진단**: 확인할 문제 목록(긴급·주의. 예: 준비 안 됨, 디스크 10% 미만, 백업 실패·2일 넘게 없음, 복원 시험 31일 넘게 없음, Heartbeat 없음·실패, 비밀 키 없음, 이메일 확인 정책인데 SMTP 없음, 접속 주소 없음), 호스트·DB·수집 지표, Heartbeat·보존 정리·백업·복원 시험 결과, "지금 백업"·"복원 시험" 버튼
-- **인스턴스 설정**: 사이트, 가입 정책, SMTP(저장·시험 메일, 암호는 다시 표시하지 않음), OAuth client
+- **인스턴스 설정**: 사이트, 사무실 화면(활동 없는 세션 숨기기, 아래), 가입 정책, SMTP(저장·시험 메일, 암호는 다시 표시하지 않음), OAuth client
 - **설정 경계 안내**: 인프라(`.env.production`, 재시작 필요) / 인스턴스(이 화면) / 개인(`/teams`·계정·Collector)
+
+## 활동 없는 세션 숨기기(#245)
+
+세션을 닫지 않고 오래 쉬게 두면 사무실이 붐비므로, 마지막 활동(`last_event_at`) 후 정한 분이 지난 세션은 사무실 지도와 "활성 세션" 목록에서 숨깁니다.
+
+- 저장 위치: `instance_settings`의 `office.hide_idle_after_minutes`(정수). 값이 없거나 잘못되면 기본 60분입니다. 마이그레이션은 없습니다.
+- 전달: 개인·팀·통합 사무실 스냅샷에 `settings: {"hide_idle_after_minutes": N}`이 실립니다([사무실 실시간 API](office-live-v1.md)). 증분에는 없습니다.
+- 화면: 숨긴 세션의 캐릭터는 퇴근처럼 출입구로 걸어 나가고, 새 활동이 오면 다시 자리로 돌아옵니다. 승인 대기(`WAITING_USER`) 세션은 숨기지 않습니다. 세션을 종료하거나 기록·책상 배정을 바꾸지 않습니다(화면 표시만).
+- 반영 시점: 팀·통합 화면은 다음 주기(1초 안)에 새 스냅샷으로, 개인 사무실은 다음 재접속·새로고침 때 반영됩니다.
+- 감사: `settings.office`(관리자 ID와 분 값만).
 
 ## 알려진 제한
 

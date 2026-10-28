@@ -2,7 +2,15 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { Card, Field, Notice } from "./AccountPages";
 import { type SessionInfo, call, messageFor, smtpMessage } from "./api";
-import { type AdminSettings, type Metrics, SETTING_BOUNDARIES, formatBytes, warningsFor } from "./admin";
+import {
+  type AdminSettings,
+  type Metrics,
+  MAX_HIDE_IDLE_MINUTES,
+  SETTING_BOUNDARIES,
+  formatBytes,
+  parseHideIdleMinutes,
+  warningsFor,
+} from "./admin";
 import { AdminUsers, AuditLog } from "./AdminUsers";
 import { NotificationChannels } from "./NotificationChannels";
 import { POLICY_LABELS } from "./wizard";
@@ -171,6 +179,7 @@ function SettingsForms({ settings, csrf, reload }: { settings: AdminSettings; cs
   const [serviceName, setServiceName] = useState(settings.site.service_name);
   const [publicUrl, setPublicUrl] = useState(settings.site.public_url ?? "");
   const [policy, setPolicy] = useState(settings.signup_policy);
+  const [hideIdle, setHideIdle] = useState(String(settings.office?.hide_idle_after_minutes ?? 60));
   const [smtp, setSmtp] = useState({
     host: settings.smtp?.host ?? "",
     port: String(settings.smtp?.port ?? 587),
@@ -208,6 +217,44 @@ function SettingsForms({ settings, csrf, reload }: { settings: AdminSettings; cs
         <h3>사이트</h3>
         <Field label="서비스 이름" name="service_name" value={serviceName} onChange={setServiceName} />
         <Field label="접속 주소" name="public_url" type="url" value={publicUrl} onChange={setPublicUrl} required={false} />
+        <button type="submit">저장</button>
+      </form>
+      <form
+        onSubmit={(event) => {
+          const minutes = parseHideIdleMinutes(hideIdle);
+          if (minutes === null) {
+            event.preventDefault();
+            setInfo(null);
+            setError(`0에서 ${MAX_HIDE_IDLE_MINUTES} 사이의 정수(분)로 입력하세요.`);
+            return;
+          }
+          void save(
+            () => call("PUT", "/api/v1/admin/settings/office", { hide_idle_after_minutes: minutes }, csrf),
+            minutes === 0 ? "활동 없는 세션 숨기기를 껐습니다." : `활동이 ${minutes}분 없는 세션을 숨깁니다.`,
+          )(event);
+        }}
+      >
+        <h3>사무실 화면</h3>
+        <label className="field">
+          <span>활동 없는 세션 숨기기(분, 0이면 끔)</span>
+          <input
+            name="hide_idle_after_minutes"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={MAX_HIDE_IDLE_MINUTES}
+            step={1}
+            value={hideIdle}
+            required
+            onChange={(event) => setHideIdle(event.target.value)}
+          />
+        </label>
+        <p className="hint">
+          마지막 활동 후 이 시간이 지난 세션은 사무실 지도와 활성 세션 목록에서 숨깁니다(캐릭터는 퇴근하듯 나갑니다). 승인
+          대기 중인 세션은 숨기지 않고, 새 활동이 오면 다시 나타납니다. 세션을 종료하거나 기록을 지우지는 않습니다. 최대
+          {" "}
+          {MAX_HIDE_IDLE_MINUTES}분(7일).
+        </p>
         <button type="submit">저장</button>
       </form>
       <form onSubmit={save(() => call("PUT", "/api/v1/admin/settings/signup-policy", { policy }, csrf), "가입 정책을 저장했습니다.")}>

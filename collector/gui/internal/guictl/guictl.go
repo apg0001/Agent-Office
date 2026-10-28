@@ -62,6 +62,23 @@ func (p *Primary) Release() {
 	}
 }
 
+// Pending은 아직 읽지 않은 요청을 지우지 않고 돌려준다(없거나 알 수 없으면 "").
+// 창이 늦게 뜨는 동안 트레이 "종료"가 이미 도착했는지 보려는 것이다(#177).
+func (p *Primary) Pending() Verb {
+	if p == nil {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(p.dir, requestName))
+	if err != nil {
+		return ""
+	}
+	switch v := Verb(strings.TrimSpace(string(b))); v {
+	case Show, Quit:
+		return v
+	}
+	return ""
+}
+
 // Serve는 ctx가 끝날 때까지 요청 파일을 읽어 handle을 부른다. 읽은 요청은 지운다.
 func (p *Primary) Serve(ctx context.Context, handle func(Verb)) {
 	t := time.NewTicker(PollInterval)

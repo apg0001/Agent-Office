@@ -204,6 +204,10 @@ func TestPermissionDeniedFailsOpen(t *testing.T) {
 	if res.Status != StatusPermissionDenied {
 		t.Fatalf("status = %q", res.Status)
 	}
+	// 단계·오류 종류만 남기고 경로는 담지 않는다(#184).
+	if res.Denied != "open_eacces" {
+		t.Fatalf("denied = %q", res.Denied)
+	}
 	records(t, res)
 	if res.Checkpoint.Offset != 0 {
 		t.Fatalf("offset = %d", res.Checkpoint.Offset)

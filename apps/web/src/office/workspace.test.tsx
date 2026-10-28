@@ -51,7 +51,7 @@ describe("workspace name (#181)", () => {
   it("shortens long names with an ellipsis", () => {
     expect(shortWorkspace("short")).toBe("short");
     const long = shortWorkspace("a-very-long-workspace-folder-name");
-    expect(Array.from(long)).toHaveLength(20);
+    expect(Array.from(long)).toHaveLength(10);
     expect(long.endsWith("…")).toBe(true);
   });
 

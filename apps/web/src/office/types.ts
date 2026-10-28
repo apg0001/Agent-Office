@@ -71,8 +71,16 @@ export interface AgentState {
 /** 데이터 출처. 합성 데이터는 화면에 반드시 합성이라고 표시한다. */
 export type DataSource = "server" | "synthetic";
 
+/** 관리자가 정한 사무실 화면 설정(#245). 스냅샷에만 온다. */
+export interface OfficeSettings {
+  /** 마지막 활동 후 이 분이 지난 세션을 화면에서 숨긴다. 0이면 끔. */
+  hide_idle_after_minutes: number;
+}
+
 export interface OfficeState {
   source: DataSource;
+  /** 없으면(이전 서버·합성 데이터) 숨기지 않는다. */
+  settings?: OfficeSettings;
   devices: DeviceState[];
   sessions: SessionState[];
   agents: AgentState[];
