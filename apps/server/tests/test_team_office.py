@@ -153,6 +153,38 @@ def test_team_update_diff() -> None:
     assert office.team_update(base, removed) is removed
 
 
+def test_team_update_sends_snapshot_when_value_changes_without_seq() -> None:
+    # 책상 번호처럼 DB 행이 그대로(change_seq 같음)인데 바뀐 값은
+    # 증분으로 보내면 클라이언트가 버린다(#231).
+    seat = {"id": "s1", "change_seq": 5, "desk_slot": 8}
+    base = {"devices": [], "sessions": [seat], "agents": []}
+    moved = {**base, "sessions": [{**seat, "desk_slot": 7}]}
+    assert office.team_update(base, moved) is moved
+
+
+def _session(session_id: str, lifecycle: str = "OPEN") -> dict[str, Any]:
+    return {"id": session_id, "lifecycle": lifecycle, "desk_slot": None}
+
+
+def test_stabilize_desks_keeps_seats_and_fills_gaps() -> None:
+    desks: dict[str, int] = {}
+    first = {"sessions": [_session("a"), _session("b"), _session("c")]}
+    office.stabilize_desks(first, desks)
+    assert [s["desk_slot"] for s in first["sessions"]] == [0, 1, 2]
+
+    # a가 끝나도 b·c는 자리를 옮기지 않는다.
+    second = {"sessions": [_session("a", "ENDED"), _session("b"), _session("c")]}
+    office.stabilize_desks(second, desks)
+    assert [s["desk_slot"] for s in second["sessions"]] == [None, 1, 2]
+
+    # 새 세션은 비어 있는 가장 앞 책상을 받는다. 같은 번호는 생기지 않는다.
+    third = {"sessions": [_session("b"), _session("c"), _session("d"), _session("e")]}
+    office.stabilize_desks(third, desks)
+    slots = [s["desk_slot"] for s in third["sessions"]]
+    assert slots == [1, 2, 0, 3]
+    assert len(set(slots)) == len(slots)
+
+
 def test_team_live_revokes_on_unshare_and_removal(client: TestClient, engine: Engine) -> None:
     alice, bob = Person(client, engine, "Alice"), Person(client, engine, "Bob")
     team = team_with(alice, bob)
