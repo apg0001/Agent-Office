@@ -21,16 +21,17 @@ import (
 // versionTimeout은 `<도구> --version` 실행 상한이다.
 const versionTimeout = 3 * time.Second
 
-// detectToolVersion은 PATH의 도구를 `--version`으로 실행해 버전 문자열만 돌려준다.
+// detectToolVersion은 PATH(없으면 흔한 설치 위치, findTool)의 도구를 `--version`으로 실행해 버전 문자열만 돌려준다.
 // stdout은 4KiB까지만 읽고, stderr와 나머지 출력은 보관하지 않는다.
 func detectToolVersion(name string) (string, error) {
-	exe, err := exec.LookPath(name)
+	exe, path, err := findTool(name)
 	if err != nil {
 		return "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), versionTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, "--version")
+	cmd.Env = append(os.Environ(), "PATH="+path)
 	out := &capped{max: 4096}
 	cmd.Stdout = out
 	cmd.Stderr = io.Discard

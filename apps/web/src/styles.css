@@ -799,3 +799,37 @@ textarea.domains {
 .agent-panel dd.workspace {
   overflow-wrap: anywhere;
 }
+
+/* 전체 화면(#206) */
+.fullscreen-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+}
+
+.office-stage:fullscreen,
+.office-stage.is-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  background: #2b2d31;
+}
+
+.office-stage.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.office-stage:fullscreen .office-canvas,
+.office-stage.is-fullscreen .office-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.office-stage .agent-panel {
+  top: 48px;
+}
