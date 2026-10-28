@@ -297,12 +297,41 @@ def _with_connection(function: Any, *args: Any) -> Any:
         return function(connection, *args)
 
 
+def stabilize_desks(snapshot: dict[str, Any], desks: dict[str, int]) -> None:
+    """팀·통합 화면 책상을 실시간 연결 동안 고정한다. 스냅샷은 매번 시작 순서 순번을 매기므로
+    세션 하나가 끝나면 뒤 세션들이 한 칸씩 당겨진다(캐릭터가 우르르 자리를 옮기고, change_seq가
+    그대로라 클라이언트가 바뀐 번호를 버려 두 대장이 한 책상에 앉았다, #231). 이미 앉은 세션은
+    그대로 두고, 새 세션은 시작 순서대로 빈 책상 중 가장 앞 번호를 받는다. `desks`를 갱신한다."""
+    active = [s for s in snapshot["sessions"] if s["lifecycle"] != "ENDED"]
+    keep = {s["id"] for s in active}
+    for session_id in [k for k in desks if k not in keep]:
+        del desks[session_id]
+    used = set(desks.values())
+    candidate = 0
+    for session in active:
+        if session["id"] not in desks:
+            while candidate in used:
+                candidate += 1
+            desks[session["id"]] = candidate
+            used.add(candidate)
+        session["desk_slot"] = desks[session["id"]]
+
+
 def team_update(previous: dict[str, Any], current: dict[str, Any]) -> dict[str, Any] | None:
     """팀 범위 변경분. 보이던 세션·에이전트가 빠지면(공유 해제·탈퇴) 클라이언트가 지우도록
-    새 스냅샷을, 그렇지 않으면 바뀐 행만 담은 증분을 돌려준다. 변경이 없으면 None."""
+    새 스냅샷을, 그렇지 않으면 바뀐 행만 담은 증분을 돌려준다. 변경이 없으면 None.
+
+    클라이언트는 change_seq가 커진 행만 받는다. 책상 번호·프로젝트 이름처럼 DB 행이 그대로인데
+    바뀐 값이 있으면 증분으로는 반영되지 않으므로 스냅샷을 보낸다(#231)."""
     for kind in ("sessions", "agents", "devices"):
         if {r["id"] for r in previous[kind]} - {r["id"] for r in current[kind]}:
             return current
+    for kind in ("sessions", "agents"):
+        before_rows = {r["id"]: r for r in previous[kind]}
+        for row in current[kind]:
+            old = before_rows.get(row["id"])
+            if old is not None and old != row and row["change_seq"] <= old["change_seq"]:
+                return current
     delta: dict[str, Any] = {"type": "delta", "devices": [], "sessions": [], "agents": []}
     for kind in ("devices", "sessions", "agents"):
         before = {r["id"]: r for r in previous[kind]}
@@ -335,6 +364,8 @@ async def _live_scoped(
     if snapshot is None:
         await websocket.close(code=CLOSE_SCOPE_UNAVAILABLE)
         return
+    desks: dict[str, int] = {}
+    stabilize_desks(snapshot, desks)
     await websocket.accept()
     await websocket.send_json(snapshot)
     receiver = asyncio.create_task(websocket.receive())
@@ -355,6 +386,7 @@ async def _live_scoped(
             if current is None:
                 await websocket.close(code=CLOSE_SCOPE_UNAVAILABLE)
                 return
+            stabilize_desks(current, desks)
             message = team_update(snapshot, current)
             snapshot = current
             if message is not None:
