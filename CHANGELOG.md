@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- Collector: 작업 폴더 이름 보내기 기본 켜짐(팀 사무실 "(이름 없음)" 해소). 업데이트한 PC도 켜지며 `settings workspace-name off`로 끕니다(#221)
+
 ## 0.1.0-beta.3 (2026-10-28)
 
 자세한 내용은 `docs/releases/0.1.0-beta.3.md`.

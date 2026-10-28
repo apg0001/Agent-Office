@@ -51,8 +51,8 @@ func cmdSettings(args []string, env Env) int {
 	}
 	if action != "status" {
 		want := action == "on"
-		if cfg.ShareWorkspaceName != want {
-			cfg.ShareWorkspaceName = want
+		if cfg.ShareWorkspaceName == nil || *cfg.ShareWorkspaceName != want {
+			cfg.ShareWorkspaceName = &want
 			if err := config.Save(dirs.ConfigFile(), cfg); err != nil {
 				fmt.Fprintln(env.Stderr, "설정을 저장하지 못했습니다")
 				return ExitError
@@ -60,14 +60,14 @@ func cmdSettings(args []string, env Env) int {
 		}
 	}
 	if *asJSON {
-		data, _ := json.Marshal(workspaceNameJSON{WorkspaceNameSharing: cfg.ShareWorkspaceName})
+		data, _ := json.Marshal(workspaceNameJSON{WorkspaceNameSharing: cfg.WorkspaceNameSharing()})
 		fmt.Fprintln(env.Stdout, string(data))
 		return ExitOK
 	}
-	if cfg.ShareWorkspaceName {
-		fmt.Fprintln(env.Stdout, "작업 폴더 이름 보내기: 켜짐. 이 PC의 Hook 이벤트에 작업 폴더의 마지막 이름(예: Agent-Office)만 붙여 보냅니다. 전체 경로·상위 폴더·대화 제목·프롬프트는 보내지 않습니다.")
+	if cfg.WorkspaceNameSharing() {
+		fmt.Fprintln(env.Stdout, "작업 폴더 이름 보내기: 켜짐(기본). 이 PC의 Hook 이벤트에 작업 폴더의 마지막 이름(예: Agent-Office)만 붙여 보냅니다. 전체 경로·상위 폴더·대화 제목·프롬프트는 보내지 않습니다.")
 	} else {
-		fmt.Fprintln(env.Stdout, "작업 폴더 이름 보내기: 꺼짐(기본). Hook은 작업 폴더 경로를 읽지 않습니다. 이미 서버에 표시된 이름은 세션이 끝날 때까지 남을 수 있습니다.")
+		fmt.Fprintln(env.Stdout, "작업 폴더 이름 보내기: 꺼짐. Hook은 작업 폴더 경로를 읽지 않습니다. 이미 서버에 표시된 이름은 세션이 끝날 때까지 남을 수 있습니다.")
 	}
 	return ExitOK
 }
