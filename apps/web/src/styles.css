@@ -216,6 +216,13 @@ code,
     padding: 32px 0;
   }
 
+  /* 폰(#255): 넓은 표는 페이지 전체가 아니라 표 안에서만 가로로 밀린다. */
+  table.members,
+  table.device-table {
+    display: block;
+    overflow-x: auto;
+  }
+
   .office-shell {
     padding: 8px 0 24px;
   }
@@ -231,7 +238,8 @@ code,
 
 .office-canvas {
   width: 100%;
-  min-height: 560px;
+  /* 지도 높이(camera.ts mapHeight와 같은 규칙): 화면 높이의 72%, 300~560px. */
+  min-height: clamp(300px, 72vh, 560px);
   overflow: hidden;
   background: #2b2d31;
 }
@@ -283,7 +291,7 @@ code,
 
 .side-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -475,7 +483,7 @@ code,
 
 .zone-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 4px 20px;
 }
 
@@ -853,6 +861,8 @@ textarea.domains {
 .office-stage.is-fullscreen {
   width: 100vw;
   height: 100vh;
+  /* 폰 브라우저 주소창을 뺀 실제 보이는 높이(지원하는 브라우저만). */
+  height: 100dvh;
   background: #2b2d31;
 }
 
@@ -873,6 +883,35 @@ textarea.domains {
 
 .office-stage .agent-panel {
   top: 48px;
+}
+
+/* 좁거나 낮은 화면(#255: 세로 폰·가로로 눕힌 폰·작은 창): 활성 세션 창이 지도를 가리지 않게 지도 아래로
+   내린다. 전체 화면에서는 지도 위에 작게 겹친다. */
+@media (max-width: 720px), (max-height: 500px) {
+  .office-stage .session-list {
+    position: static;
+    width: auto;
+    max-height: 40vh;
+    margin-top: 8px;
+  }
+
+  .office-stage.is-fullscreen .session-list {
+    position: absolute;
+    width: min(220px, calc(100% - 20px));
+    max-height: 35%;
+    margin-top: 0;
+  }
+
+  .office-stage:fullscreen .session-list {
+    position: absolute;
+    width: min(220px, calc(100% - 20px));
+    max-height: 35%;
+    margin-top: 0;
+  }
+
+  .agent-panel {
+    max-height: min(480px, calc(100% - 64px));
+  }
 }
 
 /* Collector 설치 안내(#215) */

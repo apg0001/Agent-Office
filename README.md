@@ -2,6 +2,10 @@
   <img src="docs/images/office.png" alt="Agent Office 사무실 화면(합성 데모 데이터)" width="820">
 </p>
 
+<p align="center">
+  <img src="apps/web/public/icons/icon-192.png" alt="Agent Office 앱 아이콘(왕관 쓴 픽셀 캐릭터)" width="96">
+</p>
+
 <h1 align="center">🏢 Agent Office</h1>
 
 <p align="center">
@@ -10,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/apg0001/Agent-Office/releases"><img alt="버전" src="https://img.shields.io/badge/version-0.1.0--beta.5-orange?style=flat-square"></a>
+  <a href="https://github.com/apg0001/Agent-Office/releases"><img alt="버전" src="https://img.shields.io/badge/version-0.1.0--beta.6-orange?style=flat-square"></a>
   <img alt="상태" src="https://img.shields.io/badge/status-Beta-yellow?style=flat-square">
   <a href="https://github.com/apg0001/Agent-Office/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/apg0001/Agent-Office/ci.yml?branch=develop&label=CI&style=flat-square"></a>
   <img alt="셀프 호스팅" src="https://img.shields.io/badge/self--hosted-Docker%20Compose-2496ED?style=flat-square">
@@ -59,7 +63,8 @@ Agent Office는 여러 컴퓨터에서 돌아가는 AI 코딩 에이전트(Claud
 - **실시간 사무실** — 세션이 시작·종료되고 활동이 바뀌면 WebSocket으로 바로 반영되고, 캐릭터가 해당 구역으로 이동합니다.
 - **머리 위 상태와 활성 세션 목록** — 화면 왼쪽 목록에서 PC·도구·작업 폴더 이름·하위 에이전트 수를 보고, 고르면 그 캐릭터에 초점이 갑니다.
 - **팀·통합 사무실** — 팀원들의 에이전트를 한 사무실에서 봅니다. 팀원마다 **모두 공유 / 선택한 프로젝트만 / 공유 안 함** 중에서 공유 범위를 직접 고릅니다.
-- **전체 화면** — 버튼 하나로 사무실만 크게 띄워 모니터에 걸어 둘 수 있습니다.
+- **전체 화면·반응형** — 버튼 하나로 사무실만 크게 띄워 모니터에 걸어 둘 수 있고, 폰 세로·가로 화면에서도 지도가 화면에 맞춰집니다(두 손가락으로 확대·축소).
+- **앱으로 설치(PWA)** — 폰 홈 화면이나 Windows·macOS 앱 아이콘으로 사무실을 바로 엽니다. 왕관 쓴 픽셀 캐릭터 아이콘이 붙습니다.
 - **Collector 데스크톱 앱** — Windows·macOS·Linux 설치 파일, 트레이 아이콘, 설치 직후 설정 마법사, 사용자가 승인해야 설치되는 자동 업데이트.
 - **셀프 호스팅 운영** — Docker Compose와 Caddy 단일 진입점, 설치 마법사, 백업·복원, 승인형 업그레이드·롤백(`deploy/upgrade.sh`), 알림.
 
@@ -102,6 +107,19 @@ $C exec server agent-office-bootstrap      # 일회용 토큰 → 브라우저�
 > 설치 파일에는 아직 코드 서명·공증이 없습니다. macOS는 "개인정보 보호 및 보안 → 그래도 열기", Windows는 SmartScreen에서 "추가 정보 → 실행"을 눌러야 합니다.
 
 자세한 내용: [Collector GUI](docs/installation/collector-gui.md) · [설치 패키지](docs/installation/collector-packages.md) · [업데이트](docs/installation/collector-update.md) · [CLI](docs/installation/collector-cli.md)
+
+### 3. 폰·데스크톱에 앱으로 설치(선택)
+
+HTTPS 주소로 접속한 브라우저에서 사무실을 앱처럼 설치할 수 있습니다.
+
+| 기기 | 방법 |
+|---|---|
+| 🤖 Android(Chrome) | 메뉴 → **앱 설치** 또는 **홈 화면에 추가** |
+| 📱 iPhone·iPad(Safari) | 공유 버튼 → **홈 화면에 추가** |
+| 💻 Windows·macOS(Chrome·Edge) | 주소창 오른쪽 **설치** 아이콘 |
+| 🧭 macOS(Safari 17 이상) | 파일 → **Dock에 추가** |
+
+설치한 앱은 정적 파일(화면 코드·글꼴·그림)만 기기에 캐시하고, 세션·계정 정보(`/api/`)는 저장하지 않습니다.
 
 ### 개발 환경
 

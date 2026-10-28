@@ -279,6 +279,19 @@ agent-office-collector hooks print --tool codex > ~/.codex/hooks.json
 
 오류 코드: `device_revoked`, `http_4xx`, `http_429`, `http_5xx`, `http_redirect`, `network`, `timeout`, `queue_error`, `watch_root_unavailable`, `tail_permission_denied`, `tail_unsupported`, `tail_error`, `spool_invalid`, `spool_error`, `pause_state_invalid`, `status_write_failed`.
 
+### 읽을 수 없는 기록 파일(`tail_permission_denied`, #184)
+
+`status`의 개수에 `tail_denied_<단계>_<종류>`가 보이면 Claude 기록 파일(transcript)을 열지 못한 것입니다. Hook 수집은 영향이 없고, Collector는 그 파일을 30초부터 두 배씩 최대 10분 간격으로만 다시 시도합니다.
+
+- `_eacces`: 파일 권한 문제입니다. 소유자 실측(macOS)에서는 `sudo`로 실행한 세션의 기록이 root 소유(`-rw-------`)로 남아 있었습니다. 내 계정 소유가 아닌 항목 확인과 복구(macOS·Linux):
+
+```bash
+find ~/.claude/projects ! -user "$USER"
+sudo find ~/.claude/projects ! -user "$USER" -exec chown "$USER" {} +
+```
+
+- `_eperm`: 권한 비트 밖의 거부(macOS 개인정보 보호 등)일 수 있습니다. 이슈로 알려 주세요.
+
 `diagnose`의 서버 도달 확인은 인증 없이 `GET /api/v1/system/health`만 보냅니다(5초, 리다이렉트 미추종). 결과는 `reachable`, `http_<상태>`, `network`, `timeout`, `skipped`(`--offline`), `not_configured`입니다.
 
 ## 예시(Linux)
