@@ -293,6 +293,8 @@
 207. #175(PR #176): GUI에서 Claude·Codex 도구 선택 Hook 설치·제거, Codex 신뢰 안내, 제거 도우미 Codex Hook 정리. 간헐 실패 #177(Linux 트레이 종료 대기) 기록.
 208. #180(PR #185, 서브에이전트): 설치 직후 "처음 설정" 마법사, 승인형 자동 업데이트(manifest `installers`, `update download|install --installer`, 트레이 주기 확인·알림·승인, 후처리), 명령어 설치 → 설치 프로그램 이전(`legacy status|remove`), Ubuntu 22.04 데스크톱 빌드(jammy, webkit2gtk-4.1), `publish-collector.yml` `publish_channel` 입력으로 채널 Release 갱신. ADR-0006.
 209. #181(PR #186, 서브에이전트): 세션 이름 = 작업 폴더 마지막 이름, PC별 `settings workspace-name on` 동의 시에만, 이벤트 v1 선택 필드 `workspace_name`, 마이그레이션 0008. #182(PR #183): 하위 에이전트 겹침. #187(PR #188): 덤프 64KB 초과 시 백업 항상 실패(운영 Pi에서 10-25 17:36 KST 뒤 백업 없음) 수정. 운영 Pi를 `deploy/upgrade.sh`로 dev-2a82a71(DB 0008)로 올림. #184 macOS tail 권한 오류 기록. #189(PR #190) 22.04 arm GUI 단일 실행 판정 완화.
+210. 0.1.0-beta.2 게시(2026-10-26): main `2adc37c`, 태그 `server-v0.1.0-beta.2`, GHCR server `sha256:0ce282e2…`·web `sha256:2a68a9da…`, Collector Release·채널 `collector-beta`(manifest 서명 확인). 운영 Pi 정식 이미지 업그레이드는 소유자 승인 대기. #197(PR #200) 팀 공유 범위·폴더 프로젝트 자동 생성(마이그레이션 0009), #198 SMTP 비ASCII, #202 Linux apt 안내, #204 macOS GUI 확인 창·도구 감지, #207 전체 화면, #209 공개 접속 실제 IP. Tailscale Funnel로 운영 주소 공개(가입 정책 ADMIN_APPROVAL). 서브에이전트 #206(팀 화면 사람 이름·PC 이름 수정) 진행 중.
+211. #63: 72시간 실행 완료 — 129,600라운드(이벤트 약 1,166만), 표시 p95 1.51초, 실패·누락 0, 처음·마지막 10% p95 1.447→1.478초, 서버 메모리 91→76MB. `docs/operations/performance.md` 기록.
 
 ## 이번 변경 요약(#22)
 
