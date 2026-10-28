@@ -16,7 +16,7 @@ import {
   zoomBy,
 } from "./camera";
 import { findPath } from "./pathfinding";
-import { headlineFor } from "./headline";
+import { headlineFor, idleHeadline } from "./headline";
 import { BADGE_LABELS, idleCycle, presenceOf } from "./presence";
 import { type DisplayedZone, nextDisplayedZone } from "./smoothing";
 import {
@@ -273,6 +273,32 @@ export class OfficeScene extends Phaser.Scene {
     actor.marker.setVisible(false);
   }
 
+  /** 쉬기 시작한 때: 세션의 마지막 활동 시각(없으면 모름). */
+  private idleSince(actor: Actor): number | null {
+    const session = this.state.sessions.find((s) => s.id === actor.agent.session_id);
+    const at = session?.last_event_at ? Date.parse(session.last_event_at) : Number.NaN;
+    return Number.isNaN(at) ? null : at;
+  }
+
+  /** 옆(2칸 안)에 다른 쉬는 캐릭터가 서 있으면 수다를 떤다. 걷는 중이면 아니다. */
+  private hasIdleNeighbor(actor: Actor): boolean {
+    if (actor.path.length > 0) {
+      return false;
+    }
+    for (const other of this.actors.values()) {
+      if (
+        other !== actor &&
+        !other.leaving &&
+        other.agent.turn_state === "IDLE" &&
+        other.path.length === 0 &&
+        Math.hypot(other.position.x - actor.position.x, other.position.y - actor.position.y) <= 2
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private plan(actor: Actor, now: number): void {
     if (actor.leaving) {
       return;
@@ -284,7 +310,12 @@ export class OfficeScene extends Phaser.Scene {
     }
     actor.container.setAlpha(view.alpha);
     // 머리 위 짧은 상태: 연결 끊김 같은 존재 배지가 우선, 아니면 지금 활동(#162).
-    const headline = view.badge ? BADGE_LABELS[view.badge] : headlineFor(actor.agent);
+    // 쉬는 중이면 소일거리·수다·졸기·잠 연출(#233).
+    const headline = view.badge
+      ? BADGE_LABELS[view.badge]
+      : actor.agent.turn_state === "IDLE"
+        ? idleHeadline(actor.agent.id, now, this.idleSince(actor), this.hasIdleNeighbor(actor))
+        : headlineFor(actor.agent);
     if (actor.status.text !== headline) {
       actor.status.setText(headline);
     }
