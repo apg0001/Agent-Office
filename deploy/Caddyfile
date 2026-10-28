@@ -5,6 +5,13 @@
 	http_port 8080
 	https_port 8443
 	# 도메인을 지정하지 않으면(기본 :8080) 자동 HTTPS를 쓰지 않는다. TLS는 Tunnel·Tailscale이 맡는다.
+	# 앞단 프록시(Tailscale Serve·Funnel, Cloudflare Tunnel 등)가 보낸 X-Forwarded-For는 이 범위에서 온 요청만
+	# 믿는다(#209). 기본은 루프백만. 호스트 루프백 포트로만 열고 앞단이 같은 호스트에 있으면
+	# Docker 내부 대역(예: 172.16.0.0/12)을 더한다(docs/installation/remote-access.md).
+	servers {
+		trusted_proxies static {$AGENT_OFFICE_TRUSTED_PROXIES:127.0.0.1/32 ::1/128}
+		client_ip_headers X-Forwarded-For
+	}
 }
 
 {$AGENT_OFFICE_SITE_ADDRESS::8080} {
@@ -19,7 +26,10 @@
 
 	# API·WebSocket은 서버로. Caddy는 신뢰하지 않는 클라이언트가 보낸 X-Forwarded-For를 덮어쓴다.
 	handle /api/* {
-		reverse_proxy server:8000
+		reverse_proxy server:8000 {
+			# 서버에는 Caddy가 판단한 클라이언트 IP 하나만 넘긴다(위조된 앞부분 체인이 서버로 가지 않음).
+			header_up X-Forwarded-For {client_ip}
+		}
 	}
 
 	handle {

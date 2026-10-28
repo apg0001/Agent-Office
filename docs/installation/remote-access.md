@@ -44,6 +44,25 @@ sudo tailscale serve --bg --https=443 http://127.0.0.1:8080
 
 `AGENT_OFFICE_PUBLIC_URL`(또는 설치 마법사의 접속 주소)을 위 주소로 둡니다. Tailscale serve는 원래 Host를 넘기므로 Origin 검사가 그대로 동작합니다. 팀원을 tailnet에 초대하거나 노드 공유로 접근 범위를 정합니다.
 
+### Tailscale Funnel(공개, Tailscale 없이 접속)
+
+팀원·팀원 PC가 Tailscale을 쓰지 않고 접속하게 하려면 같은 주소를 인터넷에 공개합니다(2026-10-28 Pi 실측: 공개 DNS로 health 200).
+
+```sh
+sudo tailscale funnel --bg http://127.0.0.1:8080
+# 끄기: sudo tailscale funnel --https=443 off
+```
+
+- 처음이면 tailnet 관리 화면에서 Funnel 허용 링크가 뜹니다. 주소는 Serve와 같아서 이미 등록한 Collector는 그대로 동작합니다.
+- 공개하기 전에 관리 화면의 가입 정책을 **"초대만"** 또는 **"관리자 승인"** 으로 두세요.
+- **실제 클라이언트 IP:** Tailscale은 실제 IP를 `X-Forwarded-For`로 넘깁니다. Caddy는 기본으로 루프백에서 온 값만 믿으므로, 같은 호스트의 Tailscale이 Docker 게이트웨이를 거쳐 들어오는 이 구성에서는 `deploy/.env.production`에 아래를 더하고 proxy를 다시 시작합니다. 그러지 않으면 모든 외부 사용자가 같은 IP로 보여 로그인 시도 제한을 함께 쓰게 됩니다(#209).
+
+  ```sh
+  AGENT_OFFICE_TRUSTED_PROXIES=127.0.0.1/32 172.16.0.0/12
+  ```
+
+  `AGENT_OFFICE_BIND_ADDRESS`가 `127.0.0.1`일 때만 넣습니다. LAN에 직접 열었으면(0.0.0.0) LAN 기기도 Docker 게이트웨이로 보이므로 넣지 마세요(위조 IP를 믿게 됨).
+
 ## Cloudflare Tunnel(선택, 공개)
 
 인바운드 포트 없이 공개 도메인으로 접속합니다. 인터넷에 공개되므로 가입 정책은 `INVITE_ONLY`·`ADMIN_APPROVAL`·`CLOSED` 중에서 고르고, 가능하면 Cloudflare Access로 앞단 인증을 겁니다.
