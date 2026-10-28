@@ -119,8 +119,11 @@ func Generate(p Params) (Spec, error) {
 //
 //   - Linux·macOS: 실행 파일을 작은따옴표로 인용한다(작은따옴표 자체는 닫고-이스케이프-다시 열기).
 //     Hook 명령은 sh로 실행된다.
-//   - Windows: 구분자를 슬래시로 바꾸고 큰따옴표로 인용한다. cmd.exe와 Git Bash 모두 같은 뜻으로
-//     읽도록 큰따옴표, 퍼센트, 느낌표, 달러, 백틱이 든 경로는 거부한다(실기 미검증).
+//   - Windows: 구분자를 슬래시로 바꾼다. Hook을 실행하는 셸이 도구·사용자마다 다르다(Claude는 Git Bash,
+//     Codex는 세션 셸이라 보통 PowerShell, 없으면 cmd.exe). 따옴표로 묶은 실행 파일 뒤에 인자가 오는 형태는
+//     PowerShell에서 문법 오류이므로(#225), 경로가 안전 문자(영숫자 `._~-/:`)뿐이면 따옴표 없이 쓴다.
+//     cli는 이를 위해 설치 폴더를 8.3 짧은 경로로 넘긴다. 그래도 공백 등이 남으면 cmd·Git Bash용 큰따옴표
+//     형식으로 쓴다(PowerShell에서는 실패). 큰따옴표, 퍼센트, 느낌표, 달러, 백틱이 든 경로는 거부한다.
 func Command(goos, exe, tool string) (string, error) {
 	if exe == "" || strings.ContainsAny(exe, "\x00\r\n\t") {
 		return "", ErrInvalidExecutable
@@ -135,11 +138,32 @@ func Command(goos, exe, tool string) (string, error) {
 		if len(exe) < 3 || exe[1] != ':' || (exe[2] != '\\' && exe[2] != '/') || strings.ContainsAny(exe, "\"%!$`") {
 			return "", ErrInvalidExecutable
 		}
-		return `"` + strings.ReplaceAll(exe, `\`, "/") + `" hook ` + tool, nil
+		slashed := strings.ReplaceAll(exe, `\`, "/")
+		if AnyShellSafe(slashed) {
+			return slashed + " hook " + tool, nil
+		}
+		return `"` + slashed + `" hook ` + tool, nil
 	default:
 		return "", ErrUnsupportedOS
 	}
 }
+
+// AnyShellSafe는 Windows 경로(슬래시 구분)가 따옴표 없이 cmd.exe·PowerShell·bash에서 같은 뜻인지다.
+// 드라이브 문자 뒤에는 영숫자와 `._~-/`만 허용한다(`~`는 단어 중간이라 bash에서도 펼쳐지지 않는다).
+func AnyShellSafe(path string) bool {
+	if len(path) < 4 || path[1] != ':' || path[2] != '/' || !isASCIILetter(path[0]) {
+		return false
+	}
+	for i := 3; i < len(path); i++ {
+		c := path[i]
+		if !(isASCIILetter(c) || (c >= '0' && c <= '9') || strings.IndexByte("._~-/", c) >= 0) {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCIILetter(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
 
 func shQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"

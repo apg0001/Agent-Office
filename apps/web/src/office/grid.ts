@@ -20,6 +20,8 @@ export type Furniture =
   | "whiteboard"
   | "table"
   | "rack"
+  | "labBench"
+  | "labScope"
   | "sofa"
   | "coffee"
   | "fridge"
@@ -206,6 +208,9 @@ export function createDefaultOffice(deskRows = 2): OfficeMap {
   const testing = zones.testing;
   place({ x: testing.x + testing.width - 1, y: testing.y }, "rack");
   place({ x: testing.x + testing.width - 1, y: testing.y + 1 }, "rack");
+  // 실험실(#235): 문(testing.x + 1) 옆과 뒤쪽 구석에 실험대. 가운데 칸은 비워 둔다.
+  place({ x: testing.x, y: testing.y }, "labBench");
+  place({ x: testing.x + testing.width - 1, y: testing.y + testing.height - 1 }, "labScope");
   // 회의실: 뒤쪽 화면과 그 앞 2칸짜리 테이블.
   place({ x: zones.meeting.x + 2, y: zones.meeting.y }, "whiteboard");
   place({ x: zones.meeting.x + 2, y: zones.meeting.y + 1 }, "table");

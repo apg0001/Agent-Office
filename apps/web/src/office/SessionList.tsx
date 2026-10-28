@@ -49,8 +49,19 @@ export function activeSessions(state: OfficeState): ActiveSession[] {
 /**
  * 사무실 왼쪽 위에 겹쳐 보이는 활성 세션 목록. 누르면 그 세션 대장의 상세를 연다.
  * `unnamed`(팀·통합 화면)이면 이름이 없는 세션을 "(이름 없음)"으로 보여 준다(#197).
+ * `selected`가 세션 대장이면 그 항목을 강조한다(지도에서도 그 캐릭터를 따라가고 강조).
  */
-export function SessionList({ state, onSelect, unnamed = false }: { state: OfficeState; onSelect: (agentId: string) => void; unnamed?: boolean }) {
+export function SessionList({
+  state,
+  onSelect,
+  unnamed = false,
+  selected = null,
+}: {
+  state: OfficeState;
+  onSelect: (agentId: string) => void;
+  unnamed?: boolean;
+  selected?: string | null;
+}) {
   const sessions = activeSessions(state);
   return (
     <aside className="session-list" aria-label="활성 세션">
@@ -65,7 +76,12 @@ export function SessionList({ state, onSelect, unnamed = false }: { state: Offic
             const workspace = sessionName(session, unnamed);
             return (
               <li key={session.id}>
-                <button type="button" disabled={!leadId} onClick={() => leadId && onSelect(leadId)}>
+                <button
+                  type="button"
+                  disabled={!leadId}
+                  aria-pressed={leadId !== null && leadId === selected}
+                  onClick={() => leadId && onSelect(leadId)}
+                >
                   <span className="who">
                     {deviceName} · {PROVIDER_LABELS[session.provider]}
                   </span>

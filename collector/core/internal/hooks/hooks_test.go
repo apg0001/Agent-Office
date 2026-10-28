@@ -93,12 +93,38 @@ func TestCommandRejectsUnsafePaths(t *testing.T) {
 	}
 }
 
+// Windows 명령은 Hook을 실행하는 셸(cmd·PowerShell·Git Bash)과 관계없이 같은 뜻이어야 한다(#225).
+// 안전 문자뿐인 경로(설치 폴더를 8.3 짧은 경로로 바꾼 것)는 따옴표 없이, 아니면 기존 큰따옴표 형식.
+func TestWindowsCommandIsQuoteFreeWhenSafe(t *testing.T) {
+	cases := []struct{ exe, want string }{
+		{`C:\Users\USER\AppData\Local\Programs\AGENTO~1\agent-office-collector.exe`, `C:/Users/USER/AppData/Local/Programs/AGENTO~1/agent-office-collector.exe hook codex`},
+		{`C:\Program Files\AgentOffice\agent-office-collector.exe`, `"C:/Program Files/AgentOffice/agent-office-collector.exe" hook codex`},
+		{`C:\Users\홍길동\agent-office-collector.exe`, `"C:/Users/홍길동/agent-office-collector.exe" hook codex`},
+		{`C:\a(b)\agent-office-collector.exe`, `"C:/a(b)/agent-office-collector.exe" hook codex`},
+	}
+	for _, c := range cases {
+		got, err := Command("windows", c.exe, ToolCodex)
+		if err != nil || got != c.want {
+			t.Errorf("%q: got %q, %v", c.exe, got, err)
+		}
+		if !IsOwnedCommand(got, ToolCodex) {
+			t.Errorf("%q: 소유 판정 실패", got)
+		}
+	}
+	for _, bad := range []string{"", "C:", "C:/", "c:x/y", "1:/a", "C:/a b", "C:/a&b", "C:/a;b", "C:/a'b", "C:/a@b"} {
+		if AnyShellSafe(bad) {
+			t.Errorf("AnyShellSafe(%q) = true", bad)
+		}
+	}
+}
+
 func TestIsOwnedCommand(t *testing.T) {
 	owned := []string{
 		`'/opt/x/agent-office-collector' hook claude`,
 		`/usr/bin/agent-office-collector hook claude --mode print`,
 		`"C:/Program Files/AgentOffice/Agent-Office-Collector.EXE" hook claude`,
 		`'/a/it'\''s/agent-office-collector' hook claude`,
+		`C:/Users/USER/AppData/Local/Programs/AGENTO~1/agent-office-collector.exe hook claude`,
 	}
 	for _, c := range owned {
 		if !IsOwnedCommand(c, ToolClaude) {

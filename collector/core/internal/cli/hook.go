@@ -83,7 +83,7 @@ func runHook(args []string, env Env) (code int) {
 // hookOptions는 PC별 동의(#181)가 켜져 있을 때만 작업 폴더 이름을 읽게 한다. 홈 폴더 자체에서
 // 실행한 세션은 마지막 이름이 OS 사용자 이름이므로 보내지 않는다.
 func hookOptions(cfg config.Config, dirs paths.Dirs) adapter.HookOptions {
-	if !cfg.ShareWorkspaceName {
+	if !cfg.WorkspaceNameSharing() {
 		return adapter.HookOptions{}
 	}
 	opts := adapter.HookOptions{WorkspaceName: true}

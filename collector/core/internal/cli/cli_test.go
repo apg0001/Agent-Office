@@ -112,7 +112,7 @@ func spoolFiles(t *testing.T, dirs paths.Dirs) [][]byte {
 	return out
 }
 
-const validHook = `{"hook_event_name":"PreToolUse","session_id":"00000000-0000-4000-8000-000000000001","prompt_id":"00000000-0000-4000-8000-000000000101","tool_name":"Read","tool_use_id":"toolu_x1","tool_input":{"file_path":"/home/someone/` + sentinelPrompt + `"},"cwd":"/home/someone/` + sentinelPrompt + `","prompt":"` + sentinelPrompt + `"}`
+const validHook = `{"hook_event_name":"PreToolUse","session_id":"00000000-0000-4000-8000-000000000001","prompt_id":"00000000-0000-4000-8000-000000000101","tool_name":"Read","tool_use_id":"toolu_x1","tool_input":{"file_path":"/home/someone/` + sentinelPrompt + `"},"cwd":"/home/someone/` + sentinelPrompt + `/proj","prompt":"` + sentinelPrompt + `"}`
 
 // blockingReader는 끝나지 않는 stdin이다.
 type blockingReader struct{ ch chan struct{} }

@@ -69,11 +69,30 @@ def read_text_any(p: Path) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def short_dir(p: str) -> str:
+    """Windows: 폴더만 8.3 짧은 경로로(Collector hookExe와 같은 규칙, #225). 못 얻으면 그대로."""
+    import ctypes
+
+    folder, base = os.path.split(p)
+    buf = ctypes.create_unicode_buffer(512)
+    n = ctypes.windll.kernel32.GetShortPathNameW(folder, buf, len(buf))  # type: ignore[attr-defined]
+    if n == 0 or n >= len(buf):
+        return p
+    return os.path.join(buf.value, base)
+
+
 def hook_form(p: str) -> str:
-    """Hook 명령 안의 실행 파일 표기(Windows는 슬래시, 대소문자 무시 비교)."""
+    """Hook 명령 안의 실행 파일 표기(Windows는 짧은 경로·슬래시, 대소문자 무시 비교)."""
     if sys.platform == "win32":
-        return p.replace("\\", "/").lower()
+        return short_dir(p).replace("\\", "/").lower()
     return p
+
+
+def legacy_absent(p: str, text: str) -> bool:
+    """이전 경로가 긴 표기로도 짧은 표기로도 남지 않았는지."""
+    if sys.platform == "win32":
+        return p.replace("\\", "/").lower() not in text and hook_form(p) not in text
+    return p not in text
 
 
 def hook_text(s: str) -> str:
@@ -198,7 +217,13 @@ def main() -> int:
 
         s = claude.read_text(encoding="utf-8")
         c.record("claude_hooks_point_to_new_core", hook_form(new_core) in hook_text(s))
-        c.record("claude_hooks_no_legacy_path", hook_form(old) not in hook_text(s))
+        c.record("claude_hooks_no_legacy_path", legacy_absent(old, hook_text(s)))
+        if sys.platform == "win32":
+            # PowerShell·cmd·Git Bash 어디서나 실행되도록 따옴표 없는 명령(#225).
+            c.record(
+                "hooks_unquoted_any_shell",
+                '\\"' + hook_form(new_core) not in hook_text(s),
+            )
         stop = [
             h
             for g in json.loads(s)["hooks"].get("Stop", [])
@@ -208,8 +233,7 @@ def main() -> int:
         cx = (codex_dir / "hooks.json").read_text(encoding="utf-8")
         c.record(
             "codex_hooks_point_to_new_core",
-            hook_form(new_core) in hook_text(cx)
-            and hook_form(old) not in hook_text(cx),
+            hook_form(new_core) in hook_text(cx) and legacy_absent(old, hook_text(cx)),
         )
         # 명령 경로가 바뀌었으므로 Codex는 한 번 다시 신뢰해야 한다(트레이가 알림으로 안내).
         c.record(

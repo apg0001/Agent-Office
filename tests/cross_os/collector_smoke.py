@@ -181,7 +181,7 @@ def main() -> int:
                 "session_id": SESSION,
                 "prompt_id": "00000000-0000-4000-8000-000000000402",
                 "prompt": PROMPT_SENTINEL,
-                "cwd": str(Path.home() / PROMPT_SENTINEL),
+                "cwd": str(Path.home() / PROMPT_SENTINEL / "proj"),
             },
         ):
             p = run("hook", "claude", stdin=json.dumps(payload), check=False)
