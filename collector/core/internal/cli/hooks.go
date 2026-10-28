@@ -120,6 +120,7 @@ func cmdHooks(args []string, env Env) int {
 			fmt.Fprintln(env.Stderr, "실행 파일 경로를 확인할 수 없습니다")
 			return ExitError
 		}
+		exe = hookExe(exe)
 	}
 	if sub == "print" {
 		spec, err := hooks.Generate(hooks.Params{Tool: tools[0], GOOS: *goos, Exe: exe})
