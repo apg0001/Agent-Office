@@ -296,6 +296,7 @@
 210. 0.1.0-beta.2 게시(2026-10-26): main `2adc37c`, 태그 `server-v0.1.0-beta.2`, GHCR server `sha256:0ce282e2…`·web `sha256:2a68a9da…`, Collector Release·채널 `collector-beta`(manifest 서명 확인). 운영 Pi 정식 이미지 업그레이드는 소유자 승인 대기. #197(PR #200) 팀 공유 범위·폴더 프로젝트 자동 생성(마이그레이션 0009), #198 SMTP 비ASCII, #202 Linux apt 안내, #204 macOS GUI 확인 창·도구 감지, #207 전체 화면, #209 공개 접속 실제 IP. Tailscale Funnel로 운영 주소 공개(가입 정책 ADMIN_APPROVAL). 서브에이전트 #206(팀 화면 사람 이름·PC 이름 수정) 진행 중.
 211. #63: 72시간 실행 완료 — 129,600라운드(이벤트 약 1,166만), 표시 p95 1.51초, 실패·누락 0, 처음·마지막 10% p95 1.447→1.478초, 서버 메모리 91→76MB. `docs/operations/performance.md` 기록.
 212. #206(PR #212) 팀·통합 사무실 사람 이름표·PC 이름 변경, #213(PR #214) e2e 큐 비움 대기, #215(PR #216) 비밀번호 확인·메인 화면 OS별 Collector 설치 안내·공유 범위 링크. 운영 Pi는 정식 0.1.0-beta.2(DB 0008). #217 0.1.0-beta.3 릴리스 노트 작성.
+213. 0.1.0-beta.3 게시·운영 반영(2026-10-28, main `0a10eb5`, DB 0009, server-v 태그·Release는 소유자 생성 대기). 이후 #221(폴더 이름 기본 켜짐), #223(세션 선택 초점), #225(Windows Codex Hook이 PowerShell로 실행돼 실패 → 짧은 경로·따옴표 없는 명령. Codex는 `build_hooks_config`에서 세션 셸로 Hook 실행), #227(계정 화면 상단 바·표), #229(README), #231(팀 책상 겹침: change_seq 같은 값 변경을 클라이언트가 버림), #233(쉬는 연출), #235(실험실). Pi Collector beta.3. 커밋 형식은 `[type] 설명 (#N)`.
 
 ## 이번 변경 요약(#22)
 
@@ -382,7 +383,7 @@
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
 4. 진행 순서(자율, 2026-10-26 갱신):
-   1. 0.1.0-beta.3 릴리스(#217): develop→main PR 병합 → `gh workflow run publish-images.yml --ref main -f version=0.1.0-beta.3`(소유자 `image-publish` 승인)과 동시에 소유자가 `gh workflow run publish-collector.yml --ref main -f version=0.1.0-beta.3 -f publish_channel=true` 실행·`collector-publish` 승인 → Release `collector-v0.1.0-beta.3` 자산·SHA256SUMS·채널 manifest 서명 확인 → 소유자 승인 후 `deploy/upgrade.sh --server …:0.1.0-beta.3@sha256:… --web …:0.1.0-beta.3@sha256:… --env-file deploy/.env.production --yes`(DB 0009) → `server-v0.1.0-beta.3` 태그·Release → main→develop 역병합, #215·#217 종료 확인.
+   1. 0.1.0-beta.4 릴리스(#237): develop→main PR 병합 → `gh workflow run publish-images.yml --ref main -f version=0.1.0-beta.4`(소유자 승인)과 동시에 소유자가 `gh workflow run publish-collector.yml --ref main -f version=0.1.0-beta.4 -f publish_channel=true` 실행·승인 → 자산·SHA256SUMS·채널 서명 확인 → `deploy/upgrade.sh --server …:0.1.0-beta.4@sha256:… --web …@sha256:… --env-file deploy/.env.production --yes`(Allow 규칙 있음) → 소유자 `gh release create server-v0.1.0-beta.4 …` → main→develop 역병합. 소유자 GICHAN_DESKTOP에서 Codex 재신뢰 후 Codex 이벤트 수신 확인(#225 실기).
    2. 소유자 결정 대기: 관리자 "이메일 확인 없이 승인" 옵션, 주소(Tailscale 이름 변경 vs 도메인+Cloudflare Tunnel), 운영 SMTP 계정·앱 비밀번호 수정.
    3. macOS 사용자는 beta.3 설치 파일로 GUI 마법사(#204 수정) 실사용 확인.
    4. 후속: #177 트레이 종료 간헐 실패, 트레이 "동기화"(Core flush 명령), 업데이트 알림(#44), macOS·Windows Codex 실기 확인, 서명 비용 결정(#42), #62·#87 소유자 장비.
