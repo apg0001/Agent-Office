@@ -16,6 +16,7 @@ from agent_office.state.engine import (
     is_newer,
     next_activity,
     next_lifecycle,
+    next_wait_kind,
 )
 
 
@@ -29,11 +30,14 @@ def apply_event(
     confidence: str,
     occurred_at: dt.datetime,
     sequence: int,
+    wait_kind: str | None = None,
 ) -> None:
     lifecycle = _apply_lifecycle(connection, session_id, event_type, occurred_at)
     if lifecycle != "ENDED":
         ensure_desk(connection, session_id)
-    _apply_agent(connection, agent_id, event_type, activity, confidence, occurred_at, sequence)
+    _apply_agent(
+        connection, agent_id, event_type, activity, confidence, occurred_at, sequence, wait_kind
+    )
 
 
 def apply_plan(
@@ -108,6 +112,7 @@ def _apply_agent(
     confidence: str,
     occurred_at: dt.datetime,
     sequence: int,
+    wait_kind: str | None,
 ) -> None:
     states, agents = schema.agent_current_states, schema.agents
     connection.execute(
@@ -118,6 +123,7 @@ def _apply_agent(
             states.c.turn_state,
             states.c.activity,
             states.c.confidence,
+            states.c.wait_kind,
             states.c.state_version,
             states.c.last_event_occurred_at,
             states.c.last_event_sequence,
@@ -144,14 +150,18 @@ def _apply_agent(
     if newer:
         values.update(last_event_occurred_at=occurred_at, last_event_sequence=sequence)
     confidence_changed = newer and changed != current and row.confidence != confidence
-    if changed != current:
+    kind = next_wait_kind(row.wait_kind, changed, event_type, wait_kind) if newer else row.wait_kind
+    kind_changed = kind != row.wait_kind
+    if kind_changed:
+        values["wait_kind"] = kind
+    if changed != current or kind_changed:
         values.update(
             turn_state=changed.turn_state,
             activity=changed.activity,
             confidence=confidence,
             state_version=row.state_version + 1,
         )
-    if changed != current or lifetime or confidence_changed:
+    if changed != current or kind_changed or lifetime or confidence_changed:
         # 화면에 보이는 값이 바뀌었을 때만 실시간 전달 대상이 된다.
         values.update(change_seq=_next_change(), updated_at=func.clock_timestamp())
     if values:

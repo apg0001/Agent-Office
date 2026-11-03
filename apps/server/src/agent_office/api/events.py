@@ -80,6 +80,7 @@ RejectionCode = Literal[
     "internal_error",
 ]
 PlanStatus = Literal["pending", "in_progress", "completed", "unknown"]
+WaitKind = Literal["permission", "question", "plan_review"]
 # RFC 3339 시간대(Z 또는 ±HH:MM)가 반드시 붙은 문자열만 받는다.
 # 작업 폴더의 마지막 이름(#181). 경로 구분자·제어·서식 문자를 거부한다(스키마 pattern과 같음).
 WORKSPACE_NAME_PATTERN = (
@@ -116,11 +117,15 @@ class EventV1(BaseModel):
     plan_steps: Annotated[tuple[PlanStatus, ...], Field(min_length=1, max_length=50)] | None = None
     # 작업 폴더의 마지막 이름만(#181). Collector가 PC별 동의를 받았을 때만 보낸다.
     workspace_name: WorkspaceName | None = None
+    # approval.requested에서만: 권한 승인·질문·계획 확인(#262). 도구 이름 원문은 받지 않는다.
+    wait_kind: WaitKind | None = None
 
     @model_validator(mode="after")
     def _inferred_source_is_inferred(self) -> EventV1:
         if self.plan_steps is not None and self.event_type != "plan.updated":
             raise ValueError("plan_steps only on plan.updated")
+        if self.wait_kind is not None and self.event_type != "approval.requested":
+            raise ValueError("wait_kind only on approval.requested")
         if self.workspace_name in {".", ".."}:
             raise ValueError("workspace_name must be a folder name")
         if self.source == "inferred" and self.confidence != "inferred":
@@ -141,6 +146,9 @@ class EventV1(BaseModel):
         if canonical.get("workspace_name") is None:
             # 작업 폴더 이름(#181)이 없는 이벤트도 필드 추가 전과 같은 digest를 유지한다.
             canonical.pop("workspace_name", None)
+        if canonical.get("wait_kind") is None:
+            # 대기 종류(#262)가 없는 이벤트도 필드 추가 전과 같은 digest를 유지한다.
+            canonical.pop("wait_kind", None)
         canonical["occurred_at"] = self.occurred_datetime().astimezone(dt.UTC).isoformat()
         return hashlib.sha256(
             json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -351,6 +359,7 @@ def _store(
         confidence=event.confidence,
         occurred_at=occurred,
         sequence=event.sequence,
+        wait_kind=event.wait_kind,
     )
     if event.plan_steps is not None:
         apply_plan(connection, session_id, agent_id, list(event.plan_steps), occurred)

@@ -9,8 +9,10 @@ import {
   PASTIME_MS,
   SLEEPING,
   SLEEP_AFTER_MS,
+  WAIT_HEADLINES,
   headlineFor,
   idleHeadline,
+  waitMark,
 } from "./headline";
 
 describe("headline above characters (#162)", () => {
@@ -24,6 +26,21 @@ describe("headline above characters (#162)", () => {
     expect(headlineFor({ activity: "coding", turn_state: "WAITING_USER" })).toBe("✋ 승인 대기");
     expect(headlineFor({ activity: "coding", turn_state: "IDLE" })).toBe("☕ 쉬는 중");
     expect(headlineFor({ activity: "unknown", turn_state: "THINKING" })).toBe("💭 생각 중");
+  });
+
+  it("tells what a waiting agent waits for (#262)", () => {
+    const waiting = { activity: "waiting_user", turn_state: "WAITING_USER" } as const;
+    expect(headlineFor({ ...waiting, wait_kind: "question" })).toBe("❓ 질문 대기");
+    expect(headlineFor({ ...waiting, wait_kind: "plan_review" })).toBe("📋 계획 확인 대기");
+    expect(headlineFor({ ...waiting, wait_kind: "permission" })).toBe("✋ 승인 대기");
+    // 이전 서버(종류 없음)는 권한 승인.
+    expect(headlineFor({ ...waiting, wait_kind: null })).toBe("✋ 승인 대기");
+    expect(waitMark({ wait_kind: "question" })).toBe("?");
+    expect(waitMark({ wait_kind: "plan_review" })).toBe("!");
+    expect(waitMark({})).toBe("!");
+    for (const label of Object.values(WAIT_HEADLINES)) {
+      expect(Array.from(label).length).toBeLessThanOrEqual(12);
+    }
   });
 
   it("keeps every label short", () => {

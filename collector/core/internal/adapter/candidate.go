@@ -75,8 +75,33 @@ const (
 	ToolDelegate ToolCategory = "delegate"
 	ToolPlan     ToolCategory = "plan"
 	ToolMCP      ToolCategory = "mcp"
+	// ToolQuestion은 사용자에게 질문·선택지를 보여 주는 도구다(Claude AskUserQuestion, #262).
+	ToolQuestion ToolCategory = "question"
 	ToolOther    ToolCategory = "other"
 )
+
+// WaitKind는 승인 요청(approval.requested)이 사용자에게 무엇을 기다리는지다(#262).
+// 도구 분류에서만 정하고 도구 이름 원문은 보내지 않는다.
+type WaitKind string
+
+const (
+	WaitNone       WaitKind = ""
+	WaitPermission WaitKind = "permission"
+	WaitQuestion   WaitKind = "question"
+	WaitPlanReview WaitKind = "plan_review"
+)
+
+// WaitKindFor는 승인 요청 도구 분류로 대기 종류를 정한다. 질문 도구는 질문, 계획 도구(ExitPlanMode 등)는
+// 계획 확인, 나머지는 권한 승인이다(Claude Code 2.1.310 대화형 실측: 셋 다 PermissionRequest에 tool_name이 온다).
+func WaitKindFor(category ToolCategory) WaitKind {
+	switch category {
+	case ToolQuestion:
+		return WaitQuestion
+	case ToolPlan:
+		return WaitPlanReview
+	}
+	return WaitPermission
+}
 
 // AgentTypeCategory는 하위 에이전트 유형 원문(사용자 정의 이름 포함) 대신 남기는 분류다.
 type AgentTypeCategory string

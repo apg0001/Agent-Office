@@ -3,7 +3,7 @@
  * 화면은 이 출처일 때 항상 "합성 데이터" 배지를 보여야 한다.
  */
 
-import type { Activity, AgentState, OfficeState, TurnState } from "./types";
+import type { Activity, AgentState, OfficeState, TurnState, WaitKind } from "./types";
 
 const ACTIVITY_CYCLE: ReadonlyArray<[TurnState, Activity]> = [
   ["THINKING", "thinking"],
@@ -15,6 +15,8 @@ const ACTIVITY_CYCLE: ReadonlyArray<[TurnState, Activity]> = [
   ["WAITING_USER", "waiting_user"],
   ["IDLE", "idle"],
 ];
+
+const SYNTHETIC_WAITS: readonly WaitKind[] = ["permission", "question", "plan_review"];
 
 const ID_PREFIX = { device: "d", session: "5", agent: "a" } as const;
 
@@ -79,6 +81,8 @@ function agentAt(
     role: parent ? "subagent" : "lead",
     turn_state: turnState,
     activity,
+    // 승인 대기 종류(#262)도 골고루 보이게 한다.
+    wait_kind: turnState === "WAITING_USER" ? SYNTHETIC_WAITS[offset % SYNTHETIC_WAITS.length] : null,
     // 합성 데이터에서도 추정 표시를 확인할 수 있게 일부를 추정으로 둔다.
     confidence: offset % 4 === 3 ? "inferred" : "observed",
     state_version: tick,

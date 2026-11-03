@@ -165,6 +165,15 @@
           }
         ]
       }
+    },
+    "wait_kind": {
+      "description": "approval.requested에서만(#262): 사용자에게 무엇을 기다리는지. permission(도구 권한 승인)·question(질문·선택지)·plan_review(계획 확인). 도구 이름 원문은 담지 않는다.",
+      "type": "string",
+      "enum": [
+        "permission",
+        "question",
+        "plan_review"
+      ]
     }
   },
   "allOf": [
@@ -197,6 +206,20 @@
         "properties": {
           "event_type": {
             "const": "plan.updated"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "wait_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "event_type": {
+            "const": "approval.requested"
           }
         }
       }

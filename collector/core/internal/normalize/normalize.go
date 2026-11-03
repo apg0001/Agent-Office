@@ -196,6 +196,12 @@ func (n *Normalizer) normalize(in Input) (Record, Outcome) {
 	if eventType == string(adapter.EventPlanUpdated) && c.Plan != nil {
 		planSteps = sanitizePlan(c.Plan.Steps)
 	}
+	waitKind := ""
+	if eventType == string(adapter.EventApprovalRequested) {
+		if kind := string(adapter.WaitKindFor(c.ToolCategory)); waitKinds[kind] {
+			waitKind = kind
+		}
+	}
 	workspace := ""
 	if adapter.ValidWorkspaceName(c.WorkspaceName) {
 		// 2차 방어선: 어댑터가 정리한 값과 같을 때만 보낸다. 아니면 이름 없이 보낸다.
@@ -218,6 +224,7 @@ func (n *Normalizer) normalize(in Input) (Record, Outcome) {
 			Sequence:      seq,
 			PlanSteps:     planSteps,
 			WorkspaceName: workspace,
+			WaitKind:      waitKind,
 		},
 		DeterministicID: deterministic,
 	}, OutcomeAccepted

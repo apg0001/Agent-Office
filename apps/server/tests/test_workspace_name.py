@@ -187,6 +187,7 @@ def test_digest_without_workspace_name_is_unchanged() -> None:
     canonical = events_api.EventV1.model_validate(body).model_dump(mode="json")
     canonical.pop("plan_steps")
     canonical.pop("workspace_name")
+    canonical.pop("wait_kind")
     canonical["occurred_at"] = "2026-10-26T00:00:00+00:00"
     expected = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()

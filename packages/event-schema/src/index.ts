@@ -46,6 +46,10 @@ export type EventConfidence = (typeof EVENT_CONFIDENCE_LEVELS)[number];
 export const PLAN_STEP_STATUSES = ["pending", "in_progress", "completed", "unknown"] as const;
 export type PlanStepStatus = (typeof PLAN_STEP_STATUSES)[number];
 
+/** approval.requested의 대기 종류(#262). 도구 이름 원문은 담지 않는다. */
+export const WAIT_KINDS = ["permission", "question", "plan_review"] as const;
+export type WaitKind = (typeof WAIT_KINDS)[number];
+
 export interface AgentOfficeEventV1 {
   schema_version: typeof EVENT_SCHEMA_VERSION;
   event_id: string;
@@ -67,6 +71,8 @@ export interface AgentOfficeEventV1 {
    * 경로 구분자(`/`, `\\`)와 제어 문자는 담지 않는다. 이전 Collector는 보내지 않는다.
    */
   workspace_name?: string;
+  /** approval.requested에서만(#262): 권한 승인·질문·계획 확인. 이전 Collector는 보내지 않는다(권한으로 본다). */
+  wait_kind?: WaitKind;
 }
 
 /** 이벤트 v1 `workspace_name` 최대 길이(코드 포인트). */

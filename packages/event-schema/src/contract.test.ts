@@ -10,6 +10,7 @@ import {
   EVENT_SCHEMA_VERSION,
   EVENT_SOURCES,
   EVENT_TYPES,
+  WAIT_KINDS,
   type AgentOfficeEventV1,
 } from "./index.js";
 
@@ -34,6 +35,7 @@ describe("이벤트 계약의 TypeScript 상수", () => {
     expect(schema.properties.event_type.enum).toEqual(EVENT_TYPES);
     expect(schema.properties.activity.enum).toEqual(EVENT_ACTIVITIES);
     expect(schema.properties.confidence.enum).toEqual(EVENT_CONFIDENCE_LEVELS);
+    expect(schema.properties.wait_kind.enum).toEqual(WAIT_KINDS);
   });
 
   it("필수 필드와 TypeScript 이벤트 구조를 맞춘다", () => {

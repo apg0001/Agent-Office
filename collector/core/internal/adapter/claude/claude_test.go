@@ -217,3 +217,24 @@ func FuzzParse(f *testing.F) {
 		}
 	})
 }
+
+// 권한·질문·계획 확인은 모두 PermissionRequest로 오고 tool_name으로만 구분된다(#262, 2.1.310 대화형 실측).
+func TestPermissionRequestWaitKind(t *testing.T) {
+	cases := map[string]adapter.WaitKind{
+		"Write":           adapter.WaitPermission,
+		"Bash":            adapter.WaitPermission,
+		"AskUserQuestion": adapter.WaitQuestion,
+		"ExitPlanMode":    adapter.WaitPlanReview,
+		"mcp__x__y":       adapter.WaitPermission,
+		"":                adapter.WaitPermission,
+	}
+	for tool, want := range cases {
+		c, err := ParseHook([]byte(`{"hook_event_name":"PermissionRequest",`+session+`,"tool_name":"`+tool+`"}`), verifiedRuntime)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := adapter.WaitKindFor(c.ToolCategory); got != want {
+			t.Fatalf("%q: %s, want %s", tool, got, want)
+		}
+	}
+}

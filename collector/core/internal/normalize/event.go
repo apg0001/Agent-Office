@@ -1,6 +1,6 @@
 // Package normalize는 어댑터 후보(adapter.Candidate)를 이벤트 v1 객체로 바꾼다(#32).
 //
-// 출력은 packages/event-schema/schema/event-v1.schema.json의 13개 필수 필드와 선택 필드 plan_steps(#38)·workspace_name(#181)뿐이다. 제공자 원본
+// 출력은 packages/event-schema/schema/event-v1.schema.json의 13개 필수 필드와 선택 필드 plan_steps(#38)·workspace_name(#181)·wait_kind(#262)뿐이다. 제공자 원본
 // 세션·에이전트 ID는 장치 범위 UUIDv5로 바꿔 PC 밖으로 내보내지 않고, enum 필드는 v1 집합에
 // 속한 값만 통과시킨다(2차 방어선). 큐·전송(#33)과 polling 실행 루프(#34)는 범위 밖이다.
 package normalize
@@ -31,6 +31,8 @@ type Event struct {
 	PlanSteps []string `json:"plan_steps,omitempty"`
 	// WorkspaceName은 작업 폴더의 마지막 이름이다(#181). PC별 동의가 켜진 Hook 이벤트에만 있다.
 	WorkspaceName string `json:"workspace_name,omitempty"`
+	// WaitKind는 approval.requested에서만 쓰는 선택 필드다(#262): permission·question·plan_review.
+	WaitKind string `json:"wait_kind,omitempty"`
 }
 
 // Record는 정규화 결과다. Event만 서버로 보낸다.
@@ -53,6 +55,7 @@ var (
 		"approval.requested", "approval.resolved",
 		"agent.started", "agent.completed", "plan.updated", "unknown",
 	)
+	waitKinds  = set("permission", "question", "plan_review")
 	activities = set(
 		"reading", "browsing", "coding", "testing", "planning", "delegating",
 		"reporting", "thinking", "waiting_user", "idle", "unknown",

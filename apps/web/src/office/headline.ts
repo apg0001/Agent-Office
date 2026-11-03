@@ -4,7 +4,7 @@
  */
 
 import { mixHash } from "./presence";
-import type { Activity, AgentState } from "./types";
+import type { Activity, AgentState, WaitKind } from "./types";
 
 export const ACTIVITY_HEADLINES: Record<Activity, string> = {
   reading: "📖 읽는 중",
@@ -20,10 +20,22 @@ export const ACTIVITY_HEADLINES: Record<Activity, string> = {
   unknown: "⚙️ 작업 중",
 };
 
-export function headlineFor(agent: Pick<AgentState, "activity" | "turn_state">): string {
+/** 승인 대기 종류별 머리 위 상태(#262). 종류가 없으면(이전 서버·Collector) 권한 승인으로 본다. */
+export const WAIT_HEADLINES: Record<WaitKind, string> = {
+  permission: "✋ 승인 대기",
+  question: "❓ 질문 대기",
+  plan_review: "📋 계획 확인 대기",
+};
+
+/** 머리 위 표식: 질문은 "?", 권한 승인·계획 확인은 "!". */
+export function waitMark(agent: Pick<AgentState, "wait_kind">): string {
+  return agent.wait_kind === "question" ? "?" : "!";
+}
+
+export function headlineFor(agent: Pick<AgentState, "activity" | "turn_state" | "wait_kind">): string {
   switch (agent.turn_state) {
     case "WAITING_USER":
-      return ACTIVITY_HEADLINES.waiting_user;
+      return WAIT_HEADLINES[agent.wait_kind ?? "permission"] ?? ACTIVITY_HEADLINES.waiting_user;
     case "IDLE":
       return ACTIVITY_HEADLINES.idle;
     case "THINKING":

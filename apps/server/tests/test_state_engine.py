@@ -24,6 +24,7 @@ from agent_office.state.engine import (
     is_newer,
     next_activity,
     next_lifecycle,
+    next_wait_kind,
 )
 
 T0 = dt.datetime(2026, 10, 23, 12, 0, tzinfo=dt.UTC)
@@ -101,6 +102,21 @@ def test_newer_compares_time_then_sequence() -> None:
     assert not is_newer(at(1), 5, at(1), 5)
 
 
+def test_wait_kind_only_while_waiting() -> None:
+    waiting = AgentActivity("WAITING_USER", "waiting_user")
+    assert next_wait_kind(None, waiting, "approval.requested", "question") == "question"
+    assert next_wait_kind(None, waiting, "approval.requested", "plan_review") == "plan_review"
+    # 이전 Collector(종류 없음)는 권한 승인으로 본다.
+    assert next_wait_kind(None, waiting, "approval.requested", None) == "permission"
+    # 대기 중 다른 이벤트는 종류를 유지하고, 대기를 벗어나면 비운다.
+    assert next_wait_kind("question", waiting, "plan.updated", None) == "question"
+    assert (
+        next_wait_kind("question", AgentActivity("WORKING", "unknown"), "approval.resolved", None)
+        is None
+    )
+    assert next_wait_kind("plan_review", IDLE, "turn.completed", None) is None
+
+
 # --- 수집 API로 반영 -----------------------------------------------------------------
 
 
@@ -138,9 +154,12 @@ class Stream:
         parent: uuid.UUID | None = None,
         activity: str = "unknown",
         confidence: str = "observed",
+        wait_kind: str | None = None,
     ) -> dict[str, object]:
         self.sequence += 1
+        extra = {"wait_kind": wait_kind} if wait_kind else {}
         return {
+            **extra,
             "schema_version": "1.0",
             "event_id": str(uuid.uuid4()),
             "device_id": self.device["device_id"],
@@ -208,6 +227,65 @@ def test_ingestion_drives_lifecycle_and_activity(
 
     stream.send(client, stream.event("session.ended", 5, lead))
     assert lifecycle(engine) == "ENDED"
+
+
+def wait_kind(engine: Engine, collector_agent_id: uuid.UUID) -> str | None:
+    states, agents = schema.agent_current_states, schema.agents
+    with engine.connect() as connection:
+        return connection.execute(
+            select(states.c.wait_kind)
+            .select_from(states.join(agents, agents.c.id == states.c.agent_id))
+            .where(agents.c.collector_agent_id == collector_agent_id)
+        ).scalar_one()
+
+
+def test_ingestion_records_wait_kind(
+    client: TestClient, engine: Engine, device: dict[str, str]
+) -> None:
+    stream, lead = Stream(device), uuid.uuid4()
+    stream.send(
+        client, stream.event("session.started", 0, lead), stream.event("turn.started", 1, lead)
+    )
+
+    stream.send(
+        client,
+        stream.event("approval.requested", 2, lead, activity="waiting_user", wait_kind="question"),
+    )
+    assert agent_state(engine, lead)[:2] == ("WAITING_USER", "waiting_user")
+    assert wait_kind(engine, lead) == "question"
+
+    stream.send(client, stream.event("tool.completed", 3, lead))
+    assert wait_kind(engine, lead) is None
+
+    # 종류 없이 오면(이전 Collector) 권한 승인.
+    stream.send(client, stream.event("approval.requested", 4, lead, activity="waiting_user"))
+    assert wait_kind(engine, lead) == "permission"
+
+    # 승인 대기 중 종류만 바뀌어도 반영된다(화면 상태가 바뀌었으므로 상태 버전도 오른다).
+    _, _, version = agent_state(engine, lead)
+    stream.send(
+        client,
+        stream.event(
+            "approval.requested", 5, lead, activity="waiting_user", wait_kind="plan_review"
+        ),
+    )
+    assert wait_kind(engine, lead) == "plan_review"
+    assert agent_state(engine, lead)[2] == version + 1
+
+
+def test_wait_kind_only_on_approval_requested(
+    client: TestClient, engine: Engine, device: dict[str, str]
+) -> None:
+    stream, lead = Stream(device), uuid.uuid4()
+    response = client.post(
+        "/api/v1/events/batch",
+        json={
+            "schema_version": "1.0",
+            "events": [stream.event("tool.started", 1, lead, wait_kind="question")],
+        },
+        headers=bearer(device["device_token"]),
+    )
+    assert response.status_code == 422
 
 
 def test_late_events_do_not_rewind_current_state(
