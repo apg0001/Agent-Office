@@ -53,6 +53,9 @@ export interface SessionState {
   change_seq: number;
 }
 
+/** 승인 대기 종류(#262): 권한 승인·질문(선택지)·계획 확인. */
+export type WaitKind = "permission" | "question" | "plan_review";
+
 export interface AgentState {
   id: string;
   session_id: string;
@@ -62,6 +65,8 @@ export interface AgentState {
   activity: Activity;
   /** 현재 활동을 만든 이벤트가 관측인지 추정인지. 추정은 화면에서 구분해 그린다. */
   confidence: "observed" | "inferred";
+  /** 승인 대기일 때 무엇을 기다리는지(#262). 승인 대기가 아니거나 이전 서버면 없음(= 권한 승인). */
+  wait_kind?: WaitKind | null;
   state_version: number;
   started_at: string | null;
   ended_at: string | null;

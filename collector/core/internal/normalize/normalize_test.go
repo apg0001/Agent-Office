@@ -277,3 +277,27 @@ func TestKeyedEventIDsAreDeterministicKeylessAreRandom(t *testing.T) {
 		t.Fatal("keyless ids must be random UUIDs")
 	}
 }
+
+// wait_kind는 approval.requested에만 붙고 도구 분류에서 정한다(#262).
+func TestWaitKindOnlyOnApprovalRequested(t *testing.T) {
+	n := newNormalizer(t, Options{})
+	cases := []struct {
+		event    adapter.EventType
+		category adapter.ToolCategory
+		want     string
+	}{
+		{adapter.EventApprovalRequested, adapter.ToolQuestion, "question"},
+		{adapter.EventApprovalRequested, adapter.ToolPlan, "plan_review"},
+		{adapter.EventApprovalRequested, adapter.ToolEdit, "permission"},
+		{adapter.EventApprovalRequested, adapter.ToolNone, "permission"},
+		{adapter.EventToolStarted, adapter.ToolQuestion, ""},
+	}
+	for _, tc := range cases {
+		c := verifiedCandidate(tc.event)
+		c.ToolCategory = tc.category
+		ev := mustAccept(t, n, Input{Candidate: c, ObservedAt: observed})
+		if ev.WaitKind != tc.want {
+			t.Fatalf("%s/%s: wait_kind %q, want %q", tc.event, tc.category, ev.WaitKind, tc.want)
+		}
+	}
+}

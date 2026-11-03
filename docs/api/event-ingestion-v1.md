@@ -28,7 +28,7 @@
 
 `source`가 `inferred`이면 `confidence`도 반드시 `inferred`입니다. 반대로 JSONL 등 관측 소스에서 불완전한 증거로 추정한 경우에는 해당 소스를 유지하면서 `confidence: inferred`를 사용할 수 있습니다.
 
-위 필드는 모두 필수이고 아래 선택 필드(`plan_steps`, `workspace_name`) 밖의 추가 필드는 거부됩니다. 따라서 프롬프트, 코드, 파일 본문·경로, 도구 입출력, 전체 명령, 사용자/소유자 식별자를 이 계약으로 전송할 수 없습니다. 이벤트에 메타데이터를 추가하려면 별도 개인정보·호환성 심사와 새 스키마 버전이 필요합니다.
+위 필드는 모두 필수이고 아래 선택 필드(`plan_steps`, `workspace_name`, `wait_kind`) 밖의 추가 필드는 거부됩니다. 따라서 프롬프트, 코드, 파일 본문·경로, 도구 입출력, 전체 명령, 사용자/소유자 식별자를 이 계약으로 전송할 수 없습니다. 이벤트에 메타데이터를 추가하려면 별도 개인정보·호환성 심사와 새 스키마 버전이 필요합니다.
 
 ### 계획 단계(`plan_steps`, #38)
 
@@ -56,6 +56,21 @@
 - 세션 이름이 있으면 서버는 장치 소유자의 같은 이름 프로젝트를 찾거나 만들어(`origin: "workspace"`) 세션을 넣습니다. 사용자가 직접 정한 배정이 있으면 바꾸지 않습니다(#197, `docs/api/teams-v1.md`).
 - 필드가 없는 이벤트의 `payload_digest`는 필드 추가 전과 같습니다. 같은 `event_id`로 이름만 다르게 보내면 `event_id_conflict`입니다.
 - 이전 서버는 `additionalProperties: false` 때문에 이 이벤트를 거부합니다. 서버를 먼저 올린 뒤 Collector에서 켭니다. 이전 Collector는 이 필드를 보내지 않으므로 그대로 동작합니다.
+
+### 승인 대기 종류(`wait_kind`, #262)
+
+`approval.requested`에만 붙는 선택 enum입니다. 사용자에게 무엇을 기다리는지만 나타내고 도구 이름·질문 문장·계획 본문은 담지 않습니다.
+
+| 값 | 뜻 | Claude 근거(2.1.310 대화형 실측) |
+|---|---|---|
+| `permission` | 도구 실행 권한 승인 | `PermissionRequest`의 `tool_name`이 아래 둘이 아닌 경우 |
+| `question` | 질문·선택지에 대한 답 | `PermissionRequest` `tool_name` = `AskUserQuestion` |
+| `plan_review` | 계획 확인(계획 모드 종료 승인) | `PermissionRequest` `tool_name` = `ExitPlanMode` 등 계획 도구 |
+
+- 다른 이벤트 유형에 붙으면 요청 전체가 `422`입니다. 값이 없는 승인 요청(이전 Collector, Codex)은 `permission`으로 봅니다.
+- 필드가 없는 이벤트의 `payload_digest`는 필드 추가 전과 같습니다.
+- 이전 서버는 이 필드를 거부하므로 서버를 먼저 올린 뒤 Collector를 올립니다.
+- 사용자가 권한을 거절하면 Claude는 이후 Hook을 보내지 않으므로(실측) 다음 프롬프트까지 승인 대기로 남습니다.
 
 ## 부모-자식 관계
 

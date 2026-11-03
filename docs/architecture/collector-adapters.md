@@ -44,7 +44,7 @@ Codex·Claude Hook stdin과 Claude transcript JSONL 한 줄을 제공자 중립 
 | `PreToolUse` | `tool.started` | 같음 |
 | `PostToolUse` | `tool.completed` | Desktop 런타임과 PostToolUse를 관측한 CLI 실측 대상(#170 `0.163.0` `linux` `exec`)과 정확히 같은 런타임만 `tool.completed`. 그 밖의 CLI·미상 런타임은 `unknown`(#17 Windows `0.162` exec 미관측) |
 | `PostToolUseFailure` | `tool.failed`(미관측이라 `unverified`) | 매핑 없음 → `unknown` |
-| `PermissionRequest` | `approval.requested`(키 없음) | 같음 |
+| `PermissionRequest` | `approval.requested`(키 없음). `tool_name`으로 `wait_kind`: `AskUserQuestion` → `question`, `ExitPlanMode`·계획 도구 → `plan_review`, 그 밖 → `permission`(#262, 2.1.310 대화형 실측) | 같음(항상 `permission`) |
 | `SubagentStart` / `SubagentStop` | `agent.started` / `agent.completed`(키 `agent_id`) | 같음 |
 | 그 밖의 이름 | `unknown`(세션·턴 참조만, `unverified`) | 같음 |
 

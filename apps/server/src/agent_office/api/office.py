@@ -105,6 +105,7 @@ def _agent_rows(connection: Connection, session_ids: list[uuid.UUID], extra: Any
                 states.c.turn_state,
                 states.c.activity,
                 states.c.confidence,
+                states.c.wait_kind,
                 states.c.state_version,
                 states.c.change_seq,
             )
@@ -160,6 +161,8 @@ def _agent_json(row: Row[Any]) -> dict[str, Any]:
         "turn_state": row.turn_state,
         "activity": row.activity,
         "confidence": row.confidence,
+        # 승인 대기 종류(#262): permission·question·plan_review. 승인 대기가 아니면 null.
+        "wait_kind": row.wait_kind,
         "state_version": row.state_version,
         "started_at": _iso(row.started_at),
         "ended_at": _iso(row.ended_at),

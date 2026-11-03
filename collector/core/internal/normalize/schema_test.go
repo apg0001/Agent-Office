@@ -194,7 +194,7 @@ func TestEventKeySetEqualsSchemaRequiredAndProperties(t *testing.T) {
 	}
 	required := append([]string(nil), s.Required...)
 	sort.Strings(required)
-	// 선택 필드가 없으면 필수 필드만, 있으면 스키마 속성 전부(plan_steps #38, workspace_name #181).
+	// 선택 필드가 없으면 필수 필드만, 있으면 스키마 속성 전부(plan_steps #38, workspace_name #181, wait_kind #262).
 	for _, ev := range []Event{sampleEvent(), {}} {
 		if got := marshalKeys(ev); fmt.Sprint(got) != fmt.Sprint(required) {
 			t.Fatalf("event keys %v, required %v", got, required)
@@ -203,6 +203,7 @@ func TestEventKeySetEqualsSchemaRequiredAndProperties(t *testing.T) {
 	withPlan := sampleEvent()
 	withPlan.EventType, withPlan.PlanSteps = "plan.updated", []string{"completed", "pending"}
 	withPlan.WorkspaceName = "Agent-Office" // 선택 필드(#181)
+	withPlan.WaitKind = "question"          // 선택 필드(#262)
 	if got := marshalKeys(withPlan); fmt.Sprint(got) != fmt.Sprint(keys(s.Properties)) {
 		t.Fatalf("event keys %v, properties %v", got, keys(s.Properties))
 	}
