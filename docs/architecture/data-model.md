@@ -39,7 +39,7 @@ erDiagram
     users |o--o{ audit_logs : "행위자(SET NULL)"
 ```
 
-실시간 전달(#37)을 위해 마이그레이션 `0003`이 전역 시퀀스 `state_change_seq`와 `agent_sessions.change_seq·changed_at`, `agent_current_states.change_seq`를 추가했습니다. 화면에 보이는 값이 바뀔 때만 증가합니다. 마이그레이션 `0004`는 현재 활동의 관측·추정 구분 `agent_current_states.confidence`를 추가했습니다(#47). 마이그레이션 `0008`은 세션 작업 폴더 이름 `agent_sessions.workspace_name`을 추가했습니다(#181). 마이그레이션 `0009`는 팀원별 공유 범위 `team_members.share_mode`(`all`·`selected`·`none`, 기존 행은 `selected`, 이후 기본 `all`), 프로젝트 출처 `projects.origin`(`manual`·`workspace`), 직접 정한 배정 표시 `agent_sessions.project_manual`(기존에 프로젝트가 있던 세션은 `true`)을 추가했습니다(#197). 다운그레이드 가능하며 내려가면 세 컬럼이 지워집니다(공유 범위 선택이 사라지고 #54 규칙으로 돌아감).
+실시간 전달(#37)을 위해 마이그레이션 `0003`이 전역 시퀀스 `state_change_seq`와 `agent_sessions.change_seq·changed_at`, `agent_current_states.change_seq`를 추가했습니다. 화면에 보이는 값이 바뀔 때만 증가합니다. 마이그레이션 `0004`는 현재 활동의 관측·추정 구분 `agent_current_states.confidence`를 추가했습니다(#47). 마이그레이션 `0008`은 세션 작업 폴더 이름 `agent_sessions.workspace_name`을 추가했습니다(#181). 마이그레이션 `0009`는 팀원별 공유 범위 `team_members.share_mode`(`all`·`selected`·`none`, 기존 행은 `selected`, 이후 기본 `all`), 프로젝트 출처 `projects.origin`(`manual`·`workspace`), 직접 정한 배정 표시 `agent_sessions.project_manual`(기존에 프로젝트가 있던 세션은 `true`)을 추가했습니다(#197). 다운그레이드 가능하며 내려가면 세 컬럼이 지워집니다(공유 범위 선택이 사라지고 #54 규칙으로 돌아감). 마이그레이션 `0010`은 승인 대기 종류 `agent_current_states.wait_kind`(`permission`·`question`·`plan_review`, 승인 대기가 아니면 NULL)를 추가했습니다(#262). 기존 행은 NULL이고 화면은 권한 승인으로 봅니다.
 
 `instance_settings`와 `notification_channels`는 인스턴스 전역 테이블입니다. 마스터 사양의 `schema_migrations`는 Alembic의 `alembic_version` 테이블이 맡습니다.
 

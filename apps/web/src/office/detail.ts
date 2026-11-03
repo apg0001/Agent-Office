@@ -84,6 +84,13 @@ export const TURN_LABELS: Record<string, string> = {
   UNKNOWN: "알 수 없음",
 };
 
+/** 승인 대기 종류(#262). 종류가 없으면 권한 승인. */
+export const WAIT_LABELS: Record<string, string> = {
+  permission: "권한 승인 대기",
+  question: "질문 답변 대기",
+  plan_review: "계획 확인 대기",
+};
+
 export const ACTIVITY_LABELS: Record<string, string> = {
   reading: "읽기",
   browsing: "탐색",

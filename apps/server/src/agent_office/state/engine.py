@@ -103,6 +103,24 @@ def next_activity(
     return current
 
 
+WAIT_KINDS = ("permission", "question", "plan_review")
+
+
+def next_wait_kind(
+    previous: str | None, changed: AgentActivity, event_type: str, wait_kind: str | None
+) -> str | None:
+    """대기 종류(#262): 승인 대기에서만 값이 있다.
+
+    승인 요청이 종류를 정하고(종류 없이 보내는 이전 Collector는 권한으로 본다),
+    승인 대기를 벗어나면 비운다.
+    """
+    if changed.turn_state != "WAITING_USER":
+        return None
+    if event_type == "approval.requested":
+        return wait_kind if wait_kind in WAIT_KINDS else "permission"
+    return previous or "permission"
+
+
 def is_newer(
     occurred_at: dt.datetime,
     sequence: int,

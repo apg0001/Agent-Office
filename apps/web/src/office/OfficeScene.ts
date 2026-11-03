@@ -18,7 +18,7 @@ import {
 } from "./camera";
 import { BUBBLE_ORIGIN, LAB_PIXEL_ART, type PixelPiece, labColor, pixelTextureKey } from "./lab";
 import { findPath } from "./pathfinding";
-import { headlineFor, idleHeadline } from "./headline";
+import { headlineFor, idleHeadline, waitMark } from "./headline";
 import { BADGE_LABELS, idleCycle, presenceOf } from "./presence";
 import { type DisplayedZone, nextDisplayedZone } from "./smoothing";
 import {
@@ -351,8 +351,8 @@ export class OfficeScene extends Phaser.Scene {
     // 실제 목적지는 모든 캐릭터의 원하는 칸을 모아 겹치지 않게 나눈 뒤 정한다(assignTargets).
     actor.want = target;
     actor.wantFixed = actor.agent.role === "lead" && actor.displayed.zone === "desk" && this.seats.has(actor.agent.session_id);
-    // 머리 위 표시는 관측된 승인 대기("!")만. 추정 여부는 상세 패널에서 보여 준다.
-    actor.marker.setVisible(actor.agent.turn_state === "WAITING_USER");
+    // 머리 위 표시는 관측된 승인 대기만: 질문은 "?", 권한 승인·계획 확인은 "!"(#262). 추정 여부는 상세 패널에서.
+    actor.marker.setText(waitMark(actor.agent)).setVisible(actor.agent.turn_state === "WAITING_USER");
   }
 
   /** 원하는 칸들을 겹치지 않게 나누고, 바뀐 캐릭터만 지금 칸에서 다시 경로를 찾는다(#194). */
@@ -477,7 +477,7 @@ export class OfficeScene extends Phaser.Scene {
     const look = lookFor(session?.provider);
     const sprite = this.add.image(0, 0, this.texture(agent.role, shirt, 0, look)).setOrigin(0.5, 1);
     const top = -sprite.height;
-    // "!"는 관측된 승인 대기.
+    // "!"·"?"는 관측된 승인 대기(#262).
     const marker = this.add
       .text(0, top - 8, "!", { fontFamily: MAP_FONT, fontSize: "12px", color: "#ffcd4a" })
       .setOrigin(0.5)

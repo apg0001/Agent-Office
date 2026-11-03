@@ -87,6 +87,8 @@ def test_event_contract_has_only_reviewed_fields() -> None:
         "plan_steps",
         # 작업 폴더 마지막 이름. PC별 동의 시에만, 경로 구분자·제어 문자 없음(#181).
         "workspace_name",
+        # approval.requested에서만 쓰는 대기 종류 enum. 도구 이름 원문은 담지 않는다(#262).
+        "wait_kind",
     }
     assert EVENT_SCHEMA["additionalProperties"] is False
     plan = EVENT_SCHEMA["properties"]["plan_steps"]
@@ -96,6 +98,13 @@ def test_event_contract_has_only_reviewed_fields() -> None:
     assert workspace["type"] == "string"
     assert (workspace["minLength"], workspace["maxLength"]) == (1, 64)
     assert "workspace_name" not in EVENT_SCHEMA["required"]
+    wait = EVENT_SCHEMA["properties"]["wait_kind"]
+    assert wait == {
+        **wait,
+        "type": "string",
+        "enum": ["permission", "question", "plan_review"],
+    }
+    assert "wait_kind" not in EVENT_SCHEMA["required"]
 
 
 @pytest.mark.parametrize(

@@ -6,6 +6,7 @@ import {
   LIFECYCLE_LABELS,
   PLAN_LABELS,
   TURN_LABELS,
+  WAIT_LABELS,
   label,
   relativeTime,
   type AgentDetail,
@@ -19,6 +20,13 @@ interface Props {
   now: number;
   onClose: () => void;
   onSelect: (agentId: string) => void;
+}
+
+/** 턴 상태. 승인 대기는 무엇을 기다리는지(권한·질문·계획 확인, #262)로 보여 준다. */
+function turnLabel(agent: AgentState): string {
+  return agent.turn_state === "WAITING_USER"
+    ? label(WAIT_LABELS, agent.wait_kind ?? "permission")
+    : label(TURN_LABELS, agent.turn_state);
 }
 
 function roleLabel(agent: AgentState): string {
@@ -51,7 +59,7 @@ export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
 
   const related = (other: AgentState) => (
     <button type="button" className="link-button" onClick={() => onSelect(other.id)}>
-      {roleLabel(other)} {shortId(other.id)} · {label(TURN_LABELS, other.turn_state)}
+      {roleLabel(other)} {shortId(other.id)} · {turnLabel(other)}
     </button>
   );
 
@@ -69,7 +77,7 @@ export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
       <dl>
         <dt>상태</dt>
         <dd>
-          {label(TURN_LABELS, agent.turn_state)} · {label(ACTIVITY_LABELS, agent.activity)}
+          {turnLabel(agent)} · {label(ACTIVITY_LABELS, agent.activity)}
           {agent.confidence === "inferred" && <span className="inferred"> (추정)</span>}
         </dd>
         <dt>세션</dt>

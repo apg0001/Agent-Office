@@ -249,6 +249,8 @@ func toolCategory(name string) (adapter.ToolCategory, adapter.Activity) {
 		return adapter.ToolShell, adapter.ActivityUnknown
 	case "TodoWrite", "ExitPlanMode", "EnterPlanMode":
 		return adapter.ToolPlan, adapter.ActivityUnknown
+	case "AskUserQuestion":
+		return adapter.ToolQuestion, adapter.ActivityUnknown
 	}
 	if strings.HasPrefix(name, "mcp__") {
 		return adapter.ToolMCP, adapter.ActivityUnknown

@@ -93,6 +93,8 @@ ACTIVITIES = (
     "unknown",
 )
 CONFIDENCES = ("observed", "inferred")
+# 승인 대기 종류(#262). 도구 이름 원문이 아니라 분류만 저장한다.
+WAIT_KINDS = ("permission", "question", "plan_review")
 SESSION_LIFECYCLES = ("DISCOVERED", "OPEN", "ENDED", "UNKNOWN")
 TURN_STATES = ("WORKING", "THINKING", "WAITING_USER", "IDLE", "UNKNOWN")
 AGENT_ROLES = ("lead", "subagent")
@@ -524,6 +526,8 @@ agent_current_states = Table(
     Column("activity", String(16), nullable=False, server_default="unknown"),
     # 현재 활동을 만든 이벤트의 신뢰도. 화면이 추정 상태를 관측과 구분해 그린다(#47).
     Column("confidence", String(16), nullable=False, server_default="observed"),
+    # 승인 대기 종류(#262). WAITING_USER일 때만 값이 있다.
+    Column("wait_kind", String(16), nullable=True),
     # 늦게 도착한 과거 이벤트가 현재 상태를 되돌리지 않도록 비교하는 기준.
     Column("state_version", BigInteger, nullable=False, server_default="0"),
     Column("last_event_occurred_at", DateTime(timezone=True), nullable=True),
@@ -538,6 +542,7 @@ agent_current_states = Table(
     CheckConstraint(_in("turn_state", TURN_STATES), name="turn_state"),
     CheckConstraint(_in("activity", ACTIVITIES), name="activity"),
     CheckConstraint(_in("confidence", CONFIDENCES), name="confidence"),
+    CheckConstraint(_in("wait_kind", WAIT_KINDS), name="wait_kind"),
     CheckConstraint("state_version >= 0", name="state_version_non_negative"),
 )
 
