@@ -160,6 +160,12 @@ func ParseHookWith(data []byte, rt adapter.Runtime, opts adapter.HookOptions) (c
 			return adapter.Candidate{}, adapter.ErrMissingRef
 		}
 		c.ToolCategory, c.Activity = toolCategory(obj.String("tool_name"))
+		if c.ToolCategory == adapter.ToolShell {
+			// 명령 원문은 분류에만 쓰고 후보에 남기지 않는다(#280).
+			if input, ok := obj.Object("tool_input"); ok {
+				c.Activity = adapter.ShellActivity(input)
+			}
+		}
 		if obj.String("tool_name") == planTool {
 			c.Plan = updatePlan(obj, rt)
 		}
@@ -199,7 +205,7 @@ func toolCategory(name string) (adapter.ToolCategory, adapter.Activity) {
 	case "apply_patch":
 		return adapter.ToolEdit, adapter.ActivityCoding
 	case "update_plan":
-		return adapter.ToolPlan, adapter.ActivityUnknown
+		return adapter.ToolPlan, adapter.ActivityPlanning
 	}
 	if strings.HasPrefix(name, "mcp__") {
 		return adapter.ToolMCP, adapter.ActivityUnknown

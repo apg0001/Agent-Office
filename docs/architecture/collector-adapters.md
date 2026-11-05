@@ -66,7 +66,7 @@ transcript(Claude)는 `assistant`의 `tool_use` → `tool.started`, `user`의 `t
 
 ## 활동(activity) 분류
 
-보수적으로 이름이 명확한 도구만 분류합니다. Bash는 테스트·빌드·임의 명령을 구분할 수 없어 `unknown`입니다.
+보수적으로 이름이 명확한 도구만 분류합니다. Bash(셸)는 명령을 **PC 안에서만** 보고 테스트 실행이면 `testing`, 그 밖은 `unknown`입니다(#280). 명령 원문·실행 파일 이름·인자는 후보·대기열·서버·로그 어디에도 남지 않고 activity enum 하나만 나갑니다.
 
 | 제공자 | 도구 이름 | 분류 / activity |
 |---|---|---|
@@ -75,13 +75,15 @@ transcript(Claude)는 `assistant`의 `tool_use` → `tool.started`, `user`의 `t
 | Claude | `Edit`, `MultiEdit`, `Write`, `NotebookEdit` | `edit` / `coding` |
 | Claude | `WebSearch`, `WebFetch` | `web` / `browsing` |
 | Claude | `Agent`, `Task` | `delegate` / `delegating` |
-| Claude | `Bash` | `shell` / `unknown` |
-| Claude | `TodoWrite`, `ExitPlanMode`, `EnterPlanMode` | `plan` / `unknown`(계획 모드 미실측) |
-| Codex | `Bash` | `shell` / `unknown` |
+| Claude | `Bash` | `shell` / 테스트 명령이면 `testing`, 아니면 `unknown` |
+| Claude | `TodoWrite`, `ExitPlanMode`, `EnterPlanMode` | `plan` / `planning`(#280) |
+| Codex | `Bash` | `shell` / 테스트 명령이면 `testing`, 아니면 `unknown`(문자열·`["bash","-lc",…]` 배열 모두) |
 | Codex | `apply_patch` | `edit` / `coding`(이름 기반, 미관측) |
-| Codex | `update_plan` | `plan` / `unknown` |
+| Codex | `update_plan` | `plan` / `planning`(#280) |
 | 공통 | `mcp__*` | `mcp` / `unknown` |
 | 공통 | 그 밖의 이름 | `other` / `unknown` |
+
+테스트 명령 판정(`adapter.ShellActivity`): `&&`·`||`·`;`·`|`·줄바꿈·괄호로 나눈 명령 중 하나라도 테스트면 `testing`. 앞의 환경 변수 대입·`sudo`·`env`·`time`·`npx`·`bunx`·`uv run`·`poetry run`·`bundle exec`·`bash -c` 등은 건너뜁니다. 테스트로 보는 것: `pytest`·`vitest`·`jest`·`mocha`·`tox`·`nox`·`phpunit`·`rspec`·`ctest` 등 실행 파일, `python -m pytest|unittest`, `go`·`cargo`·`dotnet`·`mvn`·`gradle`·`deno`·`bun`·`swift`·`flutter`·`playwright` 등의 `test` 하위 명령, `npm`·`yarn`·`pnpm`의 `test`·`t`·`run test*`, `make test|check`. 16KiB보다 긴 명령은 분류하지 않습니다.
 
 Codex 하위 에이전트 관리 도구 이름은 #18에서 확정되지 않아 분류하지 않습니다. 도구 이벤트가 아닌 후보의 activity는 `unknown`이며, 상태 의미 부여는 #32 정규화·상태 엔진이 맡습니다.
 

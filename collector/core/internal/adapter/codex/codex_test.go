@@ -163,7 +163,7 @@ func TestCodexErrorsAndUnknown(t *testing.T) {
 func TestCodexToolCategory(t *testing.T) {
 	cases := map[string]adapter.Activity{
 		"Bash": adapter.ActivityUnknown, "apply_patch": adapter.ActivityCoding,
-		"update_plan": adapter.ActivityUnknown, "mcp__x__y": adapter.ActivityUnknown,
+		"update_plan": adapter.ActivityPlanning, "mcp__x__y": adapter.ActivityUnknown,
 		"spawn_agent": adapter.ActivityUnknown, "Read": adapter.ActivityUnknown,
 	}
 	for name, want := range cases {
