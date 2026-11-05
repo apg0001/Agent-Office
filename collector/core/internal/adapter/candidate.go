@@ -49,6 +49,7 @@ const (
 	ActivityReading    Activity = "reading"
 	ActivityBrowsing   Activity = "browsing"
 	ActivityCoding     Activity = "coding"
+	ActivityTesting    Activity = "testing"
 	ActivityPlanning   Activity = "planning"
 	ActivityDelegating Activity = "delegating"
 	ActivityUnknown    Activity = "unknown"

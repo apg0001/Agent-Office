@@ -129,6 +129,12 @@ func ParseHookWith(data []byte, rt adapter.Runtime, opts adapter.HookOptions) (c
 			return adapter.Candidate{}, adapter.ErrMissingRef
 		}
 		c.ToolCategory, c.Activity = toolCategory(obj.String("tool_name"))
+		if c.ToolCategory == adapter.ToolShell {
+			// 명령 원문은 분류에만 쓰고 후보에 남기지 않는다(#280).
+			if input, ok := obj.Object("tool_input"); ok {
+				c.Activity = adapter.ShellActivity(input)
+			}
+		}
 		if eventType != adapter.EventToolFailed && obj.String("tool_name") == planTool {
 			if input, ok := obj.Object("tool_input"); ok {
 				c.Plan = todoPlan(input, rt)
@@ -190,6 +196,11 @@ func ParseTranscriptLine(line []byte, rt adapter.Runtime) (out []adapter.Candida
 				c.EventType = adapter.EventToolStarted
 				c.ToolUseRef = ref
 				c.ToolCategory, c.Activity = toolCategory(block.String("name"))
+				if c.ToolCategory == adapter.ToolShell {
+					if input, ok := block.Object("input"); ok {
+						c.Activity = adapter.ShellActivity(input)
+					}
+				}
 				if block.String("name") == planTool {
 					if input, ok := block.Object("input"); ok {
 						c.Plan = todoPlan(input, rt)
@@ -230,7 +241,7 @@ func todoPlan(input adapter.Object, rt adapter.Runtime) *adapter.Plan {
 }
 
 // toolCategory는 도구 이름을 보수적으로 분류한다. 이름 원문은 반환하지 않는다.
-// Bash는 테스트·빌드·임의 명령을 구분할 수 없어 activity unknown이다.
+// Bash는 여기서 unknown이고, 도구 이벤트에서 명령을 PC 안에서만 보고 테스트면 testing으로 바꾼다(#280).
 func toolCategory(name string) (adapter.ToolCategory, adapter.Activity) {
 	switch name {
 	case "":
@@ -248,7 +259,7 @@ func toolCategory(name string) (adapter.ToolCategory, adapter.Activity) {
 	case "Bash":
 		return adapter.ToolShell, adapter.ActivityUnknown
 	case "TodoWrite", "ExitPlanMode", "EnterPlanMode":
-		return adapter.ToolPlan, adapter.ActivityUnknown
+		return adapter.ToolPlan, adapter.ActivityPlanning
 	case "AskUserQuestion":
 		return adapter.ToolQuestion, adapter.ActivityUnknown
 	}
