@@ -104,6 +104,8 @@ export class OfficeScene extends Phaser.Scene {
   /** 선택한 캐릭터. 자동 초점이 이 캐릭터를 따라가고 발밑에 강조 고리를 그린다. */
   private focused: string | null = null;
   private ring?: Phaser.GameObjects.Graphics;
+  /** 세션 목록 PC 머리줄에 마우스를 올린 PC(#271). 다른 PC 캐릭터를 흐리게 한다. */
+  private highlighted: string | null = null;
 
   constructor(map: OfficeMap, initial: OfficeState) {
     super("office");
@@ -145,6 +147,24 @@ export class OfficeScene extends Phaser.Scene {
     if (agentId) {
       this.setCamera(resumeAutoFocus(this.camera));
     }
+  }
+
+  /** 한 PC의 캐릭터만 또렷하게 보인다(#271). null이면 모두 원래대로. */
+  highlightDevice(deviceId: string | null): void {
+    this.highlighted = deviceId;
+    for (const actor of this.actors.values()) {
+      if (!actor.leaving) {
+        actor.container.setAlpha(presenceOf(actor.agent, this.state).alpha * this.dimFor(actor));
+      }
+    }
+  }
+
+  private dimFor(actor: Actor): number {
+    if (!this.highlighted) {
+      return 1;
+    }
+    const session = this.state.sessions.find((s) => s.id === actor.agent.session_id);
+    return session?.device_id === this.highlighted ? 1 : 0.3;
   }
 
   /** 자동 초점을 다시 켠다(버튼·F 키). */
@@ -325,7 +345,7 @@ export class OfficeScene extends Phaser.Scene {
       this.startLeaving(actor);
       return;
     }
-    actor.container.setAlpha(view.alpha);
+    actor.container.setAlpha(view.alpha * this.dimFor(actor));
     // 머리 위 짧은 상태: 연결 끊김 같은 존재 배지가 우선, 아니면 지금 활동(#162).
     // 쉬는 중이면 소일거리·수다·졸기·잠 연출(#233).
     const headline = view.badge

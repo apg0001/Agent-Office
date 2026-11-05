@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { SessionList, activeSessions, sortSessions, whoFor } from "./SessionList";
+import { SessionList, activeSessions, groupSessions, sortSessions, whoFor } from "./SessionList";
 import { createSyntheticOffice } from "./synthetic";
 
 describe("active session list (#162)", () => {
@@ -84,5 +84,67 @@ describe("session list sort (#244)", () => {
     };
     const order = sortSessions(activeSessions(mixed), "status").map((item) => item.turnState);
     expect(order).toEqual(["WAITING_USER", "WORKING", "IDLE"]);
+  });
+});
+
+describe("session list PC groups (#271)", () => {
+  const state = createSyntheticOffice({ sessions: 4, subagentsPerSession: 0 });
+  state.devices = [
+    { id: "pi", name: "Pi", connection: "ONLINE" as const },
+    { id: "win", name: "Win", connection: "ONLINE" as const },
+  ];
+  const place = [
+    ["win", "blog"],
+    ["pi", "Agent-Office"],
+    ["pi", "infra"],
+    ["pi", "Agent-Office"],
+  ] as const;
+  state.sessions = state.sessions.map((s, i) => ({
+    ...s,
+    device_id: place[i]![0],
+    workspace_name: place[i]![1],
+    started_at: `2026-11-06T0${i}:00:00Z`,
+  }));
+  const leads = state.agents.filter((a) => a.role === "lead");
+  const turn = ["IDLE", "WORKING", "IDLE", "WAITING_USER"] as const;
+  const mixed = {
+    ...state,
+    agents: state.agents.map((a) => (a.role === "lead" ? { ...a, turn_state: turn[leads.indexOf(a)]! } : a)),
+  };
+
+  it("puts the PC with a waiting session first and summarises it", () => {
+    const groups = groupSessions(sortSessions(activeSessions(mixed), "status"));
+    expect(groups.map((g) => [g.deviceId, g.status, g.count, g.waiting])).toEqual([
+      ["pi", "waiting", 3, 1],
+      ["win", "idle", 1, 0],
+    ]);
+  });
+
+  it("adds a project heading only when a PC has two sessions of it", () => {
+    const pi = groupSessions(sortSessions(activeSessions(mixed), "started"))[1]!;
+    expect(pi.projects.map((p) => [p.workspace, p.rows.length])).toEqual([
+      ["Agent-Office", 2],
+      [null, 1],
+    ]);
+  });
+
+  it("does not group sessions without a name", () => {
+    const blank = { ...mixed, sessions: mixed.sessions.map((s) => ({ ...s, workspace_name: null, project_name: null })) };
+    const pi = groupSessions(activeSessions(blank)).find((g) => g.deviceId === "pi")!;
+    expect(pi.projects.every((p) => p.workspace === null)).toBe(true);
+  });
+
+  it("renders PC headers and drops the PC name from rows", () => {
+    const html = renderToStaticMarkup(<SessionList state={mixed} onSelect={() => undefined} />);
+    expect(html.match(/class="device-head"/g)).toHaveLength(2);
+    expect(html).toContain("✋1");
+    expect(html).toContain('class="project-name"');
+    expect(html).not.toContain("Pi · ");
+  });
+
+  it("keeps the flat list when there is only one PC", () => {
+    const one = createSyntheticOffice({ sessions: 2, subagentsPerSession: 0 });
+    const html = renderToStaticMarkup(<SessionList state={one} onSelect={() => undefined} />);
+    expect(html).not.toContain("device-head");
   });
 });
