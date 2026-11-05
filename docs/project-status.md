@@ -301,6 +301,7 @@
 215. 0.1.0-beta.5 게시·운영 반영(main `bcf92fa`, DB 0009, Pi Collector beta.5). 열린 Issue 0개로 정리(#62 실사용 근거 기록 후 종료, #87 보류 종료, #184 원인=sudo로 실행한 세션의 root 소유 transcript, PR #254 status 안내). #255 PWA: 매니페스트·최소 서비스 워커(`/assets/` 등 정적 파일만 캐시, `/api/`·HTML 캐시 안 함)·픽셀 캐릭터 아이콘(`apps/web/scripts/icons.mjs`로 생성)·반응형(캔버스가 ResizeObserver·회전·전체 화면에 맞춰 크기 조정, 높이 `mapHeight` 300~560px, 720px 이하·높이 500px 이하에서 세션 목록 지도 아래, 핀치 확대, 폰 표 가로 스크롤). 320×568·390×844·844×390·768×1024·1400×1000 스크린샷과 전체 화면 전환에서 가로 넘침 0. headless Chromium `Page.getInstallabilityErrors` 오류 0 확인, 실기기(Android·iPhone·Windows·macOS) 설치는 미확인.
 216. 0.1.0-beta.6 게시·운영 반영(main `6715efa`, server `sha256:f13e92b6…`, web `sha256:1375946d…`, DB 0009, Pi Collector beta.6, server Release 소유자 생성). 소유자 아이폰 PWA: 처음에 "인증서 유효하지 않음"(서버 체인 YE1→Root YE→X2→X1은 테일넷·Funnel 모두 검증 통과)이었으나 일시 오류로 해소, 설치·접속 확인(2026-11-03). #262 승인 대기 종류: Claude 2.1.310 대화형 실측으로 질문(AskUserQuestion)·계획 확인(ExitPlanMode)·권한 모두 `PermissionRequest`에 `tool_name`이 옴, 거절 뒤에는 Hook 없음. 이벤트 선택 필드 `wait_kind`, 마이그레이션 0010 `agent_current_states.wait_kind`, 웹 ❓/📋/✋ 표시.
 217. 0.1.0-beta.7 게시·운영 반영(main `09f6101`, server `sha256:64a93ca5…`, web `sha256:43c48940…`, DB 0010). Collector 게시 실행 41658660850 전 작업 성공, `sha256sum -c SHA256SUMS` 16개 OK, beta 채널 manifest 0.1.0-beta.7, Pi Collector beta.7(linux/arm64) 설치·서비스 active, 역병합 #268(2026-11-04). server Release는 소유자 생성 대기.
+218. #271 활성 세션 목록 PC별 묶음(웹만, Collector·서버 변경 없음): PC 머리줄(가장 급한 상태 점·세션 수·✋ 승인 대기 수, 접기는 `agentOffice.sessionCollapsed`에 기억), PC 순서는 정렬에서 처음 나온 자리, 같은 PC에 같은 프로젝트가 2개 이상이면 소제목(이름 없는 세션은 묶지 않음), PC 1대면 예전 한 줄 목록. 머리줄 마우스 올림·포커스 시 다른 PC 캐릭터 투명도 0.3. 1400×900·390×844 스크린샷 가로 넘침 0.
 
 ## 이번 변경 요약(#22)
 
@@ -387,10 +388,11 @@
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
 4. 진행 순서(자율, 2026-10-26 갱신):
-   1. 0.1.0-beta.7 마무리: 소유자 `gh release create server-v0.1.0-beta.7 --target 09f61011b68b75dc809a7b25a6223b3236a1c989 --prerelease --title "Agent Office 0.1.0-beta.7" --notes-file docs/releases/0.1.0-beta.7.md`. Pi에서 대화형 `claude`로 AskUserQuestion·계획 모드(ExitPlanMode)를 띄워 운영 화면 머리 위 `?`와 패널 ❓ 질문 대기·📋 계획 확인 대기 표시를 확인한다.
-   2. 소유자 결정(2026-10-28): 이메일 확인 없이 승인 옵션·주소 변경·SMTP는 하지 않음(신경 쓰지 않아도 됨).
-   3. macOS 사용자는 beta.3 설치 파일로 GUI 마법사(#204 수정) 실사용 확인.
-   4. 후속: #177 트레이 종료 간헐 실패, 트레이 "동기화"(Core flush 명령), 업데이트 알림(#44), macOS·Windows Codex 실기 확인, 서명 비용 결정(#42), #62·#87 소유자 장비.
+   1. #271 병합 뒤 웹 배포(0.1.0-beta.8, 서버 변경 없음): 릴리스 노트 PR → `[release]` main PR → `gh workflow run publish-images.yml --ref main -f version=0.1.0-beta.8`(소유자 승인) → `./deploy/upgrade.sh --server … --web … --env-file deploy/.env.production --yes`. Collector 게시는 하지 않는다.
+   2. 0.1.0-beta.7 마무리: 소유자 `gh release create server-v0.1.0-beta.7 --target 09f61011b68b75dc809a7b25a6223b3236a1c989 --prerelease --title "Agent Office 0.1.0-beta.7" --notes-file docs/releases/0.1.0-beta.7.md`. Pi에서 대화형 `claude`로 AskUserQuestion·계획 모드(ExitPlanMode)를 띄워 운영 화면 머리 위 `?`와 패널 ❓ 질문 대기·📋 계획 확인 대기 표시를 확인한다.
+   3. 소유자 결정(2026-10-28): 이메일 확인 없이 승인 옵션·주소 변경·SMTP는 하지 않음(신경 쓰지 않아도 됨).
+   4. macOS 사용자는 beta.3 설치 파일로 GUI 마법사(#204 수정) 실사용 확인.
+   5. 후속: #177 트레이 종료 간헐 실패, 트레이 "동기화"(Core flush 명령), 업데이트 알림(#44), macOS·Windows Codex 실기 확인, 서명 비용 결정(#42), #62·#87 소유자 장비.
 5. ADR-0002는 "제안됨" 상태다. 소유자 검토 후 상태를 갱신한다. #18 Desktop 결과(`PostToolUse` 관측)도 ADR 근거에 반영할지 검토한다.
 6. GHCR 게시는 소유자가 `image-publish` Environment를 만들고 승인하기 전까지 실행하지 않는다.
 7. 완료: PR #86 병합(16b55d5), #18·Epic #2 종료.

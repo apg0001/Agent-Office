@@ -103,6 +103,7 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
   const [autoFocus, setAutoFocus] = useState(true);
   const resume = useRef<() => void>(() => undefined);
   const focusAgent = useRef<(agentId: string | null) => void>(() => undefined);
+  const highlightDevice = useRef<(deviceId: string | null) => void>(() => undefined);
   const [office, setOffice] = useState<OfficeState | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [remote, setRemote] = useState<AgentDetail | null>(null);
@@ -137,6 +138,7 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       scene.onCameraChange = (camera) => setAutoFocus(camera.autoFocus);
       resume.current = () => scene.resumeFocus();
       focusAgent.current = (agentId) => scene.focusAgent(agentId);
+      highlightDevice.current = (deviceId) => scene.highlightDevice(deviceId);
       scene.onSelect = setSelected;
       game = new Phaser.Game({
         type: Phaser.AUTO,
@@ -358,7 +360,15 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       )}
       <div ref={stage} className={fullscreen ? "office-stage is-fullscreen" : "office-stage"}>
         <div ref={host} className="office-canvas" tabIndex={0} aria-label="사무실 지도" />
-        {!compact && office && <SessionList state={office} onSelect={setSelected} unnamed={scope.kind !== "personal"} selected={selected} />}
+        {!compact && office && (
+          <SessionList
+            state={office}
+            onSelect={setSelected}
+            onHoverDevice={(deviceId) => highlightDevice.current(deviceId)}
+            unnamed={scope.kind !== "personal"}
+            selected={selected}
+          />
+        )}
         {!compact && (
           <button
             type="button"
