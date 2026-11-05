@@ -965,3 +965,88 @@ textarea.domains {
 .download-pair {
   margin: 4px 0;
 }
+
+/* 활성 세션 PC 묶음(#271) */
+.session-list .device-group > ul,
+.session-list .project-group > ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session-list .device-group > ul {
+  padding-left: 10px;
+}
+
+.session-list .device-group + .device-group {
+  margin-top: 4px;
+}
+
+.session-list button.device-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 2px 4px;
+  border-bottom: 2px solid var(--panel-2);
+}
+
+.session-list .device-head .caret {
+  width: 1em;
+  color: var(--muted);
+}
+
+.session-list .device-head .dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--ink);
+  background: #8a8f9c;
+}
+
+.session-list .device-head .dot.waiting {
+  background: #ff9f43;
+}
+
+.session-list .device-head .dot.working {
+  background: var(--green);
+}
+
+.session-list .device-head .device-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-list .device-head .device-count {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.session-list .device-head .device-waiting {
+  padding: 0 3px;
+  border: 1px solid var(--ink);
+  background: #ff9f43;
+  color: #1a1408;
+  font-size: 0.85em;
+}
+
+.session-list .project-name {
+  display: block;
+  margin-top: 4px;
+  padding-left: 6px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.85em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-list .project-group > ul {
+  padding-left: 8px;
+  border-left: 2px solid var(--panel-2);
+  margin-left: 6px;
+}

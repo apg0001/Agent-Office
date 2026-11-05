@@ -13,6 +13,7 @@ const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
 
 export interface ActiveSession {
   session: SessionState;
+  deviceId: string;
   /** 행 맨 앞의 "누구" 이름. 팀·통합은 사람 이름(통합의 내 PC는 "내 이름 · PC 이름", #206), 개인은 PC 이름. */
   deviceName: string;
   leadId: string | null;
@@ -44,6 +45,7 @@ export const SESSION_SORT_LABELS: Record<SessionSort, string> = {
   name: "이름순",
 };
 const SORT_STORAGE_KEY = "agentOffice.sessionSort";
+const COLLAPSED_STORAGE_KEY = "agentOffice.sessionCollapsed";
 
 function byStart(a: ActiveSession, b: ActiveSession): number {
   return (a.session.started_at ?? "").localeCompare(b.session.started_at ?? "") || a.session.id.localeCompare(b.session.id);
@@ -78,6 +80,64 @@ export function sortSessions(list: ActiveSession[], sort: SessionSort): ActiveSe
   }
 }
 
+/** PC 하나의 세션 묶음(#271). 같은 프로젝트 세션이 2개 이상이면 `workspace`로 소제목을 붙인다. */
+export interface SessionGroup {
+  deviceId: string;
+  name: string;
+  /** 가장 급한 상태(대기 → 작업 → 쉼). 머리줄 상태 점 색. */
+  status: "waiting" | "working" | "idle";
+  waiting: number;
+  count: number;
+  projects: { workspace: string | null; rows: ActiveSession[] }[];
+}
+
+const GROUP_STATUS = ["waiting", "working", "idle", "idle"] as const;
+
+/**
+ * 정렬된 목록을 PC별로 묶는다. PC 순서는 정렬에서 그 PC 세션이 처음 나온 자리라 상태순이면
+ * 승인 대기가 있는 PC가 위로 온다. PC 안의 순서도 정렬을 그대로 따른다.
+ */
+export function groupSessions(sorted: ActiveSession[]): SessionGroup[] {
+  const groups = new Map<string, ActiveSession[]>();
+  for (const row of sorted) {
+    groups.set(row.deviceId, [...(groups.get(row.deviceId) ?? []), row]);
+  }
+  return [...groups.entries()].map(([deviceId, rows]) => {
+    // 이름 없는 세션끼리는 묶지 않는다("(이름 없음)" 소제목은 뜻이 없다).
+    const names = rows.map((row) => sessionName(row.session));
+    const repeated = new Set(names.filter((name, i) => name && names.indexOf(name) !== i));
+    const projects: SessionGroup["projects"] = [];
+    rows.forEach((row, i) => {
+      const name = names[i];
+      const shared = name && repeated.has(name) ? name : null;
+      const bucket = shared ? projects.find((project) => project.workspace === shared) : undefined;
+      if (bucket) {
+        bucket.rows.push(row);
+      } else {
+        projects.push({ workspace: shared, rows: [row] });
+      }
+    });
+    const rank = Math.min(...rows.map((row) => statusRank(row.turnState)));
+    return {
+      deviceId,
+      name: rows[0]!.deviceName,
+      status: GROUP_STATUS[rank]!,
+      waiting: rows.filter((row) => row.turnState === "WAITING_USER").length,
+      count: rows.length,
+      projects,
+    };
+  });
+}
+
+function savedCollapsed(): Set<string> {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(COLLAPSED_STORAGE_KEY) ?? "[]");
+    return new Set(Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
 function savedSort(): SessionSort {
   try {
     const value = window.localStorage.getItem(SORT_STORAGE_KEY);
@@ -96,6 +156,7 @@ export function activeSessions(state: OfficeState): ActiveSession[] {
       const lead = agents.find((agent) => agent.role === "lead") ?? null;
       return {
         session,
+        deviceId: session.device_id,
         deviceName: whoFor(state.devices.find((device) => device.id === session.device_id)),
         leadId: lead?.id ?? null,
         turnState: lead?.turn_state ?? null,
@@ -108,22 +169,29 @@ export function activeSessions(state: OfficeState): ActiveSession[] {
 
 /**
  * 사무실 왼쪽 위에 겹쳐 보이는 활성 세션 목록. 누르면 그 세션 대장의 상세를 연다.
+ * PC가 2대 이상이면 PC별로 묶고 머리줄로 접고 편다(#271). PC가 1대면 예전처럼 한 줄 목록.
  * `unnamed`(팀·통합 화면)이면 이름이 없는 세션을 "(이름 없음)"으로 보여 준다(#197).
  * `selected`가 세션 대장이면 그 항목을 강조한다(지도에서도 그 캐릭터를 따라가고 강조).
+ * `onHoverDevice`는 PC 머리줄에 마우스를 올리면 그 PC를, 내리면 null을 알린다(지도 강조).
  */
 export function SessionList({
   state,
   onSelect,
+  onHoverDevice = () => undefined,
   unnamed = false,
   selected = null,
 }: {
   state: OfficeState;
   onSelect: (agentId: string) => void;
+  onHoverDevice?: (deviceId: string | null) => void;
   unnamed?: boolean;
   selected?: string | null;
 }) {
   const [sort, setSort] = useState<SessionSort>(() => (typeof window === "undefined" ? "status" : savedSort()));
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => (typeof window === "undefined" ? new Set() : savedCollapsed()));
   const sessions = sortSessions(activeSessions(state), sort);
+  const groups = groupSessions(sessions);
+  const grouped = groups.length > 1;
   const choose = (next: SessionSort) => {
     setSort(next);
     try {
@@ -131,6 +199,44 @@ export function SessionList({
     } catch {
       // 저장할 수 없으면 이번 화면에서만 쓴다.
     }
+  };
+  const toggle = (deviceId: string) => {
+    const next = new Set(collapsed);
+    if (!next.delete(deviceId)) {
+      next.add(deviceId);
+    }
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify([...next]));
+    } catch {
+      // 저장할 수 없으면 이번 화면에서만 쓴다.
+    }
+  };
+  const row = ({ session, deviceName, leadId, headline, subagents }: ActiveSession, inProject: boolean) => {
+    const workspace = inProject ? "" : sessionName(session, unnamed);
+    return (
+      <li key={session.id}>
+        <button
+          type="button"
+          disabled={!leadId}
+          aria-pressed={leadId !== null && leadId === selected}
+          onClick={() => leadId && onSelect(leadId)}
+        >
+          <span className="who">
+            {grouped ? PROVIDER_LABELS[session.provider] : `${deviceName} · ${PROVIDER_LABELS[session.provider]}`}
+          </span>
+          {workspace && (
+            <span className="workspace" title={workspace}>
+              {shortWorkspace(workspace, 32)}
+            </span>
+          )}
+          <span className="what">
+            {headline}
+            {subagents > 0 && ` · 하위 ${subagents}`}
+          </span>
+        </button>
+      </li>
+    );
   };
   return (
     <aside className="session-list" aria-label="활성 세션">
@@ -146,31 +252,54 @@ export function SessionList({
       </h2>
       {sessions.length === 0 ? (
         <p className="empty">지금 작업 중인 세션이 없습니다</p>
+      ) : !grouped ? (
+        <ul>{groups[0]!.projects.flatMap((project) => project.rows.map((item) => row(item, false)))}</ul>
       ) : (
         <ul>
-          {sessions.map(({ session, deviceName, leadId, headline, subagents }) => {
-            const workspace = sessionName(session, unnamed);
+          {groups.map((group) => {
+            const open = !collapsed.has(group.deviceId);
             return (
-              <li key={session.id}>
+              <li key={group.deviceId} className="device-group">
                 <button
                   type="button"
-                  disabled={!leadId}
-                  aria-pressed={leadId !== null && leadId === selected}
-                  onClick={() => leadId && onSelect(leadId)}
+                  className="device-head"
+                  aria-expanded={open}
+                  onClick={() => toggle(group.deviceId)}
+                  onMouseEnter={() => onHoverDevice(group.deviceId)}
+                  onMouseLeave={() => onHoverDevice(null)}
+                  onFocus={() => onHoverDevice(group.deviceId)}
+                  onBlur={() => onHoverDevice(null)}
                 >
-                  <span className="who">
-                    {deviceName} · {PROVIDER_LABELS[session.provider]}
+                  <span className="caret" aria-hidden="true">
+                    {open ? "▾" : "▸"}
                   </span>
-                  {workspace && (
-                    <span className="workspace" title={workspace}>
-                      {shortWorkspace(workspace, 32)}
+                  <span className={`dot ${group.status}`} aria-hidden="true" />
+                  <span className="device-name" title={group.name}>
+                    {group.name}
+                  </span>
+                  <span className="device-count">{group.count}</span>
+                  {group.waiting > 0 && (
+                    <span className="device-waiting" aria-label={`승인 대기 ${group.waiting}`}>
+                      ✋{group.waiting}
                     </span>
                   )}
-                  <span className="what">
-                    {headline}
-                    {subagents > 0 && ` · 하위 ${subagents}`}
-                  </span>
                 </button>
+                {open && (
+                  <ul>
+                    {group.projects.map((project) =>
+                      project.workspace ? (
+                        <li key={`p:${project.workspace}`} className="project-group">
+                          <span className="project-name" title={project.workspace}>
+                            {shortWorkspace(project.workspace, 28)}
+                          </span>
+                          <ul>{project.rows.map((item) => row(item, true))}</ul>
+                        </li>
+                      ) : (
+                        project.rows.map((item) => row(item, false))
+                      ),
+                    )}
+                  </ul>
+                )}
               </li>
             );
           })}
