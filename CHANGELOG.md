@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## 0.1.0-beta.9 (2026-11-06)
+
+자세한 내용은 `docs/releases/0.1.0-beta.9.md`.
+
+- Collector 활동 분류: 테스트 명령(`pytest`·`go test`·`npm test`·`vitest` 등)은 테스트 구역, TodoWrite·계획 모드·Codex `update_plan`은 회의실로. 명령은 PC 안에서만 보고 서버에는 활동 값만 보냄(#280)
+
 ## 0.1.0-beta.8 (2026-11-06)
 
 자세한 내용은 `docs/releases/0.1.0-beta.8.md`.

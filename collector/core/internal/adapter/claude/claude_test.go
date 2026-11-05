@@ -114,7 +114,7 @@ func TestToolCategoryMapping(t *testing.T) {
 		"Agent":          {adapter.ToolDelegate, adapter.ActivityDelegating},
 		"Task":           {adapter.ToolDelegate, adapter.ActivityDelegating},
 		"Bash":           {adapter.ToolShell, adapter.ActivityUnknown},
-		"TodoWrite":      {adapter.ToolPlan, adapter.ActivityUnknown},
+		"TodoWrite":      {adapter.ToolPlan, adapter.ActivityPlanning},
 		"mcp__srv__tool": {adapter.ToolMCP, adapter.ActivityUnknown},
 		"read":           {adapter.ToolOther, adapter.ActivityUnknown},
 		"SomethingNew":   {adapter.ToolOther, adapter.ActivityUnknown},
@@ -125,6 +125,21 @@ func TestToolCategoryMapping(t *testing.T) {
 		if err != nil || c.ToolCategory != want.cat || c.Activity != want.act {
 			t.Errorf("%s: %s/%s err=%v", name, c.ToolCategory, c.Activity, err)
 		}
+	}
+	// 테스트 명령은 PC 안에서만 보고 testing으로 분류한다. 후보에는 명령 원문이 남지 않는다(#280).
+	for command, want := range map[string]adapter.Activity{"cd web && npx vitest run": adapter.ActivityTesting, "git status": adapter.ActivityUnknown} {
+		payload := fmt.Sprintf(`{"hook_event_name":"PreToolUse",%s,"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":%q}}`, session, command)
+		c, err := ParseHook([]byte(payload), verifiedRuntime)
+		if err != nil || c.ToolCategory != adapter.ToolShell || c.Activity != want {
+			t.Errorf("Bash %q: %s/%s err=%v", command, c.ToolCategory, c.Activity, err)
+		}
+		if strings.Contains(fmt.Sprintf("%+v", c), "vitest") {
+			t.Errorf("candidate keeps command text: %+v", c)
+		}
+	}
+	line := fmt.Sprintf(`{"type":"assistant",%s,"message":{"content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"go test ./..."}}]}}`, strings.Replace(session, `"session_id"`, `"sessionId"`, 1))
+	if out, err := ParseTranscriptLine([]byte(line), verifiedRuntime); err != nil || len(out) != 1 || out[0].Activity != adapter.ActivityTesting {
+		t.Errorf("transcript Bash: %+v err=%v", out, err)
 	}
 	// 도구 이름 없는 도구 이벤트와 비도구 이벤트는 activity unknown이다.
 	c, _ := ParseHook([]byte(`{"hook_event_name":"PreToolUse",`+session+`,"tool_use_id":"t1"}`), verifiedRuntime)
