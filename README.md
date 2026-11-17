@@ -18,7 +18,7 @@
   <img alt="상태" src="https://img.shields.io/badge/status-Beta-yellow?style=flat-square">
   <a href="https://github.com/apg0001/Agent-Office/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/apg0001/Agent-Office/ci.yml?branch=develop&label=CI&style=flat-square"></a>
   <img alt="셀프 호스팅" src="https://img.shields.io/badge/self--hosted-Docker%20Compose-2496ED?style=flat-square">
-  <img alt="라이선스" src="https://img.shields.io/badge/license-미정-lightgrey?style=flat-square">
+  <a href="LICENSE"><img alt="라이선스" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
 </p>
 
 <p align="center">
@@ -168,6 +168,13 @@ docs/                    📚 아키텍처, 설치, 운영, 호환성, 의사결
 - 기여 절차: [CONTRIBUTING.md](CONTRIBUTING.md) (Issue → `develop`에서 브랜치 → PR)
 - 보안 문제 제보: [SECURITY.md](SECURITY.md)
 
-라이선스는 저장소 소유자의 결정 전까지 **미정**입니다. 라이선스가 확정되기 전에는 재배포 조건을 추정하지 마세요.
+**[MIT License](LICENSE)** 로 공개합니다. 누구나 자유롭게 쓰고, 고치고, 다시 배포할 수 있습니다(저작권·라이선스 고지 유지).
+
+함께 들어 있는 서드파티 에셋은 각자의 라이선스를 따릅니다.
+
+| 에셋 | 라이선스 |
+|---|---|
+| [Kenney](https://kenney.nl) 아이소메트릭 사무실 에셋 | CC0 ([License.txt](apps/web/public/office/kenney/License.txt)) |
+| Galmuri 글꼴 | SIL OFL 1.1 ([LICENSE-OFL.md](apps/web/public/fonts/galmuri/LICENSE-OFL.md)) |
 
 <p align="center"><sub>🧑‍💻 오늘도 에이전트들은 출근 중입니다.</sub></p>
