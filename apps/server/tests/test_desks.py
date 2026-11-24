@@ -9,7 +9,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 from helpers import bearer, new_code, register, session_cookie, sign_in
-from sqlalchemy import Engine, text, update
+from sqlalchemy import Engine, select, text, update
 
 from agent_office.api import events as events_api
 from agent_office.db import schema
@@ -130,3 +130,46 @@ def test_each_user_has_a_separate_office(client: TestClient, engine: Engine) -> 
 
     assert list(desks(client, first_session).values()) == [0]
     assert list(desks(client, second_session).values()) == [0]
+
+
+def test_idle_session_desk_goes_to_a_new_session(client: TestClient, engine: Engine) -> None:
+    """종료 신호 없이 멈춘 세션은 OPEN으로 남지만, 숨겨질 만큼 조용하면 책상을 내준다(#291)."""
+    session, device = owner(client, engine)
+    stale, waiting = uuid.uuid4(), uuid.uuid4()
+    send(client, device, stale, "session.started")
+    send(client, device, waiting, "session.started")
+    send(client, device, waiting, "approval.requested")
+    with engine.begin() as connection:
+        connection.execute(
+            update(schema.agent_sessions).values(
+                started_at=text("now() - interval '3 hours'"),
+                last_event_at=text("now() - interval '2 hours'"),
+            )
+        )
+
+    # 서버 세션 ID는 수집 ID와 다르므로 책상 번호로 찾는다.
+    before = {slot: server_id for server_id, slot in desks(client, session).items()}
+    stale_id, waiting_id = before[0], before[1]
+
+    send(client, device, uuid.uuid4(), "session.started")
+    seats = desks(client, session)
+    (newcomer_id,) = set(seats) - {stale_id, waiting_id}
+
+    # 조용한 세션의 0번 책상을 새 세션이 받고, 승인 대기 세션은 자리를 지킨다.
+    # 사무실은 넓어지지 않는다.
+    assert seats[newcomer_id] == 0
+    assert seats[waiting_id] == 1
+    assert seats[stale_id] is None
+    with engine.connect() as connection:
+        lifecycle = connection.execute(
+            select(schema.agent_sessions.c.lifecycle).where(
+                schema.agent_sessions.c.id == uuid.UUID(stale_id)
+            )
+        ).scalar_one()
+        slots = {row.slot_index for row in connection.execute(schema.office_slots.select()).all()}
+    assert lifecycle == "OPEN"
+    assert slots == {0, 1}
+
+    # 다시 활동하면 빈 책상(없으면 새 책상)을 받는다.
+    send(client, device, stale, "turn.started")
+    assert desks(client, session)[stale_id] == 2

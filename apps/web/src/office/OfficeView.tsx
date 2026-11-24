@@ -160,17 +160,17 @@ export function OfficeView({ scope: given, compact = false, title }: OfficeViewP
       let shownHidden = "";
       const show = (state: OfficeState) => {
         latest = state;
-        // 책상 줄 수는 숨기기 전 상태로 정한다(숨겼던 세션이 돌아와도 지도가 바뀌지 않게).
-        const needed = deskRowsFor(state);
-        if (needed !== rows) {
-          // 책상이 모자랄 때만 사무실을 넓힌다. 기존 자리 좌표는 바뀌지 않는다.
-          rows = needed;
-          scene.setMap(createDefaultOffice(rows));
-        }
         // 활동 없는 세션 숨기기(#245): 목록과 지도에 넘기기 전에 거른다. 숨긴 캐릭터는 퇴근하듯 나간다.
         const hidden = hiddenSessionIds(state, state.settings?.hide_idle_after_minutes, Date.now());
         shownHidden = hiddenKey(hidden);
         const visible = withoutHidden(state, hidden);
+        // 책상 줄 수는 보이는 세션으로 정한다. 종료 신호 없이 멈춰 숨겨진 세션이 책상 번호를 붙잡아
+        // 사무실이 계속 커지지 않게 한다(#291). 줄이 줄어도 남은 자리 좌표는 바뀌지 않는다.
+        const needed = deskRowsFor(visible);
+        if (needed !== rows) {
+          rows = needed;
+          scene.setMap(createDefaultOffice(rows));
+        }
         scene.applyState(visible);
         setOffice(visible);
       };

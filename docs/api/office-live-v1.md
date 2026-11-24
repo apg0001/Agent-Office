@@ -11,7 +11,7 @@
 | 배열 | 필드 |
 |---|---|
 | `devices` | `id`, `name`, `owner_name`(팀·통합 화면만, 아래 "사람 이름표" 참고, #206), `connection`(`ONLINE`/`DISCONNECTED`) |
-| `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(개인 사무실 책상 번호, 반납되면 `null`, #48), `project_id`, `project_name`(프로젝트 표시 이름, 없으면 `null`, #197), `workspace_name`(작업 폴더 마지막 이름, 동의하지 않았거나 팀 화면이면 `null`, #181), `change_seq` |
+| `sessions` | `id`, `device_id`, `provider`, `lifecycle`(읽을 때 투영한 값, `UNKNOWN` 포함), `started_at`, `ended_at`, `last_event_at`, `desk_slot`(책상 번호, 반납되면 `null`, #48. 종료 신호 없이 활동 없는 세션 숨기기 기준(`settings.hide_idle_after_minutes`, 승인 대기 제외)을 넘긴 세션은 책상을 새 세션에 내주고 `null`, 다시 활동하면 새 번호, #291), `project_id`, `project_name`(프로젝트 표시 이름, 없으면 `null`, #197), `workspace_name`(작업 폴더 마지막 이름, 동의하지 않았거나 팀 화면이면 `null`, #181), `change_seq` |
 | `agents` | `id`, `session_id`, `parent_agent_id`, `role`(`lead`/`subagent`), `turn_state`, `activity`, `confidence`(현재 활동을 만든 이벤트의 `observed`/`inferred`, #47), `wait_kind`(승인 대기일 때 `permission`/`question`/`plan_review`, 아니면 `null`, #262), `state_version`, `started_at`, `ended_at`, `change_seq` |
 
 - 스냅샷의 세션은 종료되지 않았거나 종료 후 10분이 지나지 않은 것입니다(퇴근 연출용).
