@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import uuid
@@ -203,6 +204,32 @@ def test_stabilize_desks_keeps_seats_and_fills_gaps() -> None:
     slots = [s["desk_slot"] for s in third["sessions"]]
     assert slots == [1, 2, 0, 3]
     assert len(set(slots)) == len(slots)
+
+
+def test_idle_sessions_get_no_team_desk() -> None:
+    """숨겨질 만큼 조용한 세션은 책상 순번에서 빠지고, 승인 대기는 남는다(#291)."""
+    now = dt.datetime(2026, 11, 24, 12, tzinfo=dt.UTC)
+    old = (now - dt.timedelta(hours=2)).isoformat()
+
+    def item(session_id: str, last: str) -> dict[str, Any]:
+        return {**_session(session_id), "ended_at": None, "last_event_at": last, "started_at": last}
+
+    snapshot = {
+        "server_time": now.isoformat(),
+        "settings": {"hide_idle_after_minutes": 60},
+        "sessions": [item("stale", old), item("waiting", old), item("busy", now.isoformat())],
+        "agents": [{"session_id": "waiting", "turn_state": "WAITING_USER", "ended_at": None}],
+    }
+    desks: dict[str, int] = {"stale": 0}
+    office.stabilize_desks(snapshot, desks)
+    assert {s["id"]: s["desk_slot"] for s in snapshot["sessions"]} == {
+        "stale": None,
+        "waiting": 0,
+        "busy": 1,
+    }
+
+    snapshot["settings"] = {"hide_idle_after_minutes": 0}
+    assert office.idle_session_ids(snapshot) == set()
 
 
 def test_team_live_revokes_on_unshare_and_removal(client: TestClient, engine: Engine) -> None:
