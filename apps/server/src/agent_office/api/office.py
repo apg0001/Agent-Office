@@ -307,7 +307,8 @@ def stabilize_desks(snapshot: dict[str, Any], desks: dict[str, int]) -> None:
     세션 하나가 끝나면 뒤 세션들이 한 칸씩 당겨진다(캐릭터가 우르르 자리를 옮기고, change_seq가
     그대로라 클라이언트가 바뀐 번호를 버려 두 대장이 한 책상에 앉았다, #231). 이미 앉은 세션은
     그대로 두고, 새 세션은 시작 순서대로 빈 책상 중 가장 앞 번호를 받는다. `desks`를 갱신한다."""
-    active = [s for s in snapshot["sessions"] if s["lifecycle"] != "ENDED"]
+    idle = idle_session_ids(snapshot)
+    active = [s for s in snapshot["sessions"] if s["lifecycle"] != "ENDED" and s["id"] not in idle]
     keep = {s["id"] for s in active}
     for session_id in [k for k in desks if k not in keep]:
         del desks[session_id]
@@ -320,6 +321,32 @@ def stabilize_desks(snapshot: dict[str, Any], desks: dict[str, int]) -> None:
             desks[session["id"]] = candidate
             used.add(candidate)
         session["desk_slot"] = desks[session["id"]]
+    for session in snapshot["sessions"]:
+        if session["id"] in idle:
+            session["desk_slot"] = None
+
+
+def idle_session_ids(snapshot: dict[str, Any]) -> set[str]:
+    """화면에서 숨겨질 만큼 오래 조용한 세션(#245, 웹 `visibility.ts`와 같은 규칙).
+    책상 순번에서 빼서 종료 신호 없이 멈춘 세션 때문에 사무실이 커지지 않게 한다(#291).
+    승인 대기 세션은 빼지 않는다."""
+    minutes = snapshot.get("settings", {}).get("hide_idle_after_minutes", 0)
+    if not minutes or minutes <= 0 or "server_time" not in snapshot:
+        return set()
+    cutoff = dt.datetime.fromisoformat(snapshot["server_time"]) - dt.timedelta(minutes=minutes)
+    waiting = {
+        a["session_id"]
+        for a in snapshot.get("agents", [])
+        if a["turn_state"] == "WAITING_USER" and a["ended_at"] is None
+    }
+    idle = set()
+    for session in snapshot["sessions"]:
+        if session["lifecycle"] == "ENDED" or session["ended_at"] or session["id"] in waiting:
+            continue
+        last = session.get("last_event_at") or session.get("started_at")
+        if last and dt.datetime.fromisoformat(last) < cutoff:
+            idle.add(session["id"])
+    return idle
 
 
 def team_update(previous: dict[str, Any], current: dict[str, Any]) -> dict[str, Any] | None:
@@ -638,21 +665,17 @@ def _scoped_snapshot(
     connection_of = {d.id: connection_state(d.last_seen_at, now) for d in device_rows}
     owner_of = {d.id: d.owner_user_id for d in device_rows}
     agent_rows = _agent_rows(connection, [s.id for s in session_rows], true())
-    session_json = []
-    desk = 0
-    for row in session_rows:
+    session_json = [
         # 작업 폴더 이름(#181)은 장치 소유자 본인에게만 보인다(팀 화면은 viewer_id가 없음).
-        item = _session_json(
+        _session_json(
             row,
             connection_of,
             now,
             show_workspace=viewer_id is not None and owner_of.get(row.device_id) == viewer_id,
         )
-        if item["lifecycle"] != "ENDED":
-            item["desk_slot"] = desk
-            desk += 1
-        session_json.append(item)
-    return {
+        for row in session_rows
+    ]
+    snapshot = {
         "type": "snapshot",
         "scope": scope,
         "server_time": now.isoformat(),
@@ -670,6 +693,14 @@ def _scoped_snapshot(
         "sessions": session_json,
         "agents": [_agent_json(a) for a in agent_rows],
     }
+    # 책상은 시작 순서 순번. 오래 조용한 세션은 건너뛴다(#291).
+    idle = idle_session_ids(snapshot)
+    desk = 0
+    for item in session_json:
+        if item["lifecycle"] != "ENDED" and item["id"] not in idle:
+            item["desk_slot"] = desk
+            desk += 1
+    return snapshot
 
 
 def build_team_snapshot(connection: Connection, team_id: uuid.UUID) -> dict[str, Any]:
