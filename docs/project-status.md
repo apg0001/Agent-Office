@@ -306,6 +306,7 @@
 220. #280 구역 활용: 테스트 구역·회의실은 보내는 활동이 없어 사실상 쓰이지 않았고(도서관·인터넷은 도구가 짧아 잠깐 들렀다 돌아오는 것이 실제), 소유자 결정으로 머무르게 꾸미지 않고 사실만 분류. Collector `adapter.ShellActivity`가 Bash 명령을 PC 안에서만 보고 테스트면 `testing`(Claude Hook·transcript, Codex 문자열·배열), TodoWrite·EnterPlanMode·ExitPlanMode·`update_plan` → `planning`. 서버·웹·이벤트 계약 변경 없음(기존 enum).
 221. 0.1.0-beta.9 게시(main `46f0cfe`, Collector만, 서버·웹은 beta.8 그대로). 게시 실행 42090340868 전 작업 성공(이번부터 이미지·Collector 게시 워크플로 실행은 에이전트, Environment 승인·`gh release create`는 소유자), `sha256sum -c` 16 OK, beta 채널 manifest 0.1.0-beta.9, Pi Collector beta.9 설치·active, 역병합 #285. Pi Claude 2.1.317 `-p`로 40초짜리 `python3 -m unittest` 실행 뒤 Collector 대기열 0·dead letter 0(전송 거부 없음). 운영 화면의 테스트 구역 이동은 소유자 육안 확인 대기(운영 DB 직접 조회는 하지 않음).
 222. #291 소유자 제보 "사무실이 왜 증식해?": 원인은 SessionEnd 없이 멈춘 세션(터미널 닫기·프로세스 종료)이 OPEN으로 남아(조용하다고 끝내지 않는 원칙) 책상을 영구 점유하고 새 세션마다 슬롯을 늘린 것, 웹 책상 줄 수도 숨기기 전 상태 기준이었음. 수정: `ensure_desk`가 숨기기 기준(`office.hide_idle_after_minutes`, 기본 60분, 0이면 끔, 승인 대기 제외)을 넘긴 세션의 슬롯을 재사용(세션 상태는 OPEN 그대로, 다시 활동하면 새 책상), 팀·통합 책상 순번(`idle_session_ids`)도 같은 규칙, 웹 `deskRowsFor`는 숨긴 뒤 보이는 세션 기준. 운영 DB 직접 조회는 하지 않아 정체 세션 수는 미확인.
+223. 0.1.0-beta.10 운영 반영(main `8d5e05d`, server `sha256:440892ef…`, web `sha256:91d2b513…`, DB 0010, Collector 게시 없음, 2026-11-24). 이미지 게시는 에이전트가 실행·소유자 승인.
 
 ## 이번 변경 요약(#22)
 
@@ -392,7 +393,7 @@
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
 4. 진행 순서(자율, 2026-10-26 갱신):
-   1. 소유자 `gh release create server-v0.1.0-beta.8`·`server-v0.1.0-beta.9`(선택)와 운영 화면에서 테스트 명령 중 테스트 구역·TodoWrite 중 회의실 이동 육안 확인.
+   1. 운영 사무실 크기가 보이는 세션 수에 맞게 줄었는지 소유자 확인(새 세션이 들어올 때 조용한 세션 책상 재사용). 운영 화면에서 테스트 명령 중 테스트 구역·TodoWrite 중 회의실 이동 육안 확인.
    2. 운영에서 PC 2대 이상이 연결된 상태로 활성 세션 PC 묶음·지도 강조를 확인하고, Pi에서 대화형 `claude`로 AskUserQuestion·ExitPlanMode를 띄워 ❓·📋 표시를 확인한다.
    3. 소유자 결정(2026-10-28): 이메일 확인 없이 승인 옵션·주소 변경·SMTP는 하지 않음(신경 쓰지 않아도 됨).
    4. macOS 사용자는 beta.3 설치 파일로 GUI 마법사(#204 수정) 실사용 확인.
