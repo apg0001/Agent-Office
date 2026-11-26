@@ -383,7 +383,7 @@ def _team_snapshot_if_member(
 ) -> dict[str, Any] | None:
     if not team_member(connection, team_id, user_id):
         return None
-    return build_team_snapshot(connection, team_id)
+    return build_team_snapshot(connection, team_id, user_id)
 
 
 async def _live_scoped(
@@ -612,15 +612,54 @@ def _team_session_ids(connection: Connection, team_id: uuid.UUID, now: dt.dateti
     )
 
 
+def _named_device_ids(
+    connection: Connection, team_ids: list[uuid.UUID], now: dt.datetime
+) -> set[uuid.UUID]:
+    """이 팀들을 통해 PC 이름이 팀원에게 보이는 장치. 소유자가 그 팀에서 'PC 이름 공개'
+    (`team_members.share_device_name`)를 켰고, 그 장치의 세션이 바로 그 팀에 보일 때만이다.
+    다른 팀에서 켠 옵션은 이 팀에 영향을 주지 않는다. 옵션을 끄거나 팀을 나가면 다음 계산에서
+    빠진다."""
+    sessions, devices, members = schema.agent_sessions, schema.devices, schema.team_members
+    if not team_ids:
+        return set()
+    sharers: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for row in connection.execute(
+        select(members.c.team_id, members.c.user_id).where(
+            members.c.team_id.in_(team_ids), members.c.share_device_name.is_(True)
+        )
+    ):
+        sharers.setdefault(row.team_id, []).append(row.user_id)
+    named: set[uuid.UUID] = set()
+    for team_id, owners in sharers.items():
+        named.update(
+            connection.execute(
+                select(sessions.c.device_id).where(
+                    sessions.c.id.in_(_team_session_ids(connection, team_id, now)),
+                    sessions.c.device_id.in_(
+                        select(devices.c.id).where(devices.c.owner_user_id.in_(owners))
+                    ),
+                )
+            ).scalars()
+        )
+    return named
+
+
 def _scoped_snapshot(
     connection: Connection,
     now: dt.datetime,
     visible: Any,
     scope: dict[str, str],
     viewer_id: uuid.UUID | None,
+    *,
+    named_devices: set[uuid.UUID],
+    own_workspace: bool,
 ) -> dict[str, Any]:
-    """보이는 세션 집합으로 만든 스냅샷. 남의 장치는 PC 이름 대신 소유자 표시 이름을 쓰고,
-    책상은 화면용 순번(시작 순서)이다. 세션은 한 번만 나온다(여러 팀에 공유돼도)."""
+    """보이는 세션 집합으로 만든 스냅샷. 책상은 화면용 순번(시작 순서)이다. 세션은 한 번만
+    나온다(여러 팀에 공유돼도).
+
+    장치 `name`은 보는 사람 본인 장치와 `named_devices`(소유자가 PC 이름 공개를 켠 장치)만
+    실제 PC 이름이고, 그 밖의 남의 장치는 소유자 표시 이름이다. 작업 폴더 이름은
+    `own_workspace`일 때(통합 화면) 본인 장치 세션에만 담는다."""
     sessions, devices, users = schema.agent_sessions, schema.devices, schema.users
     projects = schema.projects
     session_rows = list(
@@ -663,18 +702,21 @@ def _scoped_snapshot(
         else []
     )
     connection_of = {d.id: connection_state(d.last_seen_at, now) for d in device_rows}
-    owner_of = {d.id: d.owner_user_id for d in device_rows}
     agent_rows = _agent_rows(connection, [s.id for s in session_rows], true())
+    # 작업 폴더 이름(#181)은 장치 소유자 본인에게만, 그것도 통합 화면에서만 보인다.
+    # 팀 화면은 보는 사람이 소유자여도 null이다(팀원과 같은 화면).
+    own_devices: set[uuid.UUID] = set()
+    if own_workspace:
+        own_devices = {d.id for d in device_rows if d.owner_user_id == viewer_id}
     session_json = [
-        # 작업 폴더 이름(#181)은 장치 소유자 본인에게만 보인다(팀 화면은 viewer_id가 없음).
-        _session_json(
-            row,
-            connection_of,
-            now,
-            show_workspace=viewer_id is not None and owner_of.get(row.device_id) == viewer_id,
-        )
+        _session_json(row, connection_of, now, show_workspace=row.device_id in own_devices)
         for row in session_rows
     ]
+
+    def shown_name(device: Any) -> str:
+        revealed = device.owner_user_id == viewer_id or device.id in named_devices
+        return str(device.device_name if revealed else device.display_name)
+
     snapshot = {
         "type": "snapshot",
         "scope": scope,
@@ -683,7 +725,7 @@ def _scoped_snapshot(
         "devices": [
             {
                 "id": str(d.id),
-                "name": d.device_name if d.owner_user_id == viewer_id else d.display_name,
+                "name": shown_name(d),
                 # 팀·통합 화면의 사람 이름표(#206). 내 장치도 내 표시 이름. 이메일은 담지 않는다.
                 "owner_name": d.display_name,
                 "connection": connection_state(d.last_seen_at, now),
@@ -703,20 +745,28 @@ def _scoped_snapshot(
     return snapshot
 
 
-def build_team_snapshot(connection: Connection, team_id: uuid.UUID) -> dict[str, Any]:
-    """팀 사무실 스냅샷. 팀 화면에서는 내 장치도 표시 이름으로 보인다(팀원과 같은 화면)."""
+def build_team_snapshot(
+    connection: Connection, team_id: uuid.UUID, viewer_id: uuid.UUID | None = None
+) -> dict[str, Any]:
+    """팀 사무실 스냅샷. 보는 사람 본인 장치는 PC 이름, 남의 장치는 그 소유자가 이 팀에서
+    PC 이름 공개를 켰을 때만 PC 이름이고 그 밖에는 소유자 표시 이름이다. 작업 폴더 이름은
+    본인에게도 담지 않는다."""
     now: dt.datetime = connection.execute(select(func.now())).scalar_one()
     return _scoped_snapshot(
         connection,
         now,
         _team_session_ids(connection, team_id, now),
         {"kind": "team", "team_id": str(team_id)},
-        None,
+        viewer_id,
+        named_devices=_named_device_ids(connection, [team_id], now),
+        own_workspace=False,
     )
 
 
 def build_combined_snapshot(connection: Connection, user_id: uuid.UUID) -> dict[str, Any]:
-    """통합 큰 사무실(#53): 내 세션 + 내가 속한 모든 팀에 보이는 세션을 한 번씩."""
+    """통합 큰 사무실(#53): 내 세션 + 내가 속한 모든 팀에 보이는 세션을 한 번씩. 남의 장치는
+    그 세션이 보이게 된 팀(나와 함께 속한 팀) 가운데 하나라도 소유자가 PC 이름 공개를 켰으면
+    PC 이름으로 보인다."""
     now: dt.datetime = connection.execute(select(func.now())).scalar_one()
     sessions, devices, members = schema.agent_sessions, schema.devices, schema.team_members
     own = (
@@ -733,7 +783,15 @@ def build_combined_snapshot(connection: Connection, user_id: uuid.UUID) -> dict[
     )
     parts = [own, *(_team_session_ids(connection, t, now) for t in team_ids)]
     visible = union(*parts).subquery()
-    return _scoped_snapshot(connection, now, select(visible.c.id), {"kind": "combined"}, user_id)
+    return _scoped_snapshot(
+        connection,
+        now,
+        select(visible.c.id),
+        {"kind": "combined"},
+        user_id,
+        named_devices=_named_device_ids(connection, team_ids, now),
+        own_workspace=True,
+    )
 
 
 def _require_team(connection: Connection, team_id: uuid.UUID, user_id: uuid.UUID) -> None:
@@ -751,14 +809,14 @@ def combined_office(user: UserDep, connection: DbConnection) -> dict[str, Any]:
 def team_office(team_id: uuid.UUID, user: UserDep, connection: DbConnection) -> dict[str, Any]:
     """팀 사무실 스냅샷. 구성원이 아니면 팀 존재도 드러내지 않는다."""
     _require_team(connection, team_id, user.id)
-    return build_team_snapshot(connection, team_id)
+    return build_team_snapshot(connection, team_id, user.id)
 
 
-@router.get("/api/v1/teams/{team_id}/office/agents/{agent_id}")
-def team_agent_detail(
-    team_id: uuid.UUID, agent_id: uuid.UUID, user: UserDep, connection: DbConnection
-) -> dict[str, Any]:
-    _require_team(connection, team_id, user.id)
+def _team_agent_detail(
+    connection: Connection, team_id: uuid.UUID, agent_id: uuid.UUID, viewer_id: uuid.UUID
+) -> tuple[dict[str, Any], bool] | None:
+    """팀에 보이는 에이전트의 상세와, 그 장치의 PC 이름이 이 팀을 통해 보이는지. 이 팀에 보이지
+    않으면 None. 호출자가 구성원 자격을 먼저 확인한다."""
     now: dt.datetime = connection.execute(select(func.now())).scalar_one()
     agents = schema.agents
     session_id = connection.execute(
@@ -768,7 +826,7 @@ def team_agent_detail(
         )
     ).scalar_one_or_none()
     if session_id is None:
-        raise HTTPException(status_code=404, detail="not_found")
+        return None
     owner = connection.execute(
         select(schema.devices.c.owner_user_id)
         .select_from(
@@ -780,23 +838,39 @@ def team_agent_detail(
     ).scalar_one()
     detail = build_agent_detail(connection, owner, agent_id)
     if detail is None:
-        raise HTTPException(status_code=404, detail="not_found")
+        return None
     # 작업 폴더 이름(#181)은 팀 화면에 보이지 않는다(팀 스냅샷과 같게 소유자 본인에게도 null).
     detail["session"]["workspace_name"] = None
-    # 팀원에게는 PC 이름 대신 소유자 표시 이름을 보여 준다.
     owner_name = connection.execute(
         select(schema.users.c.display_name).where(schema.users.c.id == owner)
     ).scalar_one()
-    detail["device"]["name"] = owner_name
+    # 팀 스냅샷과 같은 규칙: 본인 장치이거나 소유자가 이 팀에서 PC 이름 공개를 켰을 때만
+    # PC 이름, 그 밖에는 소유자 표시 이름.
+    named = uuid.UUID(detail["device"]["id"]) in _named_device_ids(connection, [team_id], now)
+    if owner != viewer_id and not named:
+        detail["device"]["name"] = owner_name
     detail["device"]["owner_name"] = owner_name
-    return detail
+    return detail, named
+
+
+@router.get("/api/v1/teams/{team_id}/office/agents/{agent_id}")
+def team_agent_detail(
+    team_id: uuid.UUID, agent_id: uuid.UUID, user: UserDep, connection: DbConnection
+) -> dict[str, Any]:
+    _require_team(connection, team_id, user.id)
+    found = _team_agent_detail(connection, team_id, agent_id, user.id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="not_found")
+    return found[0]
 
 
 @router.get("/api/v1/office/combined/agents/{agent_id}")
 def combined_agent_detail(
     agent_id: uuid.UUID, user: UserDep, connection: DbConnection
 ) -> dict[str, Any]:
-    """통합 사무실의 상세: 내 에이전트면 개인 상세, 아니면 그것이 보이는 팀의 상세."""
+    """통합 사무실의 상세: 내 에이전트면 개인 상세, 아니면 그것이 보이는 팀의 상세. 남의 장치
+    이름은 통합 스냅샷과 같이, 그것이 보이는 팀 가운데 하나라도 소유자가 PC 이름 공개를 켰으면
+    PC 이름이다."""
     own = build_agent_detail(connection, user.id, agent_id)
     if own is not None:
         # 통합 화면은 사람 이름을 함께 보여 준다(#206). 내 에이전트면 내 표시 이름.
@@ -805,14 +879,21 @@ def combined_agent_detail(
         ).scalar_one()
         return own
     members = schema.team_members
-    for team_id in connection.execute(
-        select(members.c.team_id).where(members.c.user_id == user.id)
-    ).scalars():
-        try:
-            return team_agent_detail(team_id, agent_id, user, connection)
-        except HTTPException:
+    team_ids = list(
+        connection.execute(select(members.c.team_id).where(members.c.user_id == user.id)).scalars()
+    )
+    fallback: dict[str, Any] | None = None
+    for team_id in team_ids:
+        found = _team_agent_detail(connection, team_id, agent_id, user.id)
+        if found is None:
             continue
-    raise HTTPException(status_code=404, detail="not_found")
+        detail, named = found
+        if named:
+            return detail
+        fallback = fallback or detail
+    if fallback is None:
+        raise HTTPException(status_code=404, detail="not_found")
+    return fallback
 
 
 # --- 타임라인 페이지(#38) ---------------------------------------------------------------

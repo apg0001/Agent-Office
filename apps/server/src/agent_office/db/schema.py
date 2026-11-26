@@ -231,6 +231,8 @@ team_members = Table(
     # 이 구성원이 팀에 보여 줄 범위(#197). 새 구성원은 가입·생성 화면의 동의로 정한다.
     # 0009 이전 구성원은 마이그레이션이 'selected'(기존 규칙)로 둔다.
     Column("share_mode", String(16), nullable=False, server_default="all"),
+    # 이 팀의 팀원에게 내 PC 이름을 보여 줄지(0011). 기본은 끔(소유자 표시 이름만 보임).
+    Column("share_device_name", Boolean, nullable=False, server_default="false"),
     PrimaryKeyConstraint("team_id", "user_id"),
     CheckConstraint(_in("role", TEAM_ROLES), name="role"),
     CheckConstraint(_in("share_mode", SHARE_MODES), name="share_mode"),

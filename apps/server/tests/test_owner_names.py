@@ -24,14 +24,22 @@ def test_team_payload_has_owner_name_without_pc_name_or_email(
     share(alice, working_session(alice, "alice-pc"), team)
 
     snapshot = alice.call("GET", f"/teams/{team}/office").json()
-    # 팀 화면은 내 장치도 표시 이름(팀원과 같은 화면), 사람 이름표도 표시 이름.
+    # 팀 화면에서 내 장치는 내게만 PC 이름, 남의 장치는 표시 이름(PC 이름 공개는 기본 끔).
+    # 사람 이름표는 모두 표시 이름.
     assert sorted((d["name"], d["owner_name"]) for d in snapshot["devices"]) == [
-        ("Alice", "Alice"),
         ("Bob", "Bob"),
+        ("alice-pc", "Alice"),
     ]
     dumped = json.dumps(snapshot)
-    assert "bob-secret-pc" not in dumped and "alice-pc" not in dumped
+    assert "bob-secret-pc" not in dumped
     assert email_of(bob) not in dumped and email_of(alice) not in dumped
+    # 같은 팀을 Bob이 보면 반대로 Alice의 PC 이름이 보이지 않는다.
+    seen_by_bob = bob.call("GET", f"/teams/{team}/office").json()
+    assert sorted((d["name"], d["owner_name"]) for d in seen_by_bob["devices"]) == [
+        ("Alice", "Alice"),
+        ("bob-secret-pc", "Bob"),
+    ]
+    assert "alice-pc" not in json.dumps(seen_by_bob)
 
     bob_agent = next(a["id"] for a in snapshot["agents"] if a["session_id"] == bob_session)
     detail = alice.call("GET", f"/teams/{team}/office/agents/{bob_agent}").json()

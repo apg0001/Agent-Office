@@ -683,7 +683,8 @@ td.actions > * + * {
 
 /* 팀 공유 범위(#197): 동의 상자와 팀별 설정. 픽셀 UI처럼 평면 색 + 2px 테두리. */
 .share-consent,
-.share-settings {
+.share-settings,
+.device-name-share {
   margin: 12px 0;
   padding: 8px 10px;
   border: 2px solid var(--ink);
@@ -692,7 +693,8 @@ td.actions > * + * {
 }
 
 .share-consent p,
-.share-settings > p {
+.share-settings > p,
+.device-name-share > p {
   margin: 6px 0 0;
 }
 

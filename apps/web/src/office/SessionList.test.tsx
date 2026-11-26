@@ -39,6 +39,50 @@ describe("session list person names (#206)", () => {
   });
 });
 
+describe("team scope PC names (share_device_name)", () => {
+  // 팀 스냅샷 모양: 공개를 켠 팀원은 name이 PC 이름, 끈 팀원은 name이 표시 이름과 같다.
+  const teamState = () => {
+    const state = createSyntheticOffice({ sessions: 2, subagentsPerSession: 0 });
+    state.devices = [
+      { id: "alice-pc", name: "Alice-Laptop", owner_name: "Alice", connection: "ONLINE" as const },
+      { id: "bob-pc", name: "Bob", owner_name: "Bob", connection: "ONLINE" as const },
+    ];
+    state.sessions = state.sessions.map((s, i) => ({ ...s, device_id: i === 0 ? "alice-pc" : "bob-pc" }));
+    return state;
+  };
+
+  it("shows 'name · PC name' in the PC header only for members who share it", () => {
+    const html = renderToStaticMarkup(<SessionList state={teamState()} onSelect={() => undefined} unnamed />);
+    const heads = [...html.matchAll(/class="device-name" title="([^"]*)">([^<]*)</g)].map((m) => [m[1], m[2]]);
+    expect(heads).toHaveLength(2);
+    expect(heads).toContainEqual(["Alice · Alice-Laptop", "Alice · Alice-Laptop"]);
+    expect(heads).toContainEqual(["Bob", "Bob"]);
+    expect(html).not.toContain("Bob · Bob");
+  });
+
+  it("shows 'name · PC name' on the row when the list is flat", () => {
+    const shared = teamState();
+    shared.sessions = shared.sessions.map((s) => ({ ...s, device_id: "alice-pc" }));
+    const on = renderToStaticMarkup(<SessionList state={shared} onSelect={() => undefined} unnamed />);
+    expect(on).not.toContain("device-head");
+    expect(on.match(/<span class="who">Alice · Alice-Laptop · /g)).toHaveLength(2);
+
+    const hidden = teamState();
+    hidden.sessions = hidden.sessions.map((s) => ({ ...s, device_id: "bob-pc" }));
+    const off = renderToStaticMarkup(<SessionList state={hidden} onSelect={() => undefined} unnamed />);
+    expect(off.match(/<span class="who">Bob · (Claude|Codex|도구)</g)).toHaveLength(2);
+    expect(off).not.toContain("Laptop");
+  });
+
+  it("escapes a shared PC name", () => {
+    const state = teamState();
+    state.devices = state.devices.map((d) => (d.id === "alice-pc" ? { ...d, name: "<img>" } : d));
+    const html = renderToStaticMarkup(<SessionList state={state} onSelect={() => undefined} unnamed />);
+    expect(html).toContain("Alice · &lt;img&gt;");
+    expect(html).not.toContain("<img>");
+  });
+});
+
 describe("session list selection", () => {
   it("marks only the selected session's lead as pressed", () => {
     const state = createSyntheticOffice({ sessions: 2, subagentsPerSession: 0 });

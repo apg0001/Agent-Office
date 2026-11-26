@@ -53,6 +53,9 @@ class TeamSummary(StrictModel):
     role: TeamRole
     # 내가 이 팀에 보여 주는 범위(#197). 다른 구성원의 값은 내보내지 않는다.
     share_mode: ShareMode
+    # 내가 이 팀의 팀원에게 내 PC 이름을 보여 주는지(#298). 기본은 끔.
+    # 다른 구성원의 값은 내보내지 않는다.
+    share_device_name: bool
 
 
 class Member(StrictModel):
@@ -90,7 +93,9 @@ class AcceptBody(StrictModel):
 
 
 class ShareModeBody(StrictModel):
-    share_mode: ShareMode
+    # 둘 다 선택 필드다. 보낸 것만 바꾼다(이전 클라이언트는 share_mode만 보낸다).
+    share_mode: ShareMode | None = None
+    share_device_name: bool | None = None
 
 
 class RoleBody(StrictModel):
@@ -146,15 +151,15 @@ def _require_role(
     return role
 
 
-def _share_mode(connection: Connection, team_id: uuid.UUID, user_id: uuid.UUID) -> str:
+def _sharing(connection: Connection, team_id: uuid.UUID, user_id: uuid.UUID) -> tuple[str, bool]:
+    """이 구성원의 (공유 범위, PC 이름 공개 여부)."""
     members = schema.team_members
-    return str(
-        connection.execute(
-            select(members.c.share_mode).where(
-                members.c.team_id == team_id, members.c.user_id == user_id
-            )
-        ).scalar_one()
-    )
+    row = connection.execute(
+        select(members.c.share_mode, members.c.share_device_name).where(
+            members.c.team_id == team_id, members.c.user_id == user_id
+        )
+    ).one()
+    return str(row.share_mode), bool(row.share_device_name)
 
 
 def _detail(
@@ -168,12 +173,14 @@ def _detail(
         .where(members.c.team_id == team_id)
         .order_by(members.c.joined_at, members.c.user_id)
     ).all()
+    share_mode, share_device_name = _sharing(connection, team_id, user_id)
     return TeamDetail(
         id=team.id,
         name=team.name,
         description=team.description,
         role=role,  # type: ignore[arg-type]
-        share_mode=_share_mode(connection, team_id, user_id),  # type: ignore[arg-type]
+        share_mode=share_mode,  # type: ignore[arg-type]
+        share_device_name=share_device_name,
         members=[
             Member(
                 user_id=r.user_id, display_name=r.display_name, role=r.role, joined_at=r.joined_at
@@ -222,7 +229,14 @@ def create_team(
 def list_teams(user: UserDep, connection: DbConnection) -> list[TeamSummary]:
     teams, members = schema.teams, schema.team_members
     rows = connection.execute(
-        select(teams.c.id, teams.c.name, teams.c.description, members.c.role, members.c.share_mode)
+        select(
+            teams.c.id,
+            teams.c.name,
+            teams.c.description,
+            members.c.role,
+            members.c.share_mode,
+            members.c.share_device_name,
+        )
         .select_from(teams.join(members, members.c.team_id == teams.c.id))
         .where(members.c.user_id == user.id)
         .order_by(teams.c.name, teams.c.id)
@@ -234,6 +248,7 @@ def list_teams(user: UserDep, connection: DbConnection) -> list[TeamSummary]:
             description=r.description,
             role=r.role,
             share_mode=r.share_mode,
+            share_device_name=r.share_device_name,
         )
         for r in rows
     ]
@@ -362,18 +377,18 @@ def remove_member(
 def change_share_mode(
     team_id: TeamId, body: ShareModeBody, user: UserDep, _csrf: CsrfDep, connection: DbConnection
 ) -> TeamDetail:
-    """내가 이 팀에 보여 줄 범위를 바꾼다(#197). 본인 것만 바꿀 수 있고, 팀 사무실 스냅샷·실시간·
-    상세는 매 요청·매 주기 이 값으로 다시 거르므로 바로 반영된다. 'selected'로 돌아오면 전에
-    체크해 둔 프로젝트 공유가 그대로 쓰인다."""
+    """내가 이 팀에 보여 줄 범위(#197)와 PC 이름 공개 여부(0011)를 바꾼다. 본인 것만 바꿀 수
+    있고(경로에 대상 구성원이 없다), 보낸 필드만 바꾼다. 팀 사무실 스냅샷·실시간·상세는 매 요청·
+    매 주기 이 값으로 다시 거르므로 바로 반영된다. 'selected'로 돌아오면 전에 체크해 둔 프로젝트
+    공유가 그대로 쓰인다."""
     role = _require_role(connection, team_id, user)
+    if body.share_mode is None and body.share_device_name is None:
+        raise HTTPException(status_code=422, detail="nothing_to_change")
     members = schema.team_members
-    previous = _share_mode(connection, team_id, user.id)
-    if previous != body.share_mode:
-        connection.execute(
-            update(members)
-            .where(members.c.team_id == team_id, members.c.user_id == user.id)
-            .values(share_mode=body.share_mode)
-        )
+    mine = (members.c.team_id == team_id) & (members.c.user_id == user.id)
+    previous_mode, previous_name = _sharing(connection, team_id, user.id)
+    if body.share_mode is not None and previous_mode != body.share_mode:
+        connection.execute(update(members).where(mine).values(share_mode=body.share_mode))
         audit.record(
             connection,
             "team.share_mode_changed",
@@ -381,7 +396,21 @@ def change_share_mode(
             actor_user_id=user.id,
             target_type="team",
             target_id=team_id,
-            details={"reason": f"{previous}_to_{body.share_mode}"},
+            details={"reason": f"{previous_mode}_to_{body.share_mode}"},
+        )
+    if body.share_device_name is not None and previous_name != body.share_device_name:
+        connection.execute(
+            update(members).where(mine).values(share_device_name=body.share_device_name)
+        )
+        # 켬·끔만 남긴다. PC 이름 자체는 감사 로그에 넣지 않는다.
+        audit.record(
+            connection,
+            "team.device_name_sharing_changed",
+            "success",
+            actor_user_id=user.id,
+            target_type="team",
+            target_id=team_id,
+            details={"reason": "on" if body.share_device_name else "off"},
         )
     return _detail(connection, team_id, role, user.id)
 

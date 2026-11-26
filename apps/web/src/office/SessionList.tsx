@@ -14,7 +14,10 @@ const PROVIDER_LABELS: Record<SessionState["provider"], string> = {
 export interface ActiveSession {
   session: SessionState;
   deviceId: string;
-  /** 행 맨 앞의 "누구" 이름. 팀·통합은 사람 이름(통합의 내 PC는 "내 이름 · PC 이름", #206), 개인은 PC 이름. */
+  /**
+   * 행 맨 앞의 "누구" 이름. 개인은 PC 이름, 팀·통합은 사람 이름(#206). 서버가 PC 이름을 따로 보내면
+   * (내 PC, 또는 팀원이 그 팀에서 "PC 이름 공개"를 켠 PC) "이름 · PC 이름".
+   */
   deviceName: string;
   leadId: string | null;
   /** 대장의 턴 상태(상태순 정렬용). 대장이 없으면 null. */
@@ -23,7 +26,11 @@ export interface ActiveSession {
   subagents: number;
 }
 
-/** 세션 목록 행의 "누구". 사람 이름이 있으면 앞에 두고, PC 이름이 따로 있으면(통합의 내 장치) 뒤에 붙인다. */
+/**
+ * 세션 목록 행·PC 묶음 머리줄의 "누구". 사람 이름이 있으면 앞에 두고, PC 이름이 따로 있으면 뒤에 붙인다.
+ * PC 이름을 보일지는 서버가 정한다: 내 장치이거나 소유자가 그 팀에서 "PC 이름 공개"를 켰을 때만 `name`이
+ * PC 이름이고, 아니면 `name`이 `owner_name`과 같아 이름만 나온다.
+ */
 export function whoFor(device: DeviceState | undefined): string {
   const pc = shortLabel(device?.name, 24);
   const owner = shortLabel(device?.owner_name, 16);

@@ -389,6 +389,13 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
+0. **#298 팀별 'PC 이름 공개' 옵션 — PR 검토 대기(2026-11-26)**. 브랜치 `feat/#298-team-device-name`. `team_members.share_device_name`(마이그레이션 0011, 기본 끔), `PUT /teams/{id}/share-mode`의 선택 필드, 팀·통합 스냅샷과 상세의 PC 이름 규칙, 웹 팀 카드 체크 상자.
+   - 실제 실행(Python 3.13 컨테이너 + `ao-pg-test`, Node 24 컨테이너): `ruff check`·`ruff format --check`·`mypy apps/server/src` 통과, `python -m pytest apps/server/tests tests` 504 통과·4 건너뜀, 웹 `npm run typecheck` 통과, `npm test` 23개 파일 167개 통과, `npm run build` 통과.
+   - 실행 중 고친 것: `teams.py` 주석 한 줄 길이(E501), `deviceNameShare.test.tsx`의 작은따옴표 HTML 이스케이프 단언 1개.
+   - 미실행: 실제 브라우저 확인. `/teams`에서 체크 → 새로고침 → 해제 → 새로고침, 다른 팀원 계정의 팀 사무실 세션 목록·상세에 `이름 · PC 이름`/이름만이 보이는지. `DeviceNameShare`의 `useEffect`와 `TeamsPage`의 `savedEpoch` 연결은 DOM 테스트 환경이 없어 자동 테스트로 덮이지 않는다.
+   - 웹 쪽 결정: 팀 응답에 `share_device_name`이 없으면(이전 서버) 체크 상자를 숨긴다.
+   - 다음 명령: `gh pr checks <PR>`로 CI Gate 확인 → 소유자 브라우저 확인·승인 후 `develop` 병합. 운영 배포 시 DB 0011 적용 필요(열 추가만, 가역).
+   - 참고: 저장소 루트 `node_modules`가 root 소유 빈 폴더라 호스트 `npm ci`가 EACCES로 실패한다. 웹 검증은 `node:24-slim` 컨테이너에 복사해 실행했다.
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).

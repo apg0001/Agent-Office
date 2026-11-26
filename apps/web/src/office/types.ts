@@ -21,7 +21,9 @@ export type Activity =
 
 export interface DeviceState {
   id: string;
-  /** 개인·통합의 내 장치는 PC 이름, 팀 화면·남의 장치는 소유자 표시 이름. */
+  /**
+   * 내 장치는 PC 이름. 남의 장치는 소유자 표시 이름이고, 소유자가 그 팀에서 "PC 이름 공개"를 켠 경우만 PC 이름.
+   */
   name: string;
   /**
    * 사람 이름표(#206): 장치 소유자의 표시 이름. 팀·통합 화면에만 온다(통합의 내 장치는 내 이름).
