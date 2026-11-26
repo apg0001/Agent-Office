@@ -307,6 +307,7 @@
 221. 0.1.0-beta.9 게시(main `46f0cfe`, Collector만, 서버·웹은 beta.8 그대로). 게시 실행 42090340868 전 작업 성공(이번부터 이미지·Collector 게시 워크플로 실행은 에이전트, Environment 승인·`gh release create`는 소유자), `sha256sum -c` 16 OK, beta 채널 manifest 0.1.0-beta.9, Pi Collector beta.9 설치·active, 역병합 #285. Pi Claude 2.1.317 `-p`로 40초짜리 `python3 -m unittest` 실행 뒤 Collector 대기열 0·dead letter 0(전송 거부 없음). 운영 화면의 테스트 구역 이동은 소유자 육안 확인 대기(운영 DB 직접 조회는 하지 않음).
 222. #291 소유자 제보 "사무실이 왜 증식해?": 원인은 SessionEnd 없이 멈춘 세션(터미널 닫기·프로세스 종료)이 OPEN으로 남아(조용하다고 끝내지 않는 원칙) 책상을 영구 점유하고 새 세션마다 슬롯을 늘린 것, 웹 책상 줄 수도 숨기기 전 상태 기준이었음. 수정: `ensure_desk`가 숨기기 기준(`office.hide_idle_after_minutes`, 기본 60분, 0이면 끔, 승인 대기 제외)을 넘긴 세션의 슬롯을 재사용(세션 상태는 OPEN 그대로, 다시 활동하면 새 책상), 팀·통합 책상 순번(`idle_session_ids`)도 같은 규칙, 웹 `deskRowsFor`는 숨긴 뒤 보이는 세션 기준. 운영 DB 직접 조회는 하지 않아 정체 세션 수는 미확인.
 223. 0.1.0-beta.10 운영 반영(main `8d5e05d`, server `sha256:440892ef…`, web `sha256:91d2b513…`, DB 0010, Collector 게시 없음, 2026-11-24). 이미지 게시는 에이전트가 실행·소유자 승인.
+224. 0.1.0-beta.11 운영 반영(main `1d7f723`, 태그 `server-v0.1.0-beta.11`, server `sha256:a0fe7afb…`, web `sha256:b4e29ba3…`, DB 0011, Collector 게시 없음, 2026-11-26). #298(PR #299) 팀별 PC 이름 공개 옵션, #300(PR #301) 릴리스 노트. `deploy/upgrade.sh`: 배포 전 백업 → 마이그레이션 사전 실행(0010→0011) → 이미지 교체 → health·smoke 통과. 이미지 게시는 에이전트가 실행·소유자 승인.
 
 ## 이번 변경 요약(#22)
 
@@ -389,13 +390,10 @@
 
 ## 다음 에이전트가 바로 수행할 작업
 
-0. **#298 팀별 'PC 이름 공개' 옵션 — PR 검토 대기(2026-11-26)**. 브랜치 `feat/#298-team-device-name`. `team_members.share_device_name`(마이그레이션 0011, 기본 끔), `PUT /teams/{id}/share-mode`의 선택 필드, 팀·통합 스냅샷과 상세의 PC 이름 규칙, 웹 팀 카드 체크 상자.
-   - 실제 실행(Python 3.13 컨테이너 + `ao-pg-test`, Node 24 컨테이너): `ruff check`·`ruff format --check`·`mypy apps/server/src` 통과, `python -m pytest apps/server/tests tests` 504 통과·4 건너뜀, 웹 `npm run typecheck` 통과, `npm test` 23개 파일 167개 통과, `npm run build` 통과.
-   - 실행 중 고친 것: `teams.py` 주석 한 줄 길이(E501), `deviceNameShare.test.tsx`의 작은따옴표 HTML 이스케이프 단언 1개.
-   - 미실행: 실제 브라우저 확인. `/teams`에서 체크 → 새로고침 → 해제 → 새로고침, 다른 팀원 계정의 팀 사무실 세션 목록·상세에 `이름 · PC 이름`/이름만이 보이는지. `DeviceNameShare`의 `useEffect`와 `TeamsPage`의 `savedEpoch` 연결은 DOM 테스트 환경이 없어 자동 테스트로 덮이지 않는다.
-   - 웹 쪽 결정: 팀 응답에 `share_device_name`이 없으면(이전 서버) 체크 상자를 숨긴다.
-   - 다음 명령: `gh pr checks <PR>`로 CI Gate 확인 → 소유자 브라우저 확인·승인 후 `develop` 병합. 운영 배포 시 DB 0011 적용 필요(열 추가만, 가역).
-   - 참고: 저장소 루트 `node_modules`가 root 소유 빈 폴더라 호스트 `npm ci`가 EACCES로 실패한다. 웹 검증은 `node:24-slim` 컨테이너에 복사해 실행했다.
+0. **#298 팀별 'PC 이름 공개' 옵션 — 0.1.0-beta.11로 운영 반영(2026-11-26)**. 남은 것은 소유자 브라우저 확인뿐이다.
+   - 미실행: 운영 `/teams`에서 "이 팀에 내 PC 이름 보이기" 체크 → 새로고침 → 해제 → 새로고침, 팀 사무실 세션 목록에 `내 이름 · PC 이름`이 보이는지, 다른 팀원 계정에서 옵션에 따라 `이름 · PC 이름`/이름만이 보이는지.
+   - 문제가 있으면 롤백: `deploy/upgrade.sh --server ghcr.io/apg0001/agent-office-server:0.1.0-beta.10@sha256:440892ef0e7752fcba75e99d09567c5c364f3c14886e5e190d44d72b5d910d8f --web ghcr.io/apg0001/agent-office-web:0.1.0-beta.10@sha256:91d2b513ee774c61acd9791fa540415c5e7b2e9e139de6ee6f414d784721f4dc` 전에 운영 서버 컨테이너에서 `alembic -c /app/alembic.ini downgrade 0010`.
+   - 정리: 정지해 둔 테스트 컨테이너 `docker rm ao-py-test ao-node-test`(에이전트 세션은 삭제가 막혀 있었다). 저장소 루트 `node_modules`가 root 소유 빈 폴더라 호스트 `npm ci`가 EACCES로 실패한다(웹 검증은 `node:24-slim` 컨테이너로 실행).
 1. 완료: PR #89 CI 통과·병합(`9914373`).
 2. 완료: #22 종료, Epic #3 체크리스트(#22) 갱신.
 3. 로컬 테스트 DB 컨테이너는 `docker rm -f ao-pg-test`로 정리한다(다음 DB 작업에 다시 쓰려면 남겨도 된다).
