@@ -74,6 +74,17 @@ describe("AgentPanel", () => {
     expect(html).toContain("(추정)");
     expect(html).toContain("2단계 · 진행 중");
   });
+
+  it("shows a teammate's PC name only when the server sends it (share_device_name)", () => {
+    const shared = render({ ...base, device: { ...base.device, name: "Alice-Laptop", owner_name: "Alice" } }, "server");
+    expect(shared).toContain("<dd>Alice</dd>");
+    expect(shared).toContain("Alice-Laptop · ");
+
+    const hidden = render({ ...base, device: { ...base.device, name: "Alice", owner_name: "Alice" } }, "server");
+    expect(hidden).toContain("<dd>Alice</dd>");
+    expect(hidden).not.toContain("Alice · ");
+    expect(hidden).not.toContain("Laptop");
+  });
 });
 
 describe("fetchAgentDetail", () => {
