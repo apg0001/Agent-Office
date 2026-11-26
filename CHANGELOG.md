@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+## 0.1.0-beta.11 (2026-11-26)
+
+자세한 내용은 `docs/releases/0.1.0-beta.11.md`.
+
 ## 0.1.0-beta.10 (2026-11-24)
 
 자세한 내용은 `docs/releases/0.1.0-beta.10.md`.

@@ -1,9 +1,17 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { Card, Field, Notice } from "./AccountPages";
 import { type SessionInfo, call, messageFor } from "./api";
 import { ShareConsent } from "./ShareConsent";
 import {
+  DEVICE_NAME_SHARE_HELP,
+  DEVICE_NAME_SHARE_IDLE,
+  DEVICE_NAME_SHARE_LABEL,
+  DEVICE_NAME_SHARE_NONE_NOTE,
+  type DeviceNameShareView,
+  deviceNameShareShown,
+  loadUnlessChanged,
+  settleDeviceNameShare,
   ROLE_LABELS,
   SHARE_MODES,
   SHARE_MODE_HELP,
@@ -13,16 +21,20 @@ import {
   type TeamRole,
   canRemove,
   shareModeFromConsent,
+  supportsDeviceNameShare,
   teamPermissions,
+  toggleShareDeviceName,
 } from "./teams";
 
-interface TeamSummary {
+export interface TeamSummary {
   id: string;
   name: string;
   description: string | null;
   role: TeamRole;
   /** 내가 이 팀에 보여 주는 범위(#197). */
   share_mode: ShareMode;
+  /** 내가 이 팀에 PC 이름을 보여 주는지(기본 끔). 이전 서버는 보내지 않는다. */
+  share_device_name?: boolean;
 }
 
 interface Member {
@@ -141,9 +153,112 @@ function ShareSettings({ team, csrf, act, onChanged }: { team: TeamSummary; csrf
   );
 }
 
-type Act = (action: () => Promise<{ ok: boolean; error: string | null }>) => Promise<boolean>;
+/**
+ * 저장에 성공한 팀의 `share_device_name`만 바꾼 새 목록. 다른 팀과 다른 필드는 그대로다.
+ * PC 이름 공개는 이 방식으로 목록 값만 고친다. reload()로 version을 올리면 카드가 이전 응답으로 다시 만들어진다.
+ */
+export function patchShareDeviceName<T extends { id: string; share_device_name?: boolean }>(teams: T[], teamId: string, value: boolean): T[] {
+  return teams.map((team) => (team.id === teamId ? { ...team, share_device_name: value } : team));
+}
 
-function TeamCard({ team, me, csrf, act, reload }: { team: TeamSummary; me: string; csrf: string; act: Act; reload: () => void }) {
+export type Act = (action: () => Promise<{ ok: boolean; error: string | null }>) => Promise<boolean>;
+
+/**
+ * 팀별 "PC 이름 공개" 체크 상자. 기본은 꺼져 있고 내 값만 바꾼다. 저장에 실패하면 체크를 되돌리고
+ * 화면 위쪽 오류 알림(`act`)에 이유를 보여 준다. 서버가 이 필드를 보내지 않으면(이전 서버) 그리지 않는다.
+ */
+export function DeviceNameShare({
+  team,
+  csrf,
+  act,
+  onSaved,
+}: {
+  team: TeamSummary;
+  csrf: string;
+  act: Act;
+  /** 저장에 성공한 값. 부모가 팀 목록의 이 팀 값을 바로 고친다(카드를 다시 만들지 않음). */
+  onSaved: (value: boolean) => void;
+}) {
+  // 표시 값은 props(서버 값)에서 얻고, 저장 중·저장 직후에만 덮어쓴다. 값을 state로 복사해 두면
+  // 카드가 이전 응답으로 다시 만들어질 때 저장 전 값으로 돌아간다.
+  const [view, setView] = useState<DeviceNameShareView>(DEVICE_NAME_SHARE_IDLE);
+  const server = team.share_device_name === true;
+  useEffect(() => {
+    setView((current) => settleDeviceNameShare(server, current));
+  }, [server]);
+  return (
+    <DeviceNameShareBox
+      team={team}
+      checked={deviceNameShareShown(server, view)}
+      saving={view.pending !== null}
+      onToggle={(next) =>
+        void act(() =>
+          toggleShareDeviceName({
+            teamId: team.id,
+            current: server,
+            next,
+            csrf,
+            setView,
+            onSaved,
+            request: (method, path, body, token) => call<unknown>(method, path, body, token),
+          }),
+        )
+      }
+    />
+  );
+}
+
+/** 체크 상자의 모양만. 값과 저장 중 여부는 밖에서 받는다. */
+export function DeviceNameShareBox({
+  team,
+  checked,
+  saving,
+  onToggle,
+}: {
+  team: TeamSummary;
+  checked: boolean;
+  saving: boolean;
+  onToggle: (next: boolean) => void;
+}) {
+  if (!supportsDeviceNameShare(team)) {
+    return null;
+  }
+  const helpId = `device-name-share-help-${team.id}`;
+  return (
+    <div className="device-name-share">
+      <label>
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={saving}
+          aria-describedby={helpId}
+          onChange={(event) => onToggle(event.target.checked)}
+        />{" "}
+        {DEVICE_NAME_SHARE_LABEL}
+      </label>
+      <p className="hint" id={helpId}>
+        {DEVICE_NAME_SHARE_HELP}
+        {team.share_mode === "none" && ` ${DEVICE_NAME_SHARE_NONE_NOTE}`}
+      </p>
+    </div>
+  );
+}
+
+function TeamCard({
+  team,
+  me,
+  csrf,
+  act,
+  reload,
+  onDeviceNameSaved,
+}: {
+  team: TeamSummary;
+  me: string;
+  csrf: string;
+  act: Act;
+  reload: () => void;
+  onDeviceNameSaved: (value: boolean) => void;
+}) {
   const [detail, setDetail] = useState<TeamDetail | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [email, setEmail] = useState("");
@@ -195,6 +310,7 @@ function TeamCard({ team, me, csrf, act, reload }: { team: TeamSummary; me: stri
         <a href={`/?team=${team.id}`}>팀 사무실 보기</a>
       </header>
       <ShareSettings team={team} csrf={csrf} act={act} onChanged={reload} />
+      <DeviceNameShare team={team} csrf={csrf} act={act} onSaved={onDeviceNameSaved} />
       {detail && (
         <table className="members">
           <tbody>
@@ -422,10 +538,27 @@ export function TeamsPage() {
     void call<SessionInfo>("GET", "/api/v1/auth/session").then((result) => setSession(result.data));
   }, []);
 
+  // PC 이름 공개를 저장할 때마다 올린다. 저장보다 먼저 나간 GET /teams 응답이 늦게 와서
+  // 방금 고친 목록을 저장 전 값으로 덮지 않게 한다.
+  const savedEpoch = useRef(0);
+
   useEffect(() => {
-    if (session) {
-      void call<TeamSummary[]>("GET", "/api/v1/teams").then((result) => setTeams(result.data ?? []));
+    if (!session) {
+      return undefined;
     }
+    let cancelled = false;
+    void loadUnlessChanged(
+      () => savedEpoch.current,
+      () => call<TeamSummary[]>("GET", "/api/v1/teams"),
+    ).then((loaded) => {
+      // 끝까지 저장과 겹쳤으면 지금 목록(저장 값이 반영된 것)을 그대로 둔다.
+      if (!cancelled && loaded.fresh) {
+        setTeams(loaded.value.data ?? []);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [session, version]);
 
   const act: Act = async (action) => {
@@ -475,7 +608,18 @@ export function TeamsPage() {
         <ShareConsent checked={shareAll} onChange={setShareAll} />
         {teams.length === 0 && <p className="hint">아직 속한 팀이 없습니다. 팀을 만들거나 초대 링크를 받으세요.</p>}
         {teams.map((team) => (
-          <TeamCard key={`${team.id}-${team.role}-${team.share_mode}-${version}`} team={team} me={session.user.id} csrf={csrf} act={act} reload={reload} />
+          <TeamCard
+            key={`${team.id}-${team.role}-${team.share_mode}-${version}`}
+            team={team}
+            me={session.user.id}
+            csrf={csrf}
+            act={act}
+            reload={reload}
+            onDeviceNameSaved={(value) => {
+              savedEpoch.current += 1;
+              setTeams((list) => patchShareDeviceName(list, team.id, value));
+            }}
+          />
         ))}
       </Card>
       <Projects key={version} teams={teams} csrf={csrf} act={act} />

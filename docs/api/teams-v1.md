@@ -28,9 +28,9 @@
 | 요청 | 설명 |
 |---|---|
 | `POST /teams {name, description, share_mode}` | 만든 사람이 OWNER. 사용자당 소속 팀 50개까지. `share_mode` 생략 시 `all`(#197) |
-| `GET /teams` | 내 팀과 내 역할·내 공유 범위(`share_mode`) |
-| `PUT /teams/{id}/share-mode {share_mode}` | 내가 이 팀에 보여 줄 범위 변경(본인만, 모든 역할). 즉시 반영(#197) |
-| `GET /teams/{id}` / `PATCH` / `DELETE` | 상세(구성원 포함)·수정·삭제 |
+| `GET /teams` | 내 팀과 내 역할·내 공유 범위(`share_mode`)·내 PC 이름 공개 여부(`share_device_name`) |
+| `PUT /teams/{id}/share-mode {share_mode?, share_device_name?}` | 내가 이 팀에 보여 줄 범위(#197)와 PC 이름 공개 여부 변경(본인만, 모든 역할). 두 필드 모두 선택이고 보낸 것만 바뀜. 둘 다 없으면 `422 nothing_to_change`. 응답은 팀 상세. 즉시 반영 |
+| `GET /teams/{id}` / `PATCH` / `DELETE` | 상세(구성원 포함, 내 `share_mode`·`share_device_name`)·수정·삭제 |
 | `PATCH /teams/{id}/members/{user_id} {role}` | MANAGER·MEMBER로만. OWNER 지정은 `409 use_transfer` |
 | `DELETE /teams/{id}/members/{user_id}` | 내보내기 또는 본인 탈퇴. OWNER 탈퇴는 `409 owner_must_transfer` |
 | `POST /teams/{id}/transfer {user_id}` | 대상 구성원이 OWNER, 이전 OWNER는 MANAGER |
@@ -62,7 +62,26 @@
 - **기존 구성원**: 마이그레이션 `0009`가 `selected`로 채워 지금까지의 화면(공유한 프로젝트만)이 그대로입니다. `/teams` 화면에서 바꿉니다.
 - 범위를 바꾸면 팀 사무실 스냅샷·실시간(다음 주기)·상세·타임라인이 바로 그 범위로 다시 걸러집니다. `selected`로 돌아오면 전에 체크해 둔 프로젝트 공유가 다시 쓰입니다(범위를 바꿔도 공유 체크는 지우지 않음).
 - 범위 변경은 감사 로그 `team.share_mode_changed`(`details.reason`: `이전_to_새값`, 예 `selected_to_all`)로 남습니다. 같은 값은 기록하지 않습니다. 팀 만들기·합류 로그(`team.created`·`team.joined`)의 `details.reason`에 `share_all` 같은 처음 범위를 남깁니다.
-- 어떤 범위든 장치 이름(PC 이름)은 소유자 표시 이름으로 바뀌고, 세션의 `workspace_name`은 팀 화면에서 `null`입니다. 다만 폴더 이름으로 자동 만든 프로젝트의 **이름**은 그 프로젝트가 팀에 보이면(`all`이거나 `selected`로 체크) 프로젝트 이름으로 보입니다.
+- 어떤 범위든 팀원에게 장치 이름(PC 이름)은 기본적으로 소유자 표시 이름으로 바뀌고(아래 "PC 이름 공개"를 켠 경우만 예외), 세션의 `workspace_name`은 팀 화면에서 `null`입니다. 다만 폴더 이름으로 자동 만든 프로젝트의 **이름**은 그 프로젝트가 팀에 보이면(`all`이거나 `selected`로 체크) 프로젝트 이름으로 보입니다.
+
+## PC 이름 공개(팀별 선택 옵션)
+
+구성원마다 팀별로 `share_device_name`(불리언)을 가집니다. 기본값은 `false`이고(마이그레이션 `0011`, 기존 구성원 포함), 팀 만들기·초대 수락으로는 켤 수 없습니다. 다른 구성원의 값은 API로 나오지 않습니다.
+
+| 요청 | 본문 | 응답 |
+|---|---|---|
+| `PUT /teams/{id}/share-mode` (세션 + CSRF) | `{"share_device_name": true \| false}` (`share_mode`와 함께 보내도 됨) | `200` 팀 상세(`share_mode`, `share_device_name`, `members` 포함) |
+| `GET /teams`, `GET /teams/{id}` | | 항목마다 내 `share_device_name` |
+
+- 본인 값만 바꿉니다. 경로에 대상 구성원이 없으므로 OWNER·MANAGER도 남의 값을 바꿀 수 없습니다. 구성원이 아닌 팀은 `404 not_found`입니다.
+- `share_mode`만 보내는 이전 클라이언트는 그대로 동작하고 `share_device_name`은 바뀌지 않습니다.
+- 켜면 **이 팀의** 팀 사무실(스냅샷·실시간·상세)에서 팀원에게 내 장치의 `name`이 실제 PC 이름으로 보입니다. 다른 팀에는 영향이 없습니다. 통합 사무실에서는 그 팀을 통해 내 세션을 보는 팀원에게만 보입니다. 정확한 규칙은 `docs/api/office-live-v1.md`의 "사람 이름표" 표입니다.
+- 내 세션이 그 팀에 보일 때만 의미가 있습니다(`share_mode`가 `none`이면 보이는 장치가 없음).
+- 끄거나 팀을 나가면(내보내기 포함) 다음 요청·다음 실시간 주기부터 다시 소유자 표시 이름으로 보입니다.
+- `owner_name`(사람 이름표)과 `workspace_name`(팀 화면에서 항상 `null`)은 이 옵션과 무관합니다.
+- 값이 바뀔 때만 감사 로그 `team.device_name_sharing_changed`(`details.reason`: `on`·`off`)를 남깁니다. PC 이름 자체는 감사 로그에 넣지 않습니다.
+- 웹 화면: `/teams` 팀 카드의 체크 상자 "이 팀에 내 PC 이름 보이기"(기본 꺼짐). `share_device_name`만 보내고, 저장에 실패하면 체크를 되돌리고 오류 문구를 보여 줍니다. 체크 상자의 값은 팀 목록 응답의 값에서 얻고, 저장에 성공하면 응답의 `share_device_name`으로 목록의 그 팀 값만 고칩니다(팀 카드를 다시 만들지 않음).
+- **이전 서버 호환(웹에서 정한 동작)**: 팀 응답에 `share_device_name`이 없거나 불리언이 아니면 체크 상자를 그리지 않습니다. 켤 수 없는 옵션을 보여 주고 저장에 실패하는 것보다 숨기는 쪽을 골랐습니다.
 
 ## 폴더 이름 프로젝트 자동 생성(#197)
 
@@ -89,6 +108,7 @@
 - 내 프로젝트와 공유: 프로젝트 만들기, 팀별 공유 체크, 열린 세션을 프로젝트에 넣기. 폴더 이름으로 자동 만든 프로젝트는 "폴더" 표시.
 - 팀 만들기 아래와 `/invite` 수락 화면에 공유 동의 상자("모두 공유" 미리 체크 + 보이는 것 설명)(#197).
 - 팀 카드마다 "이 팀에 보여 줄 내 작업": 모두 공유 / 선택한 프로젝트만 / 공유 안 함. "선택한 프로젝트만"이면 이 팀에 공유할 내 프로젝트 체크 목록(폴더 프로젝트 포함).
+- 팀 카드마다 "이 팀에 내 PC 이름 보이기" 체크 상자(기본 꺼짐)와 안내("켜면 이 팀 팀원에게 세션 목록과 상세에서 '이름 · PC 이름'으로 보이고, 끄면 이름만 보입니다. 이 팀에만 적용됩니다."). 팀 만들기·초대 수락 화면에는 없습니다.
 
 ## 알려진 제한
 

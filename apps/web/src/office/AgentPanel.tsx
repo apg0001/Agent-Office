@@ -43,7 +43,8 @@ export function AgentPanel({ detail, source, now, onClose, onSelect }: Props) {
   const { agent, session, device, parent, children, timeline, plan_steps: plan } = detail;
   const workspace = workspaceName(session.workspace_name);
   const project = projectName(session.project_name);
-  // 팀·통합 화면은 사람 이름(#206). 팀원의 PC 이름은 서버가 보내지 않는다(이름 자리에 표시 이름이 옴).
+  // 팀·통합 화면은 사람 이름(#206). 팀원의 PC 이름은 그 팀원이 "PC 이름 공개"를 켠 팀에서만 오고,
+  // 아니면 이름 자리에 표시 이름이 와서 PC 이름을 그리지 않는다.
   const owner = device.owner_name?.trim() || null;
   const pc = owner && device.name === device.owner_name ? null : device.name;
 
